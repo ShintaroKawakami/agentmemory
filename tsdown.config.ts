@@ -66,6 +66,13 @@ export default defineConfig([
     clean: false,
     sourcemap: false,
   },
+  {
+    entry: ["src/jtt/scoped-gateway.ts"],
+    outDir: "dist/jtt",
+    ...shared,
+    clean: false,
+    sourcemap: false,
+  },
   // One entry per config block prevents tsdown from hoisting shared
   // helpers into hashed chunks across hooks.
   ...hookEntries.map((entry) => ({

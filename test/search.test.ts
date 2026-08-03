@@ -188,6 +188,40 @@ describe("mem::search", () => {
     expect(hit?.title).toBe("Pineapple belongs on pizza");
   });
 
+  it("fails closed for unscoped and other-project memories when project is filtered", async () => {
+    for (const [id, project] of [
+      ["mem_agent_hub", "agent-hub"],
+      ["mem_jtt_cms", "jtt-cms"],
+      ["mem_legacy", undefined],
+    ] as const) {
+      await kv.set(KV.memories, id, {
+        id,
+        createdAt: "2026-08-03T00:00:00Z",
+        updatedAt: "2026-08-03T00:00:00Z",
+        type: "fact",
+        title: "Scoped handoff marker",
+        content: "Scoped handoff marker for project isolation testing.",
+        concepts: ["handoff"],
+        files: [],
+        sessionIds: [],
+        strength: 7,
+        version: 1,
+        isLatest: true,
+        ...(project ? { project } : {}),
+      });
+    }
+    getSearchIndex().clear();
+    await rebuildIndex(kv as never);
+
+    const result = (await sdk.trigger("mem::search", {
+      query: "scoped handoff marker",
+      project: "agent-hub",
+    })) as { results: Array<{ observation: CompressedObservation }> };
+
+    expect(result.results.map((item) => item.observation.id)).toEqual(["mem_agent_hub"]);
+    expect(result.results[0]?.observation.project).toBe("agent-hub");
+  });
+
   it("rebuildIndex populates the vector index", async () => {
     const mockEmbedder = {
       name: "test",
