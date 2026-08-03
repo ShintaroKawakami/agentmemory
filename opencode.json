@@ -1,0 +1,60 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    "CLAUDE.md"
+  ],
+  "mcp": {
+    "agentmemory-agentmemory": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "/bin/bash",
+        "/Users/shintaro/business/AGENT-HUB/scripts/agentmemory-mcp-remote.sh",
+        "agentmemory"
+      ]
+    },
+    "ai-worker-mcp": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "/Users/shintaro/business/AGENT-HUB/tools/ai-worker-mcp/bin/ai-worker-mcp"
+      ]
+    },
+    "codebase-context-engine-agentmemory": {
+      "type": "remote",
+      "enabled": true,
+      "url": "http://shintaros-mac-mini:8847/mcp",
+      "headers": {
+        "X-API-Key": "{env:CODEBASE_CONTEXT_ENGINE_MCP_API_KEY}"
+      }
+    },
+    "context7": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "npx",
+        "-y",
+        "@upstash/context7-mcp@3.2.0"
+      ]
+    },
+    "shintaro-gbrain": {
+      "type": "remote",
+      "enabled": true,
+      "url": "https://gbrain-mcp.jtt.cafe/mcp"
+    },
+    "stitch": {
+      "type": "remote",
+      "enabled": true,
+      "url": "https://stitch.googleapis.com/mcp",
+      "headers": {
+        "X-Goog-Api-Key": "{env:STITCH_API_KEY}"
+      }
+    },
+    "tech-gbrain": {
+      "type": "remote",
+      "enabled": true,
+      "url": "https://gbrain-mcp.jtt.cafe/mcp"
+    }
+  }
+}

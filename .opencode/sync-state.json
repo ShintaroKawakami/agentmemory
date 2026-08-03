@@ -1,0 +1,46 @@
+{
+  "tool": "opencode",
+  "generated_at": "2026-08-03T23:55:39.500992+09:00",
+  "source_commit": "c801ec1",
+  "project_root": "/Users/shintaro/.codex/worktrees/agentmemory-wave4-agentmemory",
+  "mcp_source": {
+    "registry": "/Users/shintaro/business/AGENT-HUB/docs/codex-mcp-registry.yaml",
+    "definitions": "/Users/shintaro/business/AGENT-HUB/docs/codex-mcp-definitions.yaml",
+    "project": "agentmemory",
+    "enabled_mcp": [
+      "agentmemory-agentmemory",
+      "ai-worker-mcp",
+      "codebase-context-engine-agentmemory",
+      "context7",
+      "shintaro-gbrain",
+      "stitch",
+      "tech-gbrain"
+    ],
+    "optional_mcp": []
+  },
+  "copied_agents": [
+    "backend-architect.md",
+    "backend-developer.md",
+    "chatgpt-image-creator.md",
+    "document-writer.md",
+    "frontend-developer.md",
+    "implementation-auditor.md",
+    "qa-reviewer.md",
+    "quality-engineer.md",
+    "stitch-screen-creator.md",
+    "technical-writer.md",
+    "test-runner.md"
+  ],
+  "warnings": [
+    "PreToolUse command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/storage-url-pr-gate.sh\"",
+    "PreToolUse matcher=Write|Edit|MultiEdit は OpenCode plugin へ未変換",
+    "PreToolUse matcher=Bash|Edit|MultiEdit|Shell|StrReplaceFile|Write|WriteFile は OpenCode plugin へ未変換",
+    "PreToolUse command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/post-merge-gate.sh\"",
+    "PreToolUse matcher=Skill|Task|Agent は OpenCode plugin へ未変換",
+    "SessionStart は OpenCode plugin へ未変換のため対象外",
+    "UserPromptSubmit は OpenCode plugin へ未変換のため対象外",
+    "SubagentStop は OpenCode plugin へ未変換のため対象外",
+    "Stop は OpenCode plugin へ未変換のため対象外",
+    "PostToolUse matcher=Skill|Task|Agent は OpenCode plugin へ未変換"
+  ]
+}

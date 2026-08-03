@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; bash \"$PROJECT_DIR/.cursor/hooks/scripts/block-destructive-git.sh\"'",
+        "timeout": 10
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/block-main-commit.sh\"'",
+        "timeout": 10
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/storage-url-pr-gate.sh\"'",
+        "timeout": 15
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/block-unauthorized-docs-file.sh\"'",
+        "timeout": 10
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/post-merge-gate.sh\"'",
+        "timeout": 10
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/block-skill-reverse-edit.sh\"'",
+        "timeout": 10,
+        "matcher": "Write|Edit|MultiEdit"
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/block-unauthorized-docs-file.sh\"'",
+        "timeout": 10,
+        "matcher": "Edit|MultiEdit|Write"
+      }
+    ],
+    "sessionStart": [
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/freshness-gate.sh\"'",
+        "timeout": 10
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/telemetry-log.sh\"'",
+        "timeout": 5
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/handover-preflight.sh\"'",
+        "timeout": 5
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/pre-implementation-check.sh\"'",
+        "timeout": 5
+      }
+    ],
+    "subagentStop": [
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/subagent-quality-check.sh\"'",
+        "timeout": 30,
+        "loop_limit": 10
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/telemetry-log.sh\"'",
+        "timeout": 5,
+        "loop_limit": 10
+      }
+    ],
+    "stop": [
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/stop-quality-check.sh\"'",
+        "timeout": 30,
+        "loop_limit": 10
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/telemetry-log.sh\"'",
+        "timeout": 5,
+        "loop_limit": 10
+      }
+    ]
+  }
+}

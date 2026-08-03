@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "generated_by": "sync-kimi-from-cc.py",
+  "project_root": ".",
+  "hooks": [
+    {
+      "event": "PreToolUse",
+      "command": "PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; bash \"$PROJECT_DIR/.kimi-code/hooks/scripts/block-destructive-git.sh\"",
+      "matcher": "Bash|Shell",
+      "timeout": 10
+    },
+    {
+      "event": "PreToolUse",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/block-main-commit.sh\"",
+      "matcher": "Bash|Shell",
+      "timeout": 10
+    },
+    {
+      "event": "PreToolUse",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/storage-url-pr-gate.sh\"",
+      "matcher": "Bash|Shell",
+      "timeout": 15
+    },
+    {
+      "event": "PreToolUse",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/block-skill-reverse-edit.sh\"",
+      "matcher": "Write|Edit|MultiEdit|WriteFile|StrReplaceFile",
+      "timeout": 10
+    },
+    {
+      "event": "PreToolUse",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/block-unauthorized-docs-file.sh\"",
+      "matcher": "Write|Edit|MultiEdit|WriteFile|StrReplaceFile|Bash|Shell",
+      "timeout": 10
+    },
+    {
+      "event": "PreToolUse",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/post-merge-gate.sh\"",
+      "matcher": "Bash|Shell",
+      "timeout": 10
+    },
+    {
+      "event": "PreToolUse",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/telemetry-log.sh\"",
+      "matcher": "Skill|Task|Agent",
+      "timeout": 5
+    },
+    {
+      "event": "UserPromptSubmit",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/handover-preflight.sh\"",
+      "timeout": 5
+    },
+    {
+      "event": "UserPromptSubmit",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/pre-implementation-check.sh\"",
+      "timeout": 5
+    },
+    {
+      "event": "Stop",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/stop-quality-check.sh\"",
+      "timeout": 30
+    },
+    {
+      "event": "Stop",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/telemetry-log.sh\"",
+      "timeout": 5
+    }
+  ]
+}

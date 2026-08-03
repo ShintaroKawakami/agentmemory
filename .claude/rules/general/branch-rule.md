@@ -1,0 +1,102 @@
+<!-- [2026-07-29][refactor]
+背景:
+  - ユーザー依頼意図: 常駐ルールダイエット第2弾。全PJに常駐する `branch-rule.md` が15,178字まで肥大化し、
+    現在は撤回済みの allowlist 例外の変遷史（6件のCaDコメント）と長文の手順詳細がセッション開始の
+    コンテキストを圧迫していた。
+  - 守るべき業務ルール: 内容は消さない（reference-over-hardcode.md 原則）。現行の義務・禁止事項は rule に残し、
+    撤回済みの変遷史・長文手順は移設先へ移す二段構え（PR1 #997・PR2 #1001 と同型）。
+  - 他案不採用理由: rule 側に全文を残す案は再肥大化を放置するため不採用。変遷史を単純削除する案は
+    過去の不採用判断（CaD）を再検討する際の参照材料を失うため不採用。
+対応: `.claude/rules/general/branch-rule.md` から `~/business/AGENT-HUB/docs/worktree-operations.md` へ、allowlist変遷史・
+  配布クローズアウト責任の完了条件詳細・事前計画ステップのコマンド列・pre-commit hookピボット手順を移設。
+-->
+
+# ブランチ運用ルール
+
+## main ブランチへの直接コミット・プッシュ
+
+AI エージェントの通常作業では、**main ブランチへの直接コミット・プッシュは禁止**。
+
+Markdown、`sync-state.json`、AI ツール設定、AGENT-HUB 運用設定、MCP 台帳などの軽量変更でも、
+AI は main へ直接 commit / push しない。必ず専用 worktree + feature branch を作成し、PR 経由でマージする。
+
+人間が明示的に「今回は main に直接反映してよい」と承認した場合、または初回 repo 作成直後で
+PR 導線がまだ存在しない場合だけ例外になりうる。AI はこの例外を自己判断で使わず、理由を作業ログに残す。
+
+（過去に運用設定・hook配布物等を段階的に allowlist で main 直接許可した経緯があるが、2026-06-23〜2026-07-01
+で全撤回済み。allowlist 変遷史の全文は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照）。
+
+## 理由
+
+- main checkout は複数 AI / 複数セッションで共有されやすく、軽量変更でも HEAD を掴むと競合や cleanup 失敗の原因になる
+- Markdown や設定だけでも、PR にするとレビュー履歴・CI・merge 後確認・worktree cleanup が同じ型で残る
+- ツールごとに例外を残すと、Claude / Codex / Cursor / Kimi / Antigravity 間で運用がずれる
+- main の最新化は `git pull` ではなく、fetch-only と detached HEAD / 専用 verify worktree で確認すれば足りる
+
+<!-- [2026-07-30][feat] STEP 4: CI の番人を働かせる（R4: マージ根拠のドキュメント明記）
+背景:
+  - ユーザー依頼意図: 2026-07-24 に AGENT-HUB の CI pull_request トリガーを削除した結果、
+    checks が無い PR のマージ根拠が本ルールに書かれておらず、AI がマージ判断時に参照できる
+    正本が無かった（承認済みプラン claude-plans/step4-ci-gate.html の R4）。
+  - 守るべき業務ルール: 常時ロードルールへの追記は新規セクション新設ではなく、既存の
+    branch-rule.md への短い追記に留める（常時ロード台帳の規約により新規常時ロードファイルは
+    作らない）。手順の全文は skills/post-merge/SKILL.md（R2 の使い方）を正本として参照し、
+    ここへ複製しない。
+  - 他案不採用理由: 新規 rule ファイル（例: ci-gate-rule.md）を作る案は、常時ロード許可台帳
+    （registries/always-load-rules.yaml）への理由付き登録が別途必要になり、既存 branch-rule.md
+    と同じ話題（マージ時の運用根拠）が2ファイルに分裂するため不採用。
+対応: 「AGENT-HUB の CI とマージ根拠」節を新設し、R1（.github/workflows/ ありで checks 0件は
+  ローカルゲート代替検証）・R2（registries/merge-gate-suite.yaml が唯一の検査コマンド正本）の
+  要旨だけを3行で明記し、詳細は skills/post-merge/SKILL.md を参照させる。 -->
+## AGENT-HUB の CI とマージ根拠（2026-07-30 STEP 4）
+
+AGENT-HUB の CI は `workflow_dispatch` + `ci/light` ラベル方式（pull_request 自動トリガーは 2026-07-24 に削除済み）。
+PR に checks が無い場合のマージ根拠は `merge-pr.py` のローカル軽量ゲート（`registries/merge-gate-suite.yaml`）。
+台帳未整備のリポでは従来どおり checks 0 件で通す（詳細: `skills/post-merge/SKILL.md`）。
+
+## 配布クローズアウト責任
+
+AGENT-HUB から各 PJ へ配布した差分は、配布を実行した AI / 担当者が最後まで閉じる。
+
+対象: `scripts/deploy-agent-bundle.py` / `scripts/deploy-hooks.py` / `scripts/sync-agents.py` /
+`scripts/bootstrap-skills.py` / `scripts/deploy-skills.py` / `scripts/deploy-rules.py` /
+`/publish-deploy` など、上記を呼ぶ配布コマンド。
+
+配布先 PJ に tracked 差分が出た場合は、feature branch 作成 → 配布差分だけ commit → PR 作成 → CI/review 確認 →
+`merge-pr` でマージ → fetch-only + detached HEAD / verify worktree で取り込み確認 → worktree/branch cleanup →
+`git status --short` clean 確認、まで一連で完了する（詳細な完了条件・禁止・例外の全文は `~/business/AGENT-HUB/docs/worktree-operations.md` 参照）。
+
+禁止: 「これは自分が修正したファイルではない」として配布差分を放置する／未コミットのまま終了する／
+main 直接 push で済ませる／`--push` の成功だけで完了扱いにする。
+
+例外（dry-run のみ・差分なし・既存WIPで安全に branch できない・権限やCI failureで merge できない）の場合も、
+対象 PJ・残っている差分・止めた理由・次の安全な一手を報告する。
+
+## 事前計画ステップ
+
+タスク開始時、変更を伴う作業か確認する（コード変更・JSON/YAML変更・`*.sh`変更・Markdown/sync-state/AIツール設定などの軽量変更）。
+AI 作業で変更がある場合、**最初に専用 worktree + feature branch を作成**してから編集を始める。AI 作業では `main` を checkout しない。
+コマンド列は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
+
+読み取りだけの場合、またはすでに専用 worktree / feature branch 内にいる場合は新規 worktree を作らなくてよい。
+AGENT-HUB から各 PJ へ配布した tracked 差分も「配布クローズアウト責任」に従う。
+
+## pre-commit hook 違反後のピボット
+
+万一 hook（`hook-library/scripts/block-main-commit.sh`）にブロックされた場合は、変更を退避（stash/patch）→
+専用 worktree で feature branch 作成 → 変更復元 → commit/push → PR 作成、の順で復旧する。main の HEAD は
+無変更のまま維持されることを確認する。詳細手順は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
+
+## 関連フック
+
+`hook-library/scripts/block-main-commit.sh` が上記ルールを自動判定・ブロックする。
+
+## 関連ルール
+
+- `.claude/rules/general/worktree-rule.md` — 並列セッション時の worktree 利用
+- `.claude/rules/general/sub-agent-scope-contract.md` — サブエージェント delegate 時の制約
+- `~/business/AGENT-HUB/docs/worktree-operations.md` — allowlist変遷史・配布クローズアウト責任詳細・事前計画コマンド列・pre-commit hookピボット手順の正本
+
+---
+
+**追記ルール: 実測事例・変遷史・長文手順は `~/business/AGENT-HUB/docs/worktree-operations.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**

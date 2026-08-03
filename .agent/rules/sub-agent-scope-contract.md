@@ -1,0 +1,75 @@
+<!-- [2026-07-29][refactor]
+背景:
+  - ユーザー依頼意図: 常駐ルールダイエット第2弾。全PJに常駐する `sub-agent-scope-contract.md` が6,921字まで
+    肥大化し、制定経緯の長文CaDコメントとdelegateテンプレート全文がコンテキストを圧迫していた。
+  - 守るべき業務ルール: 内容は消さない（reference-over-hardcode.md 原則）。義務（3項目+§4/§5）は rule に残し、
+    制定経緯とテンプレート全文は移設先へ移す二段構え（PR1 #997・PR2 #1001 と同型）。
+  - 他案不採用理由: rule 側に全文を残す案は再肥大化を放置するため不採用。制定経緯を削除する案は
+    過去の不採用判断の参照材料を失うため不採用。
+対応: `.claude/rules/general/sub-agent-scope-contract.md` から
+  `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` へ、制定経緯（2026-05-15）・
+  context-engine first 追加経緯（2026-06-24）・delegateプロンプトのテンプレート全文・
+  親側のverifyステップ全文を移設。
+-->
+
+# サブエージェント Scope Contract
+
+サブエージェント（Task / Agent tool）に作業を委譲するとき、delegate 元のプロンプトに**必ず以下 3 項目（コード探索を伴う場合は §4、UI/デザインを伴う場合は §5 を足す）を含める**。制定経緯・テンプレート全文は `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` を参照。
+
+## 1. allowed_files（編集を許可するファイル）
+
+委譲先が編集してよいファイルパスを明示的に列挙する。
+
+例: `「allowed_files: src/api/auth.ts のみ。他は read-only」`
+
+## 2. forbidden_actions（禁止する操作）
+
+委譲先が**してはいけない**操作を明示する。よくある禁止例:
+
+- `auto-format で quote replacement や import 並び替えを実行しない`
+- `スコープ外のファイルを編集しない（読み取りは可）`
+- `テストの skip / xit を追加しない`
+- `existing CaD コメントを削除しない`
+
+## 3. verify before return（返却前の検証手順）
+
+委譲先が作業完了を報告する前に実行する検証を指定する。
+
+例:
+- `git diff --name-only で編集ファイル一覧が allowed_files と一致することを確認`
+- `lint / typecheck を実行してエラーが出ないことを確認`
+- `想定外の編集があった場合は revert してから報告`
+
+## 4. context-engine first（コード探索を伴う委譲・Explore 含む）
+
+委譲タスクが**コードの場所・関数・route・呼び出し関係・影響範囲の探索**を含むなら、prompt に必ず入れる:
+
+- 「まず `codebase-context-engine` を使う（`grep`/`Read` を先に走らせない）。遅延ツールは
+  `select:mcp__codebase-context-engine__list_projects,hybrid_search,search_graph,get_code_snippet` でロード」
+- **解決済みの `project` 名を親が渡す**（親が `list_projects` を見て明示）。
+  `preferred_project` がある場合はそれを使う。
+  `project_scope: ambiguous_worktrees` の場合は、現在の cwd と一致する `root_path` / `preferred_project_candidates` を親が選んでから渡す。
+  subagent に `private-tmp-cbm-...` の長いミラー名を推測させない。
+- 「索引はミラー＝当日新規/変更したファイルは未反映なので、その分だけ `Read` 併用」
+
+理由: 候補圧縮で速く・低コスト（多数 grep/Read を回避）。subagent は本ルールを自動継承しないため親が prompt 注入必須（追加経緯は詳細ドキュメント参照）。
+
+## 5. design-philosophy first（UI/デザインを伴う委譲時）
+
+委譲タスクが**UI・画面・デザイン・レイアウト・コンポーネントの作成/変更**を含むなら、親が prompt に必ず入れる:
+
+- 「まず `~/business/AGENT-HUB/docs/design/design-philosophy.md`（伸太郎殿の設計思想 SSOT）を Read してから着手する」を**必読指定**する。
+- 必ず該当ファイルの**絶対パス**（`~/business/AGENT-HUB/docs/design/design-philosophy.md`）を渡す（委譲先の実行 cwd は消費先PJであり、相対パスでは解決不能なため）。
+- Stitch を使う画面作成は、`stitch-screen-creator` グローバルエージェント（設計思想を step0 で必読にしている）へ委譲するのが既定。
+
+理由: AI Worker（Kimi/Codex/Cursor/GLM 等）自身にデザインセンスが無くても、親が設計思想 doc を必読で渡せば思想に沿った画面を作れる。渡さないと委譲先が自己流判断でずれる。
+
+## delegate プロンプトのテンプレート・親側の verify ステップ
+
+テンプレート全文と、親セッションが `git diff --stat` / `git diff -- <files>` で確認する verify コマンド列は
+`~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` を参照。allowed_files 外に変更が混入していた場合は
+revert し、delegate にやり直しを指示する。
+
+---
+
+**追記ルール: 制定経緯・テンプレート全文の詳細は `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` へ書き、本ルールには義務・トリガーだけ足す（再肥大化防止）。**
