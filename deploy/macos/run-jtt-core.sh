@@ -19,4 +19,17 @@ source "$env_file"
 set +a
 
 cd "$repo_dir"
-exec node dist/cli.mjs --tools core --data-dir "${AGENTMEMORY_DATA_DIR:-$HOME/.agentmemory/data}"
+node_bin="$(command -v node 2>/dev/null || true)"
+if [ -z "$node_bin" ]; then
+  for candidate in /opt/homebrew/bin/node /usr/local/bin/node "$HOME/.local/bin/node"; do
+    if [ -x "$candidate" ]; then
+      node_bin="$candidate"
+      break
+    fi
+  done
+fi
+if [ -z "$node_bin" ]; then
+  echo "agentmemory: node binary not found" >&2
+  exit 127
+fi
+exec "$node_bin" dist/cli.mjs --tools core --data-dir "${AGENTMEMORY_DATA_DIR:-$HOME/.agentmemory/data}"
