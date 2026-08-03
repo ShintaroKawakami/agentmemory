@@ -8,7 +8,15 @@ dist/
 
 *.log
 .DS_Store
-.claude/
+# Keep the canonical project rules under version control; other Claude state
+# remains machine-local and ignored.
+.claude/*
+!.claude/rules/
+!.claude/rules/general/
+!.claude/rules/general/*
+
+# MCP接続設定は各マシンのローカル設定（sync-agents が生成）
+.mcp.json
 
 plugin/scripts/*.map
 plugin/scripts/*.d.mts
@@ -29,3 +37,18 @@ integrations/hermes/__pycache__/
 eval/reports/
 # LongMemEval download is 278MB; fetched on demand
 eval/data/longmemeval/
+
+# AGENT-HUB MANAGED: harness-generated-surfaces START
+.agent/workflows/*
+.agents/skills/*
+.claude/agents/*
+.claude/commands/*
+.claude/skills/*
+.codex/agents/*
+.cursor/agents/*
+.cursor/skills/*
+.gemini/agents/*
+.gemini/settings.json
+.kimi-code/skills/*
+.opencode/agents/*
+# AGENT-HUB MANAGED: harness-generated-surfaces END

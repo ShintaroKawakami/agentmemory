@@ -1,0 +1,168 @@
+---
+description: "Claude Code の正本から生成される Cursor 用ランタイム同期ルール。直接編集しない。"
+alwaysApply: true
+---
+
+<!-- [2026-04-08][feat]
+背景:
+  - ユーザー依頼意図: Cursor CLI を一時的に使う間も、Claude Code 側のルールと判断基準をずらさずに運用したい。
+  - 守るべき業務ルール: 正本は Claude 側に集約し、Cursor 側は最小限の派生物だけを同期する。
+  - 他案不採用理由: `.cursor/` を人手で育てる案は、Claude 側の正本更新と乖離しやすく、復帰時の差分原因になるため不採用。
+対応: Claude 正本の扱いと Cursor 側の行動ルールだけを、最小の Always rule として生成する。
+-->
+
+# Cursor Runtime Sync
+
+このファイルは `sync-cursor-from-cc` で生成された派生物。
+直接編集しないこと。
+
+## 正本
+
+- `CLAUDE.md`
+- `.claude/rules/`
+- `AGENTS.md`
+- `.claude/settings.json`
+- `.claude/hooks/`
+- `.claude/agents/`
+
+## 運用ルール
+
+- Claude Code 側の正本を最優先で扱う
+- `.cursor/` 配下は派生物として扱う
+- `CLAUDE.md` または `.claude/rules/` に変更が入ったら、`sync-cursor-from-cc` を再実行する
+- hooks / agents も Cursor 側で手編集せず、Claude 側ソースから再同期する
+- `.claude/commands/` と `.claude/skills/` / `.cursor/skills/` を優先して使う（AGENT-HUB 正本への symlink。dev-guardrails 必須）
+- `.cursor/rules/*.mdc` は `.claude/rules/*.md` からの生成物として扱う
+- `.cursorrules` は legacy 扱いのため生成しない（2026-05-04 以降）
+- hook 対応範囲は `.cursor/hooks.json` の生成結果と公式ドキュメントを基準に確認し、未対応イベントは warnings に残す
+- `rulesync` は使わない
+
+## 生成元情報
+
+- warnings: `10`
+- source_files:
+- `CLAUDE.md`
+- `.claude/rules/general/ai-model-selection.md`
+- `.claude/rules/general/branch-rule.md`
+- `.claude/rules/general/constructive-dissent.md`
+- `.claude/rules/general/hooks-structure-rule.md`
+- `.claude/rules/general/latest-stack-context7.md`
+- `.claude/rules/general/mandate-registry.md`
+- `.claude/rules/general/mcp-key-management.md`
+- `.claude/rules/general/memory-lookups.md`
+- `.claude/rules/general/plan-approval-gate.md`
+- `.claude/rules/general/plan-commitment-tracking.md`
+- `.claude/rules/general/reference-over-hardcode.md`
+- `.claude/rules/general/response-style.md`
+- `.claude/rules/general/responsive-both-viewports.md`
+- `.claude/rules/general/settings-protection-coexistence.md`
+- `.claude/rules/general/sub-agent-scope-contract.md`
+- `.claude/rules/general/ui-stitch-mandatory.md`
+- `.claude/rules/general/visual-progress-map.md`
+- `.claude/rules/general/worktree-rule.md`
+- `AGENTS.md`
+- `.claude/settings.json`
+- `.claude/hooks/.hook-library-version`
+- `.claude/hooks/lib/code-quality-check.md`
+- `.claude/hooks/lib/hook-io.sh`
+- `.claude/hooks/lib/quality-check-common.sh`
+- `.claude/hooks/lib/storage-url-common.py`
+- `.claude/hooks/scripts/block-destructive-git.sh`
+- `.claude/hooks/scripts/block-destructive-git.test.sh`
+- `.claude/hooks/scripts/block-main-commit.sh`
+- `.claude/hooks/scripts/block-main-commit.test.sh`
+- `.claude/hooks/scripts/block-skill-reverse-edit.sh`
+- `.claude/hooks/scripts/block-skill-reverse-edit.test.sh`
+- `.claude/hooks/scripts/block-unauthorized-docs-file.sh`
+- `.claude/hooks/scripts/block-unauthorized-docs-file.test.sh`
+- `.claude/hooks/scripts/freshness-gate.sh`
+- `.claude/hooks/scripts/handover-preflight.sh`
+- `.claude/hooks/scripts/handover-preflight.test.sh`
+- `.claude/hooks/scripts/post-merge-gate.sh`
+- `.claude/hooks/scripts/post-merge-gate.test.sh`
+- `.claude/hooks/scripts/pre-implementation-check.sh`
+- `.claude/hooks/scripts/stop-quality-check.sh`
+- `.claude/hooks/scripts/storage-url-pr-gate.sh`
+- `.claude/hooks/scripts/subagent-quality-check.sh`
+- `.claude/hooks/scripts/takeover-preflight.sh`
+- `.claude/hooks/scripts/takeover-preflight.test.sh`
+- `.claude/hooks/scripts/telemetry-lib.sh`
+- `.claude/hooks/scripts/telemetry-log.sh`
+- `.claude/hooks/scripts/telemetry-log.test.sh`
+- `.claude/agents/backend-architect.md`
+- `.claude/agents/backend-developer.md`
+- `.claude/agents/chatgpt-image-creator.md`
+- `.claude/agents/document-writer.md`
+- `.claude/agents/frontend-developer.md`
+- `.claude/agents/implementation-auditor.md`
+- `.claude/agents/qa-reviewer.md`
+- `.claude/agents/quality-engineer.md`
+- `.claude/agents/stitch-screen-creator.md`
+- `.claude/agents/technical-writer.md`
+- `.claude/agents/test-runner.md`
+- generated_rules:
+- `.cursor/rules/general/ai-model-selection.mdc`
+- `.cursor/rules/general/branch-rule.mdc`
+- `.cursor/rules/general/constructive-dissent.mdc`
+- `.cursor/rules/general/hooks-structure-rule.mdc`
+- `.cursor/rules/general/latest-stack-context7.mdc`
+- `.cursor/rules/general/mandate-registry.mdc`
+- `.cursor/rules/general/mcp-key-management.mdc`
+- `.cursor/rules/general/memory-lookups.mdc`
+- `.cursor/rules/general/plan-approval-gate.mdc`
+- `.cursor/rules/general/plan-commitment-tracking.mdc`
+- `.cursor/rules/general/reference-over-hardcode.mdc`
+- `.cursor/rules/general/response-style.mdc`
+- `.cursor/rules/general/responsive-both-viewports.mdc`
+- `.cursor/rules/general/settings-protection-coexistence.mdc`
+- `.cursor/rules/general/sub-agent-scope-contract.mdc`
+- `.cursor/rules/general/ui-stitch-mandatory.mdc`
+- `.cursor/rules/general/visual-progress-map.mdc`
+- `.cursor/rules/general/worktree-rule.mdc`
+- `.cursor/rules/10-runtime-sync.mdc`
+- generated_hooks:
+- `.cursor/hooks.json`
+- `.cursor/hooks/.hook-library-version`
+- `.cursor/hooks/lib/code-quality-check.md`
+- `.cursor/hooks/lib/hook-io.sh`
+- `.cursor/hooks/lib/quality-check-common.sh`
+- `.cursor/hooks/lib/storage-url-common.py`
+- `.cursor/hooks/scripts/block-destructive-git.sh`
+- `.cursor/hooks/scripts/block-destructive-git.test.sh`
+- `.cursor/hooks/scripts/block-main-commit.sh`
+- `.cursor/hooks/scripts/block-main-commit.test.sh`
+- `.cursor/hooks/scripts/block-skill-reverse-edit.sh`
+- `.cursor/hooks/scripts/block-skill-reverse-edit.test.sh`
+- `.cursor/hooks/scripts/block-unauthorized-docs-file.sh`
+- `.cursor/hooks/scripts/block-unauthorized-docs-file.test.sh`
+- `.cursor/hooks/scripts/cursor-command-bridge.sh`
+- `.cursor/hooks/scripts/freshness-gate.sh`
+- `.cursor/hooks/scripts/handover-preflight.sh`
+- `.cursor/hooks/scripts/handover-preflight.test.sh`
+- `.cursor/hooks/scripts/post-merge-gate.sh`
+- `.cursor/hooks/scripts/post-merge-gate.test.sh`
+- `.cursor/hooks/scripts/pre-implementation-check.sh`
+- `.cursor/hooks/scripts/stop-quality-check.sh`
+- `.cursor/hooks/scripts/storage-url-pr-gate.sh`
+- `.cursor/hooks/scripts/subagent-quality-check.sh`
+- `.cursor/hooks/scripts/takeover-preflight.sh`
+- `.cursor/hooks/scripts/takeover-preflight.test.sh`
+- `.cursor/hooks/scripts/telemetry-lib.sh`
+- `.cursor/hooks/scripts/telemetry-log.sh`
+- `.cursor/hooks/scripts/telemetry-log.test.sh`
+- generated_agents:
+- `.cursor/agents/backend-architect.md`
+- `.cursor/agents/backend-developer.md`
+- `.cursor/agents/chatgpt-image-creator.md`
+- `.cursor/agents/document-writer.md`
+- `.cursor/agents/frontend-developer.md`
+- `.cursor/agents/implementation-auditor.md`
+- `.cursor/agents/qa-reviewer.md`
+- `.cursor/agents/quality-engineer.md`
+- `.cursor/agents/stitch-screen-creator.md`
+- `.cursor/agents/technical-writer.md`
+- `.cursor/agents/test-runner.md`
+- generated_mcp:
+- なし
+- generated_skills:
+- なし
