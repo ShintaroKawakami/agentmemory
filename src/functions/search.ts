@@ -504,11 +504,12 @@ export function registerSearchFunction(sdk: ISdk, kv: StateKV): void {
             //      null and the entry passes through as unscoped. This is the safe
             //      fallback: we lose the ability to filter but never incorrectly
             //      block a result whose session we can no longer verify.
-            // In both cases, a null memProject means "project unknown — treat as
-            // unscoped and let it through" to preserve backward-compatibility.
+            // A project-filtered lookup must fail closed when ownership cannot
+            // be proven. Unscoped legacy rows remain available to unfiltered
+            // searches, but never cross a project boundary by accident.
             if (projectFilter) {
               const memProject = await loadMemoryProject(r.obsId)
-              if (memProject !== null && memProject !== projectFilter) continue
+              if (memProject !== projectFilter) continue
             }
             // cwd filter does not apply to unbound entries.
           }
