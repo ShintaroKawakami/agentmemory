@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `7c8e790ccd6ce37b82c706b80e8502f519f72b4277ae5635315588b50ef6232c`
+- effective hash: `f5b77467ff8a53e712da5d3a2fe991ebc226abe1ab5c9b95c58c0c79994eb1bc`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -1358,6 +1358,31 @@ Stitch 由来のファイルを散らかさないため、保存先を固定す�
 
 - 既存 UI の微修正（typo 修正・1 色だけ変更など、**見た目の方針が変わらない**もの）。
 - UI に変化を伴わない純粋なロジック修正。
+- **写真・イラスト・商品画像・掲示物の図解**（画面レイアウトではなく「絵そのもの」を作る作業）。
+  → Stitch ではなく下記「画像生成」の導線を使う。
+
+## 画像生成（写真・イラスト・図解）は手順を読んでから着手する（強制）
+
+Stitch の対象外である**絵そのもの**（商品写真・HP 用画像・バナー・掲示物の図解等）を ChatGPT で作る時は、
+**着手前に必ず `~/business/AGENT-HUB/agents/global/chatgpt-image-creator.md` と
+`~/business/AGENT-HUB/agents/config/chatgpt-image-creator.yaml` を読む**。
+
+- **サブエージェントへ委譲する時も、PM / 親セッションが自分でやる時も同じ**。
+  「自分でやるから読まなくていい」は不可（読まずに始めた結果、既知の失敗を踏み直した実測あり）。
+- 手順の正本は上記2ファイル。本ルールは義務とトリガーだけを持ち、手順を複製しない
+  （`plan-approval-gate` / 本ルール上部の Stitch と同じ二段構え）。
+
+### トリガー
+
+「画像を作って」「写真を生成して」「イラストを作って」「バナー作って」「図解を作り直して」
+「ChatGPT で画像」など。判断に迷う場合は**読む側**に倒す（読むコストは小さく、踏み直すコストは大きい）。
+
+### なぜ強制するか
+
+2026-08-05、jtt-cafe-pj の掲示物で図解を差し替えた際、手順を読まずに着手した結果、
+①自分で開いたタブが数秒で閉じる ②送信できていないのに成功と誤認 ③古い応答を最新と誤認、
+を繰り返して**10回以上リトライを空費**した。いずれも上記2ファイルに対処が書かれている
+（タブ借用ファースト / 送信の実証 / 停止ボタンでの完了判定 / 手渡し fallback）。
 
 ## MCP 前提
 
@@ -1382,6 +1407,7 @@ Stitch MCPの接続definitionは`~/business/AGENT-HUB/docs/codex-mcp-definitions
 - `registries/harness-manifest.yaml` — global / harness type / projectの採否とsurface契約
 - `~/business/AGENT-HUB/docs/design/design-philosophy.md` — 伸太郎殿の設計思想 SSOT
 - `agents/global/stitch-screen-creator.md` — Stitch 画面作成グローバルエージェント
+- `agents/global/chatgpt-image-creator.md` / `agents/config/chatgpt-image-creator.yaml` — **画像生成（絵そのもの）の手順 SSOT**。本ルールの「画像生成」節が指す先
 
 ---
 
