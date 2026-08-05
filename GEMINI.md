@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `80ea31e54e4d711ec82459f12f79d4d94a4edd3be2d21e41950adf72e91dab9f`
+- effective hash: `7c8e790ccd6ce37b82c706b80e8502f519f72b4277ae5635315588b50ef6232c`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -444,6 +444,71 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 - `.claude/rules/general/plan-commitment-tracking.md` — 承認済みプラン条項の実行追跡
 - `skills/adversarial-review/SKILL.md` — **本ルールの手順 SSOT**（dev / business の 2 モード・発火条件・証拠水準・自己反証・分布点検）。本ルールは義務、スキルは手順の二段構えとし、手順本文をここへ複製しない
 - `skills/codex-review/SKILL.md` — レビュー時の個人開発スケール校正
+
+### general/gbrain-recall.md
+
+<!-- [2026-08-04][feat] G-Brain ハーネス Phase 1（gbrain-recall rule 新設）
+背景:
+  - ユーザー依頼意図: 承認済み仕様書「G-Brain ハーネス設計仕様書（v2）」D6（リコール層）に基づき、
+    バグ修正・障害調査・経営相談・戦略検討などの**通常の会話**でも、AI が能動的に G-Brain
+    （shintaro-gbrain / tech-gbrain）や agentmemory を検索しに行く発火条件を明文化したい。
+    従来は plan 入口の preflight（plan-commitment-registry seq 0.1/0.15）・保存先の3層判断
+    （agentmemory-routing）・closeout 時の候補提示（handover-manual）はあったが、非 plan の
+    日常会話で「読みに行く」入口が欠けていた（仕様書 D9 の役割分担精査で確認済みの穴）。
+  - 守るべき業務ルール: 本ルールは仕様書 D9 の役割分担表に厳密に従い、非 plan の日常会話における
+    「読む側」の発火条件だけを担当する。plan 入口 preflight・保存先の3層判断・put_page の安全手順・
+    closeout 候補提示は、それぞれの既存正本（下記 §0 参照）を複製しない（reference-over-hardcode）。
+  - 他案不採用理由:
+    1) 発火条件を dev-guardrails / business-guardrails 等の各スキルへ個別に埋め込む案は、条件表が
+       複数ファイルに分散し改訂のたび全部を直す必要が生じるため不採用（本ルールへ集約し各スキルは
+       1行参照に留める）。
+    2) global CLAUDE.md（`~/.claude/CLAUDE.md`）に置く案は Claude Code 専用で Codex / Cursor / Kimi /
+       Antigravity へ届かないため不採用（D6 記載のとおり）。AGENT-HUB rule + manifest 配布が
+       全クライアントに届く唯一の経路。
+対応: `.claude/rules/general/gbrain-recall.md` を新設。常時ロード（`registries/always-load-rules.yaml`
+  へ理由付き登録）とし、manifest v2 global 層（`registries/harness-manifest.yaml`）から全クライアントへ
+  配布する。
+-->
+
+# G-Brain リコール層（会話中の「読む側」発火条件）
+
+## 0. scope 宣言（重複防止・複製しない）
+
+本ルールは **非 plan の日常会話における「読む側」の発火条件だけ** を定義する。以下は別の正本が担当し、
+本ルールでは内容を複製しない（G-Brain ハーネス設計仕様書 D9 役割分担表）:
+
+| 責務 | 正本（変更しない・本ルールは複製しない） |
+|------|------|
+| plan 入口の preflight（読む） | `skills/plan-approval/plan-commitment-registry.yaml` seq 0.1 / 0.15 |
+| 保存先の3層判断（書く） | `skills/agentmemory-routing/SKILL.md` + `agent-memory/registry/placement-policy.md` |
+| put_page の安全手順・承認ゲート・合図式保存 | `skills/shintaro-gbrain/SKILL.md` |
+| closeout 時の GBrain 候補承認キュー | `skills/handover-manual/SKILL.md`（合図式＝会話中の即時承認、closeout＝session 末の候補提示で別物） |
+| auto-memory の参照 | `.claude/rules/general/memory-lookups.md`（相互参照のみ、内容は複製しない） |
+| 敵対的レビュー手順（business） | `skills/adversarial-review/references/business-review.md` |
+
+## 1. 発火条件表
+
+会話の中でユーザー発話や作業内容が次のいずれかに該当したら、応答を出す前に該当 brain を検索する。
+
+| 発話・作業の性質 | 検索する先 | 例 |
+|---|---|---|
+| バグ修正・障害調査・回帰の原因特定 | `tech-gbrain`（`mcp__tech-gbrain__search` / `recall`） | 「〇〇が直らない」「なぜこのエラーが出るか」「前も似た不具合あったはず」 |
+| 経営相談・戦略・クレーム対応・売上・オペレーション改善 | `shintaro-gbrain`（`mcp__shintaro-gbrain__search` / `recall`） | 「この施策どう思う」「クレームにどう対応すべきか」「オペレーションを改善したい」 |
+| 作業再開・引き継ぎ・「あの続き」 | `agentmemory`（continuation） | 「〇〇の続き」「前回どこまでやったか」 |
+
+判断に迷う場合は検索する側に倒す（誤爆コストは低く、未検索コストは高い）。
+
+## 2. 検索実行の判断はモデル側に残す
+
+本ルールは「検索しに行くべきタイミング」を定義するだけで、検索実行を強制する hook ではない。
+`hook-library` の UserPromptSubmit hook（`gbrain-recall-preflight`）は軽量キーワード検知による
+短いリマインドだけを担い、実際に検索するかどうかの判断はモデル自身が行う（仕様書 D6）。
+
+## 3. 関連
+
+- 手順・落とし穴の詳細: `skills/shintaro-gbrain/SKILL.md`
+- 保存先判断の詳細: `skills/agentmemory-routing/SKILL.md`
+- 仕様書: `claude-plans/2026-08-04-jtt-gbrain-harness-spec.md`（D6 / D9）
 
 ### general/hooks-structure-rule.md
 
@@ -885,6 +950,15 @@ rule に置いて plan-approval-gate（義務）/ plan-approval（手順）と�
   - 守るべき業務ルール: 義務文言（台帳全消化まで完了宣言しない・明示保留・虚偽✓禁止・AI worker摩擦は1回で発火）は弱めない。
   - 他案不採用理由: 実例長文（2026-06-26 part4-2/PR#522、2026-07-06 /goal 8回反復）を本文に残す案は常駐コストが高いため不採用とし `skills/plan-approval/references/commitment-examples.md` へ移設。 -->
 
+<!-- [2026-08-03][fix] worker が実行していない検証コマンドの結果を報告に貼る事例（jtt-cms・Antigravity/Gemini 3.6 Flash 委譲）を受け対策追加。
+背景:
+  - 守るべき業務ルール: worker のサンドボックスでコマンドが実行不能な場合、「既存資産の移植・コピー」型タスクは記憶による再実装にすり替わり得る。
+    一部項目を正直に「未実行」と書いていても、他項目の実行結果が真である保証にはならない。
+  - 他案不採用理由:
+    1) worker の報告フォーマットを厳格化する案 → 捏造は書式では防げないため単独では不採用。
+    2) completion_gate に出力検証を追加する案 → コマンド実行の真偽をハーネス側で機械判定するのは困難で影響範囲も大きい。まず統括役の義務として閉じる。
+対応: 項目3へ「worker報告の検証結果は証拠にしない」を追加。詳細実例は `skills/agent-dispatch/references/model-selection-evidence.md`、委譲判断ガードは `skills/agent-dispatch/SKILL.md` へ接続。 -->
+
 # プラン・コミットメント追跡ルール（承認済みプランの条項を必ず実行で拾う）
 
 ## 原則
@@ -904,6 +978,7 @@ rule に置いて plan-approval-gate（義務）/ plan-approval（手順）と�
 2. **節目ごとに突き合わせ**: 各 PR / フェーズ完了時に standing 条項を読み返し、観測した live な失敗・回避策を突き合わせる。
 3. **workaround 自問**: 回避策を打った瞬間に「これは共通基盤・委譲ツール・SSOT の不具合か?」を自問し、Yes なら **end-of-run の正本修正タスクをその場で起票**する。
    - **AI worker 摩擦は「観測＝即発火」**: トークン超過・誤検知・空diff・停滞・誤完了申告等を **1 回でも観測したら** `env 起因`で片付けず、**その時点で end-of-run 修正タスクを起票する**。「回避できたから OK」では閉じない。実例は `commitment-examples.md`。
+   - **worker の報告に貼られた検証コマンドの実行結果は、それ自体を証拠として採用しない**（実行していないコマンドの出力をそのまま貼ることがある。一部項目を正直に「未実行」と書いていても、他項目の実行結果が真である保証にはならない）。受け入れ条件に検証コマンドを含めた場合は、統括役が同じコマンドを自分の環境で実走して照合するまで完了扱いにしない。既存資産の「移植・コピー」型タスクは、上流と `diff` を取って一致を機械確認する。詳細・実例は `skills/agent-dispatch/SKILL.md`「失敗の能動検知」および `skills/agent-dispatch/references/model-selection-evidence.md`（2026-08-03）参照。
 4. **条件トリガーはカウンタ監視**: 「X回起きたら直す」型は発生回数を監視し閾値到達で自動タスク化する。ただし **AI worker 摩擦はカウンタ閾値を待たない（1 回で発火）**。
 5. **台帳全消化まで完了宣言しない**: 全項目が「実施済み」または「明示的に保留（ユーザー判断・別プラン）」になるまで「完了」と宣言しない。
 6. **人間ゲート / オーナー操作の行は「明示保留」で解決＝全消化に数える（虚偽の✓化はしない）**: 本番投入・オーナー実機検証・承認待ちなど**AI が構造的に実行できない行**は `owner` と台帳に明記し「明示保留」として全消化に数える。**未実施を completed(✓) と偽らない／無承認で本番反映しない**。「全部✓」型 Goal と衝突しても明示保留を優先。利用者の明示 GO が揃って初めて実行可能。
