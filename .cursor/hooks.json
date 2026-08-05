@@ -57,6 +57,11 @@
     "beforeSubmitPrompt": [
       {
         "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/gbrain-recall-preflight.sh\"'",
+        "timeout": 5
+      },
+      {
+        "type": "command",
         "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/handover-preflight.sh\"'",
         "timeout": 5
       },

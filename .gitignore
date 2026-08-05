@@ -48,7 +48,16 @@ eval/data/longmemeval/
 .cursor/agents/*
 .cursor/skills/*
 .gemini/agents/*
-.gemini/settings.json
 .kimi-code/skills/*
 .opencode/agents/*
 # AGENT-HUB MANAGED: harness-generated-surfaces END
+
+# [2026-08-05][fix][SEC] ツール別 MCP / クライアント設定の派生物は git 追跡しない
+#   - 背景: ハーネス配布時、.gemini/settings.json に GCP 実キーが入ったまま追跡対象となり
+#     GitHub push protection がブロックした（push 拒否・漏えいは未発生）。
+#   - 守るべき業務ルール: mcp-key-management（実値の SSOT は ~/.config/agent-hub/.env。
+#     クライアント別生成物はローカル展開のみ）。他 PJ（jtt-cms 等）と同じ除外に揃える。
+#   - 他案不採用理由: 実キーを ${VAR} 参照へ書き換える案は Gemini が補間しないため動作しない。
+.gemini/settings.json
+.cursor/mcp.json
+.kimi-code/mcp.json
