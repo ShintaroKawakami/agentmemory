@@ -750,6 +750,269 @@ print(paths[0], end="")
 PY
 }
 
+# [2026-08-13][fix] issue #1672: 同一 -C 先への `git -C <dir> add && git -C <dir> commit` 複合を許可
+# 背景:
+#   - ユーザー依頼意図: feature worktree 内の正当な `git -C … add && git -C … commit` が
+#     single_git_c_target_dir の shell-control 判定（&&）と複数 -C 検出で誤 deny されていた。
+#   - 守るべき業務ルール: 引用外の -C がすべて同一 path で非 main なら compound でも early allow。
+#     パイプ・subshell・env chdir・main 宛 push / commit は従来どおり fail-closed。
+#   - 他案不採用理由: has_unquoted_shell_control から & 単体を外す案は subshell 検知を弱めるため不採用。
+# 対応: && / ; のみ許容する compound risk scanner と、全 -C path 一致時の target dir 解決を追加。
+consistent_unquoted_git_c_path() {
+  COMMAND_TEXT="$1" python3 - <<'PY' 2>/dev/null || true
+import os
+
+text = os.environ.get("COMMAND_TEXT", "")
+quote = None
+escaped = False
+paths = []
+i = 0
+while i < len(text):
+    ch = text[i]
+    if escaped:
+        escaped = False
+        i += 1
+        continue
+    if ch == "\\" and quote != "'":
+        escaped = True
+        i += 1
+        continue
+    if quote == "'":
+        if ch == "'":
+            quote = None
+        i += 1
+        continue
+    if quote == '"':
+        if ch == '"':
+            quote = None
+        i += 1
+        continue
+    if ch in ("'", '"'):
+        quote = ch
+        i += 1
+        continue
+    if ch == "-" and i + 1 < len(text) and text[i + 1] == "C":
+        prev = text[i - 1] if i > 0 else " "
+        if prev.isspace() or i == 0:
+            j = i + 2
+            while j < len(text) and text[j] in " \t":
+                j += 1
+            if j < len(text) and text[j] not in " \t\n;'\"|&()":
+                start = j
+                while j < len(text) and text[j] not in " \t\n;'\"|&()":
+                    j += 1
+                paths.append(text[start:j])
+                i = j
+                continue
+    i += 1
+
+if quote is not None or escaped or not paths or len(set(paths)) != 1:
+    raise SystemExit(0)
+print(paths[0], end="")
+PY
+}
+
+has_unquoted_compound_risk() {
+  local scanner_rc
+  if COMMAND_TEXT="$1" python3 - <<'PY'
+import os
+import sys
+
+text = os.environ.get("COMMAND_TEXT", "")
+quote = None
+escaped = False
+i = 0
+while i < len(text):
+    ch = text[i]
+    if escaped:
+        escaped = False
+        i += 1
+        continue
+    if ch == "\\" and quote != "'":
+        escaped = True
+        i += 1
+        continue
+    if quote == "'":
+        if ch == "'":
+            quote = None
+        i += 1
+        continue
+    if quote == '"':
+        if ch == '"':
+            quote = None
+        elif ch == "`" or (ch == "$" and i + 1 < len(text) and text[i + 1] == "("):
+            raise SystemExit(0)
+        i += 1
+        continue
+    if ch in ("'", '"'):
+        quote = ch
+    elif ch == "&" and i + 1 < len(text) and text[i + 1] == "&":
+        i += 2
+        continue
+    elif ch == ";":
+        i += 1
+        continue
+    elif ch in "<>":
+        direction = ch
+        while i + 1 < len(text) and text[i + 1] == direction:
+            i += 1
+        if i + 1 < len(text) and text[i + 1] == "&":
+            i += 1
+            while i + 1 < len(text) and (text[i + 1].isdigit() or text[i + 1] == "-"):
+                i += 1
+    elif ch in "|()" or ch == "`":
+        raise SystemExit(0)
+    i += 1
+
+raise SystemExit(0 if quote is not None or escaped else 1)
+PY
+  then
+    return 0
+  else
+    scanner_rc=$?
+    [ "$scanner_rc" -eq 1 ] && return 1
+    return 0
+  fi
+}
+
+resolve_git_c_dir() {
+  local dir="$1"
+  case "$dir" in
+    ""|"."|"./") printf '%s' "" ;;
+    "~") printf '%s' "$HOME" ;;
+    "~/"*) printf '%s' "${HOME}/${dir#\~/}" ;;
+    /*) printf '%s' "$dir" ;;
+    *) printf '%s' "$CWD/$dir" ;;
+  esac
+}
+
+consistent_git_c_target_dir() {
+  echo "$COMMAND_FOR_GIT_MATCH" | grep -qE '(^|[[:space:]]|[;&|])(GIT_DIR|GIT_WORK_TREE|GIT_NAMESPACE)=' && return 0
+  echo "$COMMAND_FOR_GIT_MATCH" | grep -qE '(^|[[:space:]])(--git-dir|--work-tree|--namespace)([=[:space:]])' && return 0
+  command_uses_env_chdir && return 0
+  has_unquoted_compound_risk "$COMMAND" && return 0
+  echo "$COMMAND_FOR_GIT_MATCH" | grep -qE "${GIT_CMD}[[:space:]]+(commit|push|add)" || return 0
+
+  local dir
+  dir="$(consistent_unquoted_git_c_path "$COMMAND")"
+  [ -n "$dir" ] || return 0
+  compound_git_c_covers_all_writes "$COMMAND" "$dir" || return 0
+  dir="$(resolve_git_c_dir "$dir")"
+  [ -n "$dir" ] || return 0
+  printf '%s' "$dir"
+}
+
+compound_git_c_covers_all_writes() {
+  COMMAND_TEXT="$1" EXPECTED_C="$2" python3 - <<'PY' 2>/dev/null || return 1
+import os
+import re
+
+text = os.environ.get("COMMAND_TEXT", "")
+expected = os.environ.get("EXPECTED_C", "")
+
+def split_segments(value):
+    quote = None
+    escaped = False
+    segments = []
+    current = []
+    i = 0
+    while i < len(value):
+        ch = value[i]
+        if escaped:
+            escaped = False
+            current.append(ch)
+            i += 1
+            continue
+        if ch == "\\" and quote != "'":
+            escaped = True
+            current.append(ch)
+            i += 1
+            continue
+        if quote == "'":
+            current.append(ch)
+            if ch == "'":
+                quote = None
+            i += 1
+            continue
+        if quote == '"':
+            current.append(ch)
+            if ch == '"':
+                quote = None
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+            current.append(ch)
+            i += 1
+            continue
+        if ch == "&" and i + 1 < len(value) and value[i + 1] == "&":
+            segments.append("".join(current))
+            current = []
+            i += 2
+            continue
+        if ch == ";":
+            segments.append("".join(current))
+            current = []
+            i += 1
+            continue
+        current.append(ch)
+        i += 1
+    segments.append("".join(current))
+    return [segment.strip() for segment in segments if segment.strip()]
+
+def extract_c_path(segment):
+    quote = None
+    escaped = False
+    i = 0
+    while i < len(segment):
+        ch = segment[i]
+        if escaped:
+            escaped = False
+            i += 1
+            continue
+        if ch == "\\" and quote != "'":
+            escaped = True
+            i += 1
+            continue
+        if quote == "'":
+            if ch == "'":
+                quote = None
+            i += 1
+            continue
+        if quote == '"':
+            if ch == '"':
+                quote = None
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+            i += 1
+            continue
+        if ch == "-" and i + 1 < len(segment) and segment[i + 1] == "C":
+            prev = segment[i - 1] if i > 0 else " "
+            if prev.isspace() or i == 0:
+                j = i + 2
+                while j < len(segment) and segment[j] in " \t":
+                    j += 1
+                if j < len(segment) and segment[j] not in " \t\n;'\"|&()":
+                    start = j
+                    while j < len(segment) and segment[j] not in " \t\n;'\"|&()":
+                        j += 1
+                    return segment[start:j]
+        i += 1
+    return None
+
+write_re = re.compile(r"\bgit\b.*\b(commit|push|add)\b")
+for segment in split_segments(text):
+    if not write_re.search(segment):
+        continue
+    c_path = extract_c_path(segment)
+    if c_path != expected:
+        raise SystemExit(1)
+raise SystemExit(0)
+PY
+}
+
 single_git_c_target_dir() {
   # 単発 `git -C <dir> commit/push` だけを解決する。
   # `git -C <dir> status && git commit` のような後続 git へ -C が効かない形は従来どおり解決しない。
@@ -772,14 +1035,35 @@ single_git_c_target_dir() {
 
   local dir
   dir="$(single_unquoted_git_c_path "$COMMAND")"
-  case "$dir" in
-    ""|"."|"./") return 0 ;;
-    "~") dir="$HOME" ;;
-    "~/"*) dir="${HOME}/${dir#\~/}" ;;
-    /*) ;;
-    *) dir="$CWD/$dir" ;;
-  esac
+  dir="$(resolve_git_c_dir "$dir")"
+  [ -n "$dir" ] || return 0
   printf '%s' "$dir"
+}
+
+# [2026-08-13][fix] issue #1672: `git push origin --delete <branch>` を main 直 push と誤判定しない
+# 背景:
+#   - ユーザー依頼意図: merge 済みリモート枝の cleanup（`git push origin --delete …`）が
+#     main checkout から実行されても、main への refspec push ではないため許可したい。
+#   - 守るべき業務ルール: リモート main 削除（--delete main / :main）は引き続き deny。
+#     push と commit が同一入力にある場合は commit 側の main 保護を維持する。
+#   - 他案不採用理由: push 全体を無条件許可する案は main refspec push の穴になるため不採用。
+push_is_safe_remote_branch_deletion() {
+  local segs seg
+  segs=$(echo "$COMMAND_FOR_GIT_MATCH" | grep -oE "${GIT_CMD}[[:space:]]+push[^;&|]*" || true)
+  [ -n "$segs" ] || return 1
+  while IFS= read -r seg; do
+    [ -z "$seg" ] && continue
+    if echo "$seg" | grep -qE '(^|[[:space:]])--delete([[:space:]]|$)'; then
+      echo "$seg" | grep -qE '(^|[[:space:]])--delete([[:space:]]+)(\+)?(refs/heads/)?main([[:space:]]|$)' && return 1
+      continue
+    fi
+    if echo "$seg" | grep -qE '(^|[[:space:]]+)([^[:space:]]+[[:space:]]+)?:[^[:space:]]+'; then
+      echo "$seg" | grep -qE '(^|[[:space:]]+)([^[:space:]]+[[:space:]]+)?:(\+)?(refs/heads/)?main([[:space:]]|$)' && return 1
+      continue
+    fi
+    return 1
+  done <<< "$segs"
+  return 0
 }
 
 # [2026-06-14][feat] / [2026-06-15][fix] 早期許可してはならない push が含まれるか（main 保護の fail-closed 判定）。
@@ -851,6 +1135,11 @@ has_unsafe_push() {
 }
 
 BRANCH=$(git -C "$CWD" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+
+# merge cleanup 等: リモート枝削除だけの push は main 直 push ではない（commit 同梱時は下流で deny）
+if push_is_safe_remote_branch_deletion && ! echo "$COMMAND_FOR_GIT_MATCH" | grep -qE "${GIT_CMD}[[:space:]]+commit"; then
+  exit 0
+fi
 
 # 複合コマンド: checkout/switch main && commit/push を検知
 if echo "$COMMAND_FOR_GIT_MATCH" | grep -qE "${GIT_CMD}[[:space:]]+(switch|checkout)([[:space:]]+-[^[:space:]]+)*[[:space:]]+main([[:space:]]|$).*${GIT_CMD}[[:space:]]+(commit|push)([[:space:]]|$)"; then
@@ -937,6 +1226,13 @@ if [ "$BRANCH" = "main" ]; then
       eff_branch="$(git -C "$eff_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
       if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir"; then
         exit 0  # 単発 `git -C <feature> commit/push` は -C が対象 git へだけ効くため許可
+      fi
+    fi
+    eff_dir="$(consistent_git_c_target_dir)"
+    if [ -n "$eff_dir" ]; then
+      eff_branch="$(git -C "$eff_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+      if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir"; then
+        exit 0  # 同一 -C 先への add && commit 等の複合（issue #1672）
       fi
     fi
   fi

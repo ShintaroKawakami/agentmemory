@@ -23,6 +23,7 @@ alwaysApply: true
 - `スコープ外のファイルを編集しない（読み取りは可）`
 - `テストの skip / xit を追加しない`
 - `existing CaD コメントを削除しない`
+- **`.claude/hooks/` / `hook-library/` のガード hook（block-main-commit 等）をデバッグ目的で一時編集しない**（deny 原因調査はログ・分割コマンド・worktree 委譲で行う。2026-08-12 jtt-system 配布インシデント再発防止）
 
 ## 3. verify before return（返却前の検証手順）
 
