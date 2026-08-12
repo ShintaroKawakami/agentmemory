@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `a0471375abffe060cb3d8c8b9a7d436b15b62c0b9b721dbe1363dbf9b75041cf`
+- effective hash: `ff6d93d953399312511b49f884d072293a5eabb220871dd9aac83ab4656655e3`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -1162,6 +1162,7 @@ paths:
 - `スコープ外のファイルを編集しない（読み取りは可）`
 - `テストの skip / xit を追加しない`
 - `existing CaD コメントを削除しない`
+- **`.claude/hooks/` / `hook-library/` のガード hook（block-main-commit 等）をデバッグ目的で一時編集しない**（deny 原因調査はログ・分割コマンド・worktree 委譲で行う。2026-08-12 jtt-system 配布インシデント再発防止）
 
 ## 3. verify before return（返却前の検証手順）
 

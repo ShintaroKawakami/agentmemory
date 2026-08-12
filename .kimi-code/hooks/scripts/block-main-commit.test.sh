@@ -508,6 +508,37 @@ expect_allow \
   "$main_repo" \
   'rg -n "git push|post-merge-gate|workflow" hook-library scripts'
 
+# [2026-08-13][test] issue #1672: 同一 -C 複合 add+commit と merge cleanup の push --delete
+# 背景:
+#   - ユーザー依頼意図: feature worktree 内 `git -C … add && git -C … commit` と
+#     merge 済み枝の `git push origin --delete …` が main 直 push と誤 deny されていた。
+#   - 守るべき業務ルール: リモート main 削除は deny のまま。commit 同梱の delete push は commit 側で deny。
+#   - 他案不採用理由: push 全面許可の回帰テストは main 保護を弱めるため不採用。
+expect_allow \
+  "同一 -C 複合 add+commit を許可" \
+  "$main_repo" \
+  "git -C $feature_repo add README.md && git -C $feature_repo commit -m docs"
+
+expect_allow \
+  "push --delete 単独を許可" \
+  "$main_repo" \
+  "git push origin --delete feature/old-branch"
+
+expect_allow \
+  "push --delete 複数枝を許可" \
+  "$main_repo" \
+  "git push origin --delete branch1 branch2 branch3"
+
+expect_block \
+  "push --delete main は拒否" \
+  "$main_repo" \
+  "git push origin --delete main"
+
+expect_block \
+  "push --delete と commit 同梱は拒否" \
+  "$main_repo" \
+  "git push origin --delete feature/old && git commit -m docs"
+
 TOTAL=$((PASS + FAIL))
 printf '\n=== block-main-commit.test.sh: %d/%d PASS ===\n' "$PASS" "$TOTAL"
 
