@@ -1,14 +1,15 @@
 {
   "tool": "opencode",
-  "generated_at": "2026-08-05T21:55:19.078023+09:00",
-  "source_commit": "6d53814",
-  "project_root": "/Users/shintaro/mcp-servers/agentmemory-wt-1493",
+  "generated_at": "2026-08-12T23:08:04.156182+09:00",
+  "source_commit": "116b1cf",
+  "project_root": "/private/tmp/agentmemory-phase-b-20260812",
   "mcp_source": {
     "registry": "/Users/shintaro/business/AGENT-HUB/docs/codex-mcp-registry.yaml",
     "definitions": "/Users/shintaro/business/AGENT-HUB/docs/codex-mcp-definitions.yaml",
     "project": "agentmemory",
     "enabled_mcp": [
       "agentmemory-agentmemory",
+      "agentmemory-project-router",
       "ai-worker-mcp",
       "codebase-context-engine-agentmemory",
       "context7",
@@ -38,10 +39,11 @@
     "PreToolUse matcher=Bash|Edit|MultiEdit|Shell|StrReplaceFile|Write|WriteFile は OpenCode plugin へ未変換",
     "PreToolUse command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/post-merge-gate.sh\"",
     "PreToolUse matcher=Skill|Task|Agent は OpenCode plugin へ未変換",
-    "SessionStart は OpenCode plugin へ未変換のため対象外",
+    "PostToolUse matcher=Edit|Write|MultiEdit は OpenCode plugin へ未変換",
+    "PostToolUse matcher=Skill|Task|Agent は OpenCode plugin へ未変換",
     "UserPromptSubmit は OpenCode plugin へ未変換のため対象外",
+    "SessionStart は OpenCode plugin へ未変換のため対象外",
     "SubagentStop は OpenCode plugin へ未変換のため対象外",
-    "Stop は OpenCode plugin へ未変換のため対象外",
-    "PostToolUse matcher=Skill|Task|Agent は OpenCode plugin へ未変換"
+    "Stop は OpenCode plugin へ未変換のため対象外"
   ]
 }

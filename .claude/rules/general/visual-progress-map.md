@@ -1,10 +1,4 @@
-<!-- [2026-07-18][refactor]
-背景:
-  - ユーザー依頼意図: 図解の発火条件を保ったまま、常時ロードされるルールを短くする。
-  - 守るべき業務ルール: L1 ASCII 既定、開発/業務の2モード、通常作業の自動発火、技術判断を平易語で聞く原則は残す。
-  - 他案不採用理由: Mermaid 専用化、skill 起動時だけの発火、単一モード化、テンプレ全文の常駐はいずれも過去の判断とコンテキスト節約に反するため不採用。
-対応: 義務とトリガーを本ルールに残し、テンプレ・実例・置換表は visual-companion references を正本とする。
--->
+<!-- CaD 全文移設（2026-08-08 ctx-slim）: ~/business/AGENT-HUB/skills/visual-companion/references/progress-map-templates.md 「visual-progress-map.md からの移設」節参照 -->
 
 # 図解・現在地マップ・非エンジニア用語ルール
 
@@ -70,14 +64,7 @@ skill 非起動時でも、以下のいずれかに該当したら L1 ASCII 図�
 
 ## 3. ミニ地図テンプレート（/brainstorm 用）
 
-```
-[ 現在地 ] /brainstorm Phase X/3
-✅ Phase 1: 要件聞き取り
-🔵 Phase 2: 不明点深掘り  ← 今ここ
-⬜ Phase 3: 実装方針提示
-
-次にやること: <1 文>
-```
+/brainstorm の Phase 遷移時に出す最小テンプレート。全文（移設済）: `~/business/AGENT-HUB/skills/visual-companion/references/progress-map-templates.md` 「ミニ地図テンプレート」節参照。
 
 ## 4-bis. 視覚化の 3 層（L1/L2/L3）の使い分け
 
