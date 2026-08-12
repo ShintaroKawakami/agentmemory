@@ -47,6 +47,11 @@
         "type": "command",
         "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/delegation-routing-backstop.sh\"'",
         "timeout": 5
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/fable-implementation-guard.sh\"'",
+        "timeout": 5
       }
     ],
     "beforeSubmitPrompt": [

@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-12T14:08:00.900583+00:00",
-  "source_commit": "116b1cf38ecfd1c9a7556f2b2a2ce72777055596",
+  "generated_at": "2026-08-12T15:04:17.159479+00:00",
+  "source_commit": "b70fc7dbd97fd1a75aa0a3671934d991625776ae",
   "source_rule_files": [
     ".claude/rules/general/ai-model-selection.md",
     ".claude/rules/general/branch-rule.md",
@@ -40,6 +40,8 @@
     ".claude/hooks/scripts/delegation-routing-backstop.test.sh",
     ".claude/hooks/scripts/delegation-routing-reminder.sh",
     ".claude/hooks/scripts/delegation-routing-reminder.test.sh",
+    ".claude/hooks/scripts/fable-implementation-guard.sh",
+    ".claude/hooks/scripts/fable-implementation-guard.test.sh",
     ".claude/hooks/scripts/freshness-gate.sh",
     ".claude/hooks/scripts/gbrain-recall-preflight.sh",
     ".claude/hooks/scripts/gbrain-recall-preflight.test.sh",
@@ -113,6 +115,8 @@
     ".cursor/hooks/scripts/delegation-routing-backstop.test.sh",
     ".cursor/hooks/scripts/delegation-routing-reminder.sh",
     ".cursor/hooks/scripts/delegation-routing-reminder.test.sh",
+    ".cursor/hooks/scripts/fable-implementation-guard.sh",
+    ".cursor/hooks/scripts/fable-implementation-guard.test.sh",
     ".cursor/hooks/scripts/freshness-gate.sh",
     ".cursor/hooks/scripts/gbrain-recall-preflight.sh",
     ".cursor/hooks/scripts/gbrain-recall-preflight.test.sh",

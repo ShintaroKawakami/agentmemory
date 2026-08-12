@@ -364,13 +364,13 @@ HEAVY_HIT="$(printf '%s\n' "$RESULT" | sed -n 's/^HEAVYHIT=//p')"
 if [ "$HIT" = "1" ]; then
   if [ -z "$SESSION_HASH" ]; then
     cat <<'MSG'
-【三役体制】着手前に委譲判定を1行宣言してから進めること: ①10分未満の小修正/ガバナンス領域→Claudeサブエージェント内製 ②まとまった実装・並列・大量読み→AI worker（agent-dispatch） ③調査: 小=context-engine直・中大=参謀Kimi ④緊急時のみ利用者の明示指示でPM直実装（解消後は委譲へ自動復帰）。PM本体のinline実装は原則禁止。
+【三役体制】着手前に委譲判定を1行宣言してから進めること: ①10分未満の小修正/ガバナンス領域/対話型ブラウザ軽作業(claude-in-chrome)→Claudeサブエージェント内製（ブラウザは sonnet 第一候補・Fable直禁止） ②まとまった実装・並列・大量読み→AI worker（agent-dispatch） ③調査: 小=context-engine直・中大=参謀Kimi ④緊急時のみ利用者の明示指示でPM直実装（解消後は委譲へ自動復帰）。PM本体のinline実装は原則禁止。
 MSG
   else
     MARKER="$CACHE_DIR/$SESSION_HASH"
     if [ ! -f "$MARKER" ]; then
       cat <<'MSG'
-【三役体制】着手前に委譲判定を1行宣言してから進めること: ①10分未満の小修正/ガバナンス領域→Claudeサブエージェント内製 ②まとまった実装・並列・大量読み→AI worker（agent-dispatch） ③調査: 小=context-engine直・中大=参謀Kimi ④緊急時のみ利用者の明示指示でPM直実装（解消後は委譲へ自動復帰）。PM本体のinline実装は原則禁止。
+【三役体制】着手前に委譲判定を1行宣言してから進めること: ①10分未満の小修正/ガバナンス領域/対話型ブラウザ軽作業(claude-in-chrome)→Claudeサブエージェント内製（ブラウザは sonnet 第一候補・Fable直禁止） ②まとまった実装・並列・大量読み→AI worker（agent-dispatch） ③調査: 小=context-engine直・中大=参謀Kimi ④緊急時のみ利用者の明示指示でPM直実装（解消後は委譲へ自動復帰）。PM本体のinline実装は原則禁止。
 MSG
       : > "$MARKER" 2>/dev/null || true
       agent_hub_telemetry_log "delegation_reminder" "delegation-routing-reminder" "fired" "" 2>/dev/null || true

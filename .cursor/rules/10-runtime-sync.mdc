@@ -80,6 +80,8 @@ alwaysApply: true
 - `.claude/hooks/scripts/delegation-routing-backstop.test.sh`
 - `.claude/hooks/scripts/delegation-routing-reminder.sh`
 - `.claude/hooks/scripts/delegation-routing-reminder.test.sh`
+- `.claude/hooks/scripts/fable-implementation-guard.sh`
+- `.claude/hooks/scripts/fable-implementation-guard.test.sh`
 - `.claude/hooks/scripts/freshness-gate.sh`
 - `.claude/hooks/scripts/gbrain-recall-preflight.sh`
 - `.claude/hooks/scripts/gbrain-recall-preflight.test.sh`
@@ -149,6 +151,8 @@ alwaysApply: true
 - `.cursor/hooks/scripts/delegation-routing-backstop.test.sh`
 - `.cursor/hooks/scripts/delegation-routing-reminder.sh`
 - `.cursor/hooks/scripts/delegation-routing-reminder.test.sh`
+- `.cursor/hooks/scripts/fable-implementation-guard.sh`
+- `.cursor/hooks/scripts/fable-implementation-guard.test.sh`
 - `.cursor/hooks/scripts/freshness-gate.sh`
 - `.cursor/hooks/scripts/gbrain-recall-preflight.sh`
 - `.cursor/hooks/scripts/gbrain-recall-preflight.test.sh`
