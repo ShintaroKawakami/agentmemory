@@ -42,19 +42,19 @@
         "matcher": "Edit|MultiEdit|Write"
       }
     ],
-    "sessionStart": [
+    "afterFileEdit": [
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/freshness-gate.sh\"'",
-        "timeout": 10
-      },
-      {
-        "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/telemetry-log.sh\"'",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/delegation-routing-backstop.sh\"'",
         "timeout": 5
       }
     ],
     "beforeSubmitPrompt": [
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/delegation-routing-reminder.sh\"'",
+        "timeout": 5
+      },
       {
         "type": "command",
         "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/gbrain-recall-preflight.sh\"'",
@@ -68,6 +68,18 @@
       {
         "type": "command",
         "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/pre-implementation-check.sh\"'",
+        "timeout": 5
+      }
+    ],
+    "sessionStart": [
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/freshness-gate.sh\"'",
+        "timeout": 10
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/telemetry-log.sh\"'",
         "timeout": 5
       }
     ],

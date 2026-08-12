@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `f5b77467ff8a53e712da5d3a2fe991ebc226abe1ab5c9b95c58c0c79994eb1bc`
+- effective hash: `40d2f5733a2a2cdcb8c53a77893866f772189fca620466fbd65d7bbffd8ff517`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -227,10 +227,36 @@ Hook scripts in `src/hooks/` are standalone Node.js scripts (no iii-sdk import).
 
 ## 4. 使い分けガイド（第一候補）
 
+<!-- [2026-08-08][feat] ctx-slim 柱3: AI worker 委譲の既定化
+背景:
+  - ユーザー依頼意図: $200 プラン上限対策として Claude 本体のトークン消費を抑えるため、実装・大量読みを
+    AI worker へ寄せる運用を既定化する（ctx-slim プラン承認済み・2026-08-08）。大量読みの第一候補は
+    伸太郎殿の指名により Kimi K3 とする（長大 context が根拠。「Fable の蒸留」説は未確認情報のため根拠にしない）。
+  - 守るべき業務ルール: モデル実名・context 上限値をここへハードコードしない（agents.yaml の
+    kimi_model_routing を実行時参照）。ガバナンス領域（.claude/ hook 等）は worker が編集できないため
+    従来どおり Claude が担う。
+  - 他案不採用理由: 専用ルール新設は常時ロード量を増やし ctx-slim の目的に反するため不採用。既存 §4 への
+    追記に留める。委譲手順の複製も skills/agent-dispatch との二重管理になるため不採用。
+[2026-08-08][feat] 境界行を追記（worker-speed プラン B）。実測（job 8714b5dc）で小タスクの往復コストが
+  実装時間を上回る事例が出たため、既定の適用範囲を1行で明示する。閾値・手順の詳細は skills/agent-dispatch
+  が正本（ここへ複製しない）。専用ルール新設は ctx-slim に反するため不採用。
+-->
+
+**既定（2026-08-08 ctx-slim）**: 実装・大量読み（リポ横断の読み込み・大規模ファイル調査）は AI worker への委譲を既定とし、Claude（PM）は設計・検証・統括に徹する。大量読みの第一候補は **Kimi K3**（長大 context 対応。選択条件・上限は `agents.yaml` の `kimi_model_routing` を正本とする）。目的: Claude 本体のクレジット消費を抑える（ガバナンス領域 `.claude/` `hook` 等は worker 編集不可のため従来どおり Claude が担う）。
+
+**境界（2026-08-08）**: 見積り10分未満の小実装とガバナンス領域（`.claude/` `hook` 等の worker 編集不可領域）は Claude サブエージェント内製、大タスク・並列・大量読みは worker（判定手順は `skills/agent-dispatch` が正本）。
+
+**三役の呼称（2026-08-09）**: 監督=PM（Claude）／参謀=Kimi 長大 context（設計・大量読み）／職人=実装 worker。調査は3段振り分け（小=監督が context-engine 直・中〜大=参謀・急ぎのみ Claude Explore）。正本: `agents.yaml` の `role_titles`／詳細: `docs/model-catalog-policy.md`「三役体制」節。
+
+**Fable 使用条件（2026-08-11・ctx-save）**: Fable は難所（設計・承認判断／原因不明バグの診断／ガバナンス領域編集）限定。調査・大量読み・軽作業は使わない。重い調査が主目的のセッションは、セッションモデル自体を Sonnet 既定で開始する（第二弾 2026-08-11）。正本・境界の全文は `agents.yaml` の `task_routing.fable_usage_policy`（`session_model_default` 含む）を参照（複製しない）。
+
+**調査系サブエージェント（Explore 等）へ委譲する時の規約**: `model:` に下位モデル（`sonnet` / `haiku`）を明示指定する。無指定のまま委譲すると親セッションのモデル（Fable 等）を継承し、大量読みが難所限定の原則から漏れる。
+
 | タスク種別 | 第一候補 | 理由 |
 |-----------|---------|------|
 | 仕様が明確・クリーンさ重視・UI/結線・お手本コード | **GLM 5.2** | 簡潔・範囲内に収まりやすい・速い |
 | 複雑・セキュリティ/堅牢性が重要なバックエンド | **Kimi K2.7 Code** | 安全性を自力で深掘り・テスト厚い |
+| 巨大 context の読み込み・リポ横断調査 | **Kimi K3** | 長大 context（ルーティング条件は `agents.yaml` 正本） |
 | どちらでも可 | いずれか | ただし下記ガードを必ず付ける |
 
 ### Kimi 内モデル選択（決定論的）
@@ -278,20 +304,9 @@ GLM 5.2 の正式運用は high / max のみ（デフォルト high・他の値�
 
 ### general/branch-rule.md
 
-<!-- [2026-07-29][refactor]
-背景:
-  - ユーザー依頼意図: 常駐ルールダイエット第2弾。全PJに常駐する `branch-rule.md` が15,178字まで肥大化し、
-    現在は撤回済みの allowlist 例外の変遷史（6件のCaDコメント）と長文の手順詳細がセッション開始の
-    コンテキストを圧迫していた。
-  - 守るべき業務ルール: 内容は消さない（reference-over-hardcode.md 原則）。現行の義務・禁止事項は rule に残し、
-    撤回済みの変遷史・長文手順は移設先へ移す二段構え（PR1 #997・PR2 #1001 と同型）。
-  - 他案不採用理由: rule 側に全文を残す案は再肥大化を放置するため不採用。変遷史を単純削除する案は
-    過去の不採用判断（CaD）を再検討する際の参照材料を失うため不採用。
-対応: `.claude/rules/general/branch-rule.md` から `~/business/AGENT-HUB/docs/worktree-operations.md` へ、allowlist変遷史・
-  配布クローズアウト責任の完了条件詳細・事前計画ステップのコマンド列・pre-commit hookピボット手順を移設。
--->
-
 # ブランチ運用ルール
+
+制定経緯（CaD）: `~/business/AGENT-HUB/docs/worktree-operations.md`「決定履歴（CaD 移設）— branch-rule.md 由来」節を参照。
 
 ## main ブランチへの直接コミット・プッシュ
 
@@ -313,21 +328,6 @@ PR 導線がまだ存在しない場合だけ例外になりうる。AI はこ�
 - ツールごとに例外を残すと、Claude / Codex / Cursor / Kimi / Antigravity 間で運用がずれる
 - main の最新化は `git pull` ではなく、fetch-only と detached HEAD / 専用 verify worktree で確認すれば足りる
 
-<!-- [2026-07-30][feat] STEP 4: CI の番人を働かせる（R4: マージ根拠のドキュメント明記）
-背景:
-  - ユーザー依頼意図: 2026-07-24 に AGENT-HUB の CI pull_request トリガーを削除した結果、
-    checks が無い PR のマージ根拠が本ルールに書かれておらず、AI がマージ判断時に参照できる
-    正本が無かった（承認済みプラン claude-plans/step4-ci-gate.html の R4）。
-  - 守るべき業務ルール: 常時ロードルールへの追記は新規セクション新設ではなく、既存の
-    branch-rule.md への短い追記に留める（常時ロード台帳の規約により新規常時ロードファイルは
-    作らない）。手順の全文は skills/post-merge/SKILL.md（R2 の使い方）を正本として参照し、
-    ここへ複製しない。
-  - 他案不採用理由: 新規 rule ファイル（例: ci-gate-rule.md）を作る案は、常時ロード許可台帳
-    （registries/always-load-rules.yaml）への理由付き登録が別途必要になり、既存 branch-rule.md
-    と同じ話題（マージ時の運用根拠）が2ファイルに分裂するため不採用。
-対応: 「AGENT-HUB の CI とマージ根拠」節を新設し、R1（.github/workflows/ ありで checks 0件は
-  ローカルゲート代替検証）・R2（registries/merge-gate-suite.yaml が唯一の検査コマンド正本）の
-  要旨だけを3行で明記し、詳細は skills/post-merge/SKILL.md を参照させる。 -->
 ## AGENT-HUB の CI とマージ根拠（2026-07-30 STEP 4）
 
 AGENT-HUB の CI は `workflow_dispatch` + `ci/light` ラベル方式（pull_request 自動トリガーは 2026-07-24 に削除済み）。
@@ -383,13 +383,8 @@ AGENT-HUB から各 PJ へ配布した tracked 差分も「配布クローズア
 
 ### general/constructive-dissent.md
 
-<!-- [2026-07-04][feat]
-背景:
-  - ユーザー依頼意図: AI が「言いなりにならない」ことをグローバル憲法として制度化したい。無理な指示には迎合せず制約を明言し、代替案とメンテナンス観点の改善提案を AI から先出しできるようにする。
-  - 守るべき業務ルール: 最終決定は常にユーザー（伸太郎殿・非エンジニア）。異見は根拠付き・平易語・選択肢+推奨の形で提示する（visual-progress-map §5 と整合）。個人開発スケールを前提とし、過剰なエンタープライズ提案にも異議を唱える（顧客向けシステムは例外で厳格維持）。
-  - 他案不採用理由: (1) plan-approval-gate だけに書く案は提案・実装・レビュー全フェーズをカバーできないため不採用。(2) CLAUDE.md インライン記述案は警告閾値超過のため不採用。(3) skill 内だけに置く案は常時ロードされず発火漏れのため不採用。
-対応: `.claude/rules/general/constructive-dissent.md` を新設し、DISTRIBUTION.yaml global.rules へ追加（user scope 常時ロード）。
--->
+<!-- [2026-07-04][feat] 制定経緯（背景・他案不採用理由）は verbatim で移設済み。
+全文: ~/business/AGENT-HUB/skills/adversarial-review/SKILL.md「constructive-dissent.md からの移設」節 -->
 
 # 建設的異議（言いなり禁止・グローバル憲法）
 
@@ -432,9 +427,8 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 
 ## メンテナンス観点の先出し例
 
-- 新スキル・hook・ドキュメントを作るとき → `checkup-registry.yaml` への出生登録を提案。
-- 手順・閾値・API 名をハードコードしそうなとき → 正本参照（ライブ読み・SSOT symlink）を提案。
-- 外部 API・ライブラリ版数を書くとき → 最終確認日の記載を提案。
+具体例（新スキル出生登録・正本参照・最終確認日 等）は
+`~/business/AGENT-HUB/skills/adversarial-review/SKILL.md`「constructive-dissent.md からの移設」節を参照。
 
 ## 関連
 
@@ -447,30 +441,9 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 
 ### general/gbrain-recall.md
 
-<!-- [2026-08-04][feat] G-Brain ハーネス Phase 1（gbrain-recall rule 新設）
-背景:
-  - ユーザー依頼意図: 承認済み仕様書「G-Brain ハーネス設計仕様書（v2）」D6（リコール層）に基づき、
-    バグ修正・障害調査・経営相談・戦略検討などの**通常の会話**でも、AI が能動的に G-Brain
-    （shintaro-gbrain / tech-gbrain）や agentmemory を検索しに行く発火条件を明文化したい。
-    従来は plan 入口の preflight（plan-commitment-registry seq 0.1/0.15）・保存先の3層判断
-    （agentmemory-routing）・closeout 時の候補提示（handover-manual）はあったが、非 plan の
-    日常会話で「読みに行く」入口が欠けていた（仕様書 D9 の役割分担精査で確認済みの穴）。
-  - 守るべき業務ルール: 本ルールは仕様書 D9 の役割分担表に厳密に従い、非 plan の日常会話における
-    「読む側」の発火条件だけを担当する。plan 入口 preflight・保存先の3層判断・put_page の安全手順・
-    closeout 候補提示は、それぞれの既存正本（下記 §0 参照）を複製しない（reference-over-hardcode）。
-  - 他案不採用理由:
-    1) 発火条件を dev-guardrails / business-guardrails 等の各スキルへ個別に埋め込む案は、条件表が
-       複数ファイルに分散し改訂のたび全部を直す必要が生じるため不採用（本ルールへ集約し各スキルは
-       1行参照に留める）。
-    2) global CLAUDE.md（`~/.claude/CLAUDE.md`）に置く案は Claude Code 専用で Codex / Cursor / Kimi /
-       Antigravity へ届かないため不採用（D6 記載のとおり）。AGENT-HUB rule + manifest 配布が
-       全クライアントに届く唯一の経路。
-対応: `.claude/rules/general/gbrain-recall.md` を新設。常時ロード（`registries/always-load-rules.yaml`
-  へ理由付き登録）とし、manifest v2 global 層（`registries/harness-manifest.yaml`）から全クライアントへ
-  配布する。
--->
-
 # G-Brain リコール層（会話中の「読む側」発火条件）
+
+制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「gbrain-recall.md からの移設」節を参照。
 
 ## 0. scope 宣言（重複防止・複製しない）
 
@@ -509,6 +482,10 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 - 手順・落とし穴の詳細: `skills/shintaro-gbrain/SKILL.md`
 - 保存先判断の詳細: `skills/agentmemory-routing/SKILL.md`
 - 仕様書: `claude-plans/2026-08-04-jtt-gbrain-harness-spec.md`（D6 / D9）
+
+---
+
+**追記ルール: 実測事例・長文詳細・制定経緯は `docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
 
 ### general/hooks-structure-rule.md
 
@@ -658,13 +635,9 @@ paths:
 
 ### general/mandate-registry.md
 
-<!-- [2026-08-03][feat] 背景: ユーザー依頼意図: 横断的な気づき（「全アプリで必要」という指摘）をルール追記だけで終わらせず、
-  台帳へも1行登録する義務を明文化したい。守るべき業務ルール: ルールは新規開発にしか効かず、既存アプリへの適用漏れは
-  機械が乖離を提示しない限り発火しない（記憶・注意力だけに頼らない）。他案不採用理由: ルール本文への箇条書き追記のみ
-  で済ませる案は、既存アプリの未対応が可視化されず同種の指摘が繰り返される（過去に複数回実測済み）ため不採用。
-  → 対応: .claude/rules/general/mandate-registry.md を新設（スキーマ正本は registries/mandate-registry.yaml のヘッダを参照・複製しない）。 -->
-
 # 横断チェック台帳（mandate-registry）への登録ルール
+
+制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「mandate-registry.md からの移設」節を参照。
 
 ## 原則
 
@@ -716,24 +689,13 @@ paths:
 
 ---
 
-**追記ルール: 実測事例・長文手順は台帳ヘッダ／別 doc へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
+**追記ルール: 実測事例・長文手順・制定経緯は台帳ヘッダ／`docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
 
 ### general/mcp-key-management.md
 
-<!-- [2026-07-29][refactor]
-背景:
-  - ユーザー依頼意図: 常駐ルールダイエット第2弾。全PJに常駐する `mcp-key-management.md` が21,345字まで
-    肥大化し、復旧手順・ローテーション手順・実装経緯の長文詳細がセッション開始のコンテキストを圧迫していた。
-  - 守るべき業務ルール: 内容は消さない（reference-over-hardcode.md 原則）。義務・トリガー・禁止事項は rule に残し、
-    詳細・実例・長い手順は移設先へ移す二段構え（PR1 #997・PR2 #1001 と同型）。
-  - 他案不採用理由: rule 側に全文を残す案は再肥大化を放置するため不採用。詳細を単純に削除する案は
-    復旧手順・実装経緯の喪失になるため不採用（reference-over-hardcode.md 原則に反する）。
-対応: `.claude/rules/general/mcp-key-management.md` から `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` へ、
-  Supabase stg/prod 例外実例・gitignore必須リスト詳細表・MANAGED block重複キー除去の実装経緯・
-  復旧手順コマンド列・ローテーション手順・User scope MCP同期フレームワーク対応表を移設。
--->
-
 # MCP API キー管理規範（AGENT-HUB SSOT）
+
+制定経緯（CaD）: `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md`「決定履歴（CaD 移設）— mcp-key-management.md 由来」節（#12 圧縮経緯・#13/#14 条件付きロード降格の試行と撤回経緯）を参照。本ルールはセキュリティ規範（API キー管理）のため常時ロードを維持する（constructive-dissent.md「個人開発スケールと例外」例外(a)）。
 
 JTT 関連の MCP（asana-mcp / jtt-smaregi-mcp / smaregi-docs / google-chat-mcp / google-docs-mcp / jtt-spreadsheet-mcp 等）の API キーは **AGENT-HUB を SSOT として一元管理**する。
 
@@ -800,7 +762,7 @@ API キーローテーション時の 7 ステップ（新キー発行 → SSOT 
 
 ## User scope MCP 同期フレームワーク (2026-05-21〜)
 
-User scope MCP (`~/.<tool>/...`) の SSOT 一元管理は **user-mcp スキル**が管轄する（User scope / Project scope の設計と担当 sync スクリプトの対応表は `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` を参照）。新エージェント追加 5 ステップ (CLAUDE.md 9-13 参照): `skills/user-mcp/SKILL.md`。
+User scope MCP (`~/.<tool>/...`) の SSOT 一元管理は **user-mcp スキル**が管轄する（User scope / Project scope の設計と担当 sync スクリプトの対応表は `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` を参照）。新エージェント追加 5 ステップ (手順本文: `~/business/AGENT-HUB/docs/architecture/claude-md-cad-archive.md` §D 参照): `skills/user-mcp/SKILL.md`。
 
 ## 関連
 
@@ -820,23 +782,9 @@ User scope MCP (`~/.<tool>/...`) の SSOT 一元管理は **user-mcp スキル**
 
 ### general/memory-lookups.md
 
-<!-- [2026-05-15][feat]
-背景:
-  - ユーザー依頼意図: `/insights` レポートで「人名の読み方（小川 → 古川 こがわ）」が auto memory に登録されているにもかかわらず参照されず、AI が「新規の人物」として扱った friction が検出されたため、メモリ参照ルールを SSOT 化する。
-  - 守るべき業務ルール: メモリの正本は `~/.claude/projects/*/memory/MEMORY.md`（auto memory）。AGENT-HUB 内に独自 MEMORY.md を新設して二重管理しない。本ルールファイルは参照規範のみを定義し、メモリ実体を持たない。
-  - 他案不採用理由: (1) AGENT-HUB 内に独自 MEMORY.md を新設する案は、auto memory との二重管理になり同期コストが発生するため不採用。(2) CLAUDE.md にインライン記述する案は警告閾値超過のため不採用。
-対応: `.claude/rules/general/memory-lookups.md` 新規作成。paths frontmatter は設定せず、全コマンドで参照される常時読み込みルールとする。
--->
-
 # メモリ参照ルール
 
-<!-- [2026-05-29][refactor]
-背景:
-  - ユーザー依頼意図: G-Brain / Markdown / 一時メモを使い分け、スマレジ・Asana・出パンダ・よやくまを正本として壊さない運用にしたい。
-  - 守るべき業務ルール: LLM の memory は便利な過去文脈だが、売上・施策・勤怠・予約・確定ルールの正本ではない。正本は各業務システムまたは Markdown SSOT に置く。
-  - 他案不採用理由: memory を「正本」と呼び続ける案は、G-Brain や MCP の導入後に同じ情報が複数箇所へ分散し、古い記憶で判断する事故につながるため不採用。
-対応: 本ルールの基本方針を「参照補助」に変更し、JTT 業務情報は専用の正本へ戻す原則を追加。
--->
+制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「memory-lookups.md からの移設」節を参照。
 
 ## 基本方針
 
@@ -885,8 +833,12 @@ memory と正本が矛盾する場合は、正本を優先する。G-Brain は�
 
 ## 関連
 
-- グローバル auto memory: `/Users/shintaro/.claude/CLAUDE.md` の「auto memory」セクション
+- グローバル auto memory: Claude Code ハーネス標準の Memory 機能（旧 CLAUDE.md「auto memory」セクションは廃止済み・保存実体は下記 PJ 別ディレクトリ）
 - PJ 別 auto memory: `~/.claude/projects/<encoded-path>/memory/`
+
+---
+
+**追記ルール: 実測事例・長文詳細・制定経緯は `docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
 
 ### general/plan-approval-gate.md
 
@@ -896,28 +848,24 @@ memory と正本が矛盾する場合は、正本を優先する。G-Brain は�
 
 中規模以上の**実装に着手する前に、必ず HTML で実装プランを提示し、利用者の明示承認（「この実装でいい」）を得てから着手する**。テキストだけで合意したつもりにならない。
 
-理由: 非エンジニアの利用者には「どの画面がどう変わるか」がテキストでは伝わりにくく、着手後に手戻りが多発する。給与v1の説明 HTML のような見せ方を毎回・自動で出して認識を合わせ「手戻りゼロ」を狙う。
+理由: 非エンジニアの利用者には「どの画面がどう変わるか」がテキストでは伝わりにくく、着手後に手戻りが多発する。同様の見せ方を毎回・自動で出し「手戻りゼロ」を狙う。
 
 これは `ui-stitch-mandatory` と同じく**ルールが義務を担い、手順はスキルに置く**二段構え。手順 SSOT は `skills/plan-approval/SKILL.md`（本ルールは手順を複製せず参照する）。
 
-<!-- [2026-07-16][refactor] 常駐ルールダイエット（PR2）。
-背景:
-  - ユーザー依頼意図: 常駐コンテキスト削減のため本ファイル（10,255Bまで肥大化）を薄い義務層へ絞る。
-  - 守るべき業務ルール: 義務文言（承認なしに進まない・固定テンプレ必須・Write必須・禁止2態様・ファイルカード+open両方必須）は弱めない。「HTMLプランの中身」の部品一覧はテンプレ parts マニフェストと SKILL.md（正本）参照に一本化し複製しない。
-  - 他案不採用理由: 部品一覧を本ルールに残す案は SKILL.md/テンプレとの三重管理になり更新漏れを生むため不採用。ルール自体を skill へ落とす案は常時発火の強制力を失うため不採用。 -->
+制定経緯（CaD）: ~/business/AGENT-HUB/skills/plan-approval/SKILL.md「plan-approval-gate.md からの移設」参照。
 
 ## 必須手順
 
 1. **プラン作成基準をライブ読み**: `skills/plan-approval` が `resolve-pj-prompt.py --phase plan` を実行し、PJ 別のプラン基準（`snippet-prompts/Typinator/plan/`。専用未作成 PJ は汎用 `dev-plan`）を読む。
 2. **HTML プランを作る（固定テンプレを必ず使う・独自デザイン禁止）**: 正本テンプレをコピーし中身だけ差し替える（通常=`plan-template.html`、AI worker 委譲時=`plan-template-aiworker.html`）。必須のビジュアル要素は下記「中身」節を参照。
-3. **提示して承認を待つ（iPhone でも PC でも、両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 `open <file>` で PC ブラウザにも表示する。**タップ用ファイルカード作成と open による PC ブラウザ表示の両方を毎回必須とする**。末尾に「この実装でいいですか？（進めて / 直す / やめる）」を置き、**承認なしに実装へ進まない**。短い同意だけで進めず、次の一手を1文に要約して再確認する。保存先は作業中 PJ の gitignore 済み一時パス（`claude-plans/` 等）、slug は短く、共有 URL は1行で提示する（詳細: `skills/plan-approval/SKILL.md` §5）。
+3. **提示して承認を待つ（両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 `open <file>` で PC ブラウザにも表示する。**タップ用ファイルカード作成と open による PC ブラウザ表示の両方を毎回必須とする**。末尾に「この実装でいいですか？（進めて / 直す / やめる）」を置き、**承認なしに実装へ進まない**。保存規約（gitignore済み一時パス・短い slug・共有 URL は1行）と短い同意時の再確認は `skills/plan-approval/SKILL.md` を参照。
 4. **承認直後に 📋 コミットメント台帳を全件タスク化する**: HTML プランの台帳の各行を、着手前に `TaskCreate` で 1 行 = 1 タスク化してから実装へ進む。台帳が全消化（実施済み or 明示保留）になるまで「完了」と宣言しない。詳細は `.claude/rules/general/plan-commitment-tracking.md`。
    - **AI worker を 1 度でも使う計画は必須**: 「AI worker 摩擦時は該当正本を worktree→PR→merge→fetch-only / detached 確認→cleanup で修正」の条項を台帳に必ず入れ、タスク化する（テンプレに既定行として焼き込み済み・消さない）。
 5. **承認後は標準パイプラインを通す**: 実装（dev-guardrails）→ codexレビュー → 実装監査 → CI → SSOT 同期確認 → マージ。本番投入は人間ゲート。
 
 ## HTMLプランの中身
 
-中身の構成部品（🎯目的・🖼️前後比較・🗺️ユーザーストーリー・🔀画面遷移図・📚メニュー構成図・🧩変える物一覧・🤔AI の異見・🔭一段上の視点・📋コミットメント台帳 等の必須要素一覧）はテンプレ正本（`references/plan-template.html` の `parts` マニフェスト）と `skills/plan-approval/SKILL.md` が正本。ここに複製しない。
+構成部品一覧は `references/plan-template.html` の `parts` マニフェストと `skills/plan-approval/SKILL.md` が正本。複製しない。
 
 ## 適用トリガー
 
@@ -932,7 +880,7 @@ memory と正本が矛盾する場合は、正本を優先する。G-Brain は�
 
 ## 接続・関連
 
-手順: `skills/plan-approval/SKILL.md`（テンプレ・保存規約・承認ループ・3層視覚化）。プラン基準: `snippet-prompts/Typinator/plan/[PLAN-INPUT]_<pj>-plan.md`。進捗: `visual-progress-map.md`。UI確定: `ui-stitch-mandatory.md`。承認後: `skills/dev-guardrails/SKILL.md`（各フェーズは `resolve-pj-prompt.py` 同一リゾルバ）。モデル委譲: `ai-model-selection.md`。
+手順: `skills/plan-approval/SKILL.md`。基準: `snippet-prompts/Typinator/plan/[PLAN-INPUT]_<pj>-plan.md`。進捗: `visual-progress-map.md`。UI確定: `ui-stitch-mandatory.md`。承認後: `skills/dev-guardrails/SKILL.md`。モデル委譲: `ai-model-selection.md`。
 
 ---
 
@@ -940,24 +888,9 @@ memory と正本が矛盾する場合は、正本を優先する。G-Brain は�
 
 ### general/plan-commitment-tracking.md
 
-<!-- [2026-06-26][feat] プラン条項が実行中に未タスク化のまま一度も発火しない構造欠陥（全PJ共通）の防止のため新規作成。
-skill内記述案は「呼んだ時だけ発火」で長い実行ループ（/compact跨ぎ）中に取りこぼすため不採用とし、常時ロードの
-rule に置いて plan-approval-gate（義務）/ plan-approval（手順）と三位一体にした。 -->
-
-<!-- [2026-07-16][refactor] 常駐ルールダイエットPR2。
-背景:
-  - ユーザー依頼意図: 常駐コンテキスト削減のため本ファイル（10,132Bまで肥大化）を薄い義務層へ絞る。
-  - 守るべき業務ルール: 義務文言（台帳全消化まで完了宣言しない・明示保留・虚偽✓禁止・AI worker摩擦は1回で発火）は弱めない。
-  - 他案不採用理由: 実例長文（2026-06-26 part4-2/PR#522、2026-07-06 /goal 8回反復）を本文に残す案は常駐コストが高いため不採用とし `skills/plan-approval/references/commitment-examples.md` へ移設。 -->
-
-<!-- [2026-08-03][fix] worker が実行していない検証コマンドの結果を報告に貼る事例（jtt-cms・Antigravity/Gemini 3.6 Flash 委譲）を受け対策追加。
-背景:
-  - 守るべき業務ルール: worker のサンドボックスでコマンドが実行不能な場合、「既存資産の移植・コピー」型タスクは記憶による再実装にすり替わり得る。
-    一部項目を正直に「未実行」と書いていても、他項目の実行結果が真である保証にはならない。
-  - 他案不採用理由:
-    1) worker の報告フォーマットを厳格化する案 → 捏造は書式では防げないため単独では不採用。
-    2) completion_gate に出力検証を追加する案 → コマンド実行の真偽をハーネス側で機械判定するのは困難で影響範囲も大きい。まず統括役の義務として閉じる。
-対応: 項目3へ「worker報告の検証結果は証拠にしない」を追加。詳細実例は `skills/agent-dispatch/references/model-selection-evidence.md`、委譲判断ガードは `skills/agent-dispatch/SKILL.md` へ接続。 -->
+<!-- CaD 履歴（2026-06-26 新規作成の経緯／2026-07-16 常駐ダイエットPR2／2026-08-03 worker検証コマンド未実行対策、
+それぞれの背景・守るべき業務ルール・他案不採用理由）は verbatim で
+~/business/AGENT-HUB/skills/plan-approval/references/commitment-examples.md 「plan-commitment-tracking.md からの移設」節参照。 -->
 
 # プラン・コミットメント追跡ルール（承認済みプランの条項を必ず実行で拾う）
 
@@ -998,21 +931,9 @@ rule に置いて plan-approval-gate（義務）/ plan-approval（手順）と�
 
 ### general/reference-over-hardcode.md
 
-<!-- [2026-07-07][feat]
-背景:
-  - ユーザー依頼意図: YAML はじめ「いかなる場所でもハードコード（直書き）しない。どうしても必要なら1箇所に集約し、
-    他は参照する（参照型設計）」を、全 Claude インスタンスに徹底させる普遍原則（グローバル憲法級）として新設したい。
-  - 守るべき業務ルール: G-Brain の上流原則 `principle-single-source-of-truth-reference`（伸太郎殿の開発大原則）と
-    同根。個人開発スケール（1人・非エンジニアオーナー）を前提とし、過剰な抽象化レイヤーは推奨しない
-    （constructive-dissent §個人開発スケールと例外と整合）。1箇所集約＝素朴な解決で十分という立場を取る。
-  - 他案不採用理由: (1) skill 内だけに置く案は常時ロードされず発火漏れが起きるため不採用（constructive-dissent と
-    同型の理由）。(2) CLAUDE.md インライン記述案は既に長大な CLAUDE.md の警告閾値を超えるため不採用。
-    (3) 「気づいたら都度指摘する」運用だけに頼る案は、AI インスタンスごとに再発するため不採用（恒久原則として明文化）。
-対応: `.claude/rules/general/reference-over-hardcode.md` を新設し、checkup-registry.yaml / tests/test_handover_manual.py /
-  DISTRIBUTION.yaml（global.rules・constructive-dissent と同じ全PJ級配布）の3箇所に登録する。
--->
-
 # ハードコード排除・参照型設計（グローバル憲法）
+
+制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「reference-over-hardcode.md からの移設」節を参照。
 
 ## 原則
 
@@ -1048,17 +969,15 @@ rule に置いて plan-approval-gate（義務）/ plan-approval（手順）と�
 
 この原則は G-Brain の上流原則 `principle-single-source-of-truth-reference`（伸太郎殿の開発大原則）と同根である。
 
+---
+
+**追記ルール: 実測事例・長文詳細・制定経緯は `docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
+
 ### general/response-style.md
 
-<!-- [2026-05-15][feat]
-背景:
-  - ユーザー依頼意図: `/insights` レポートで「長くなりすぎている」「長すぎる」というユーザーフィードバックが複数件確認されたため、AI 出力の簡潔性ルールを SSOT 化する。
-  - 守るべき業務ルール: 出力簡潔性は AI 側の振る舞いに閉じる（モデルパラメータや個別プロンプトでの制御に依存しない）。CLAUDE.md / グローバル設定で温度・max_tokens を変更する方向は採らない。
-  - 他案不採用理由: (1) モデルパラメータ（温度・max_tokens）で制御する案は、ユーザー要望（簡潔性）と方向性が異なる（パラメータでは「冗長な説明を避ける」判断は学習できない）ため不採用。(2) CLAUDE.md に簡潔性ルールをインライン記述する案は、CLAUDE.md が警告閾値超過のため不採用。
-対応: `.claude/rules/general/response-style.md` 新規作成。paths frontmatter は設定せず、全コマンドで参照される常時読み込みルールとする。
--->
-
 # 出力簡潔性ルール
+
+制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「response-style.md からの移設」節を参照。
 
 ## 基本方針
 
@@ -1090,14 +1009,6 @@ rule に置いて plan-approval-gate（義務）/ plan-approval（手順）と�
 
 過剰な「お疲れさまでした」「素晴らしい結果でした」等の挨拶は不要。
 
-<!-- [2026-07-07][fix]
-背景:
-  - ユーザー依頼意図: AI がチャットに URL を出力する際、URL 直後に全角括弧・句点（）。や 、）を隣接させると、ターミナル/Markdown のリンク解釈がその記号まで URL に取り込み、リンクが 404 になる不具合が複数回発生した。グローバルに再発防止したい。
-  - 守るべき業務ルール: URL/パスは記号に食われない形で出力する。押せないファイルカード環境（iPhone 等）では open 併用の既存運用を壊さない。
-  - 他案不採用理由: 「URL の後に半角スペースを1つ入れるだけ」案は、直後が文末だと結局括弧が続き再発するため不採用。URL を独立行に置く/全角記号を隣接させない方式を採る。
-対応: 「## URL・リンクの出力」節を新設。
--->
-
 ## URL・リンクの出力
 
 AI が URL やファイルパスを出力するとき、**URL の直後に全角括弧・句読点（`）` `。` `、` `」` など）を隣接させない**。ターミナルや Markdown のリンク解釈がその記号まで URL に取り込み、リンクが壊れる（404）ため。
@@ -1106,6 +1017,10 @@ AI が URL やファイルパスを出力するとき、**URL の直後に全角
 - 文中に置く場合は URL の直後に**半角スペースか改行**を入れ、全角記号を隣接させない。必要なら `< >` または バッククォートで囲む。
 - 悪い例: `詳細は https://example.com/path）。`（`）。` まで URL に食われて 404）。
 - 良い例: 説明文の後に改行して `https://example.com/path` を単独行で出す。
+
+---
+
+**追記ルール: 実測事例・長文詳細・制定経緯は `docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
 
 ### general/responsive-both-viewports.md
 
@@ -1229,20 +1144,6 @@ paths:
 
 ### general/sub-agent-scope-contract.md
 
-<!-- [2026-07-29][refactor]
-背景:
-  - ユーザー依頼意図: 常駐ルールダイエット第2弾。全PJに常駐する `sub-agent-scope-contract.md` が6,921字まで
-    肥大化し、制定経緯の長文CaDコメントとdelegateテンプレート全文がコンテキストを圧迫していた。
-  - 守るべき業務ルール: 内容は消さない（reference-over-hardcode.md 原則）。義務（3項目+§4/§5）は rule に残し、
-    制定経緯とテンプレート全文は移設先へ移す二段構え（PR1 #997・PR2 #1001 と同型）。
-  - 他案不採用理由: rule 側に全文を残す案は再肥大化を放置するため不採用。制定経緯を削除する案は
-    過去の不採用判断の参照材料を失うため不採用。
-対応: `.claude/rules/general/sub-agent-scope-contract.md` から
-  `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` へ、制定経緯（2026-05-15）・
-  context-engine first 追加経緯（2026-06-24）・delegateプロンプトのテンプレート全文・
-  親側のverifyステップ全文を移設。
--->
-
 # サブエージェント Scope Contract
 
 サブエージェント（Task / Agent tool）に作業を委譲するとき、delegate 元のプロンプトに**必ず以下 3 項目（コード探索を伴う場合は §4、UI/デザインを伴う場合は §5 を足す）を含める**。制定経緯・テンプレート全文は `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` を参照。
@@ -1307,18 +1208,6 @@ revert し、delegate にやり直しを指示する。
 
 ### general/ui-stitch-mandatory.md
 
-<!-- [2026-07-29][refactor]
-背景:
-  - ユーザー依頼意図: 常駐ルールダイエット第2弾。全PJに常駐する `ui-stitch-mandatory.md` が6,649字まで
-    肥大化し、制定経緯の長文CaDコメント（2件）がコンテキストを圧迫していた。
-  - 守るべき業務ルール: 内容は消さない（reference-over-hardcode.md 原則）。義務・トリガー・禁止事項は rule に残し、
-    制定経緯は移設先へ移す二段構え（PR1 #997・PR2 #1001 と同型）。
-  - 他案不採用理由: rule 側に全文を残す案は再肥大化を放置するため不採用。制定経緯を削除する案は
-    過去の不採用判断（brainstorm/parallel-run skill内限定案・Stitch手順転記案 等）の参照材料を失うため不採用。
-対応: `.claude/rules/general/ui-stitch-mandatory.md` から `skills/stitch/SKILL.md` へ、
-  制定経緯（2026-05-27）・MCP選択正本のmanifest v2切替経緯（2026-07-20）を移設。
--->
-
 # UI / デザインは必ず Stitch を通すルール（強制）
 
 制定経緯（2026-05-27 新設判断・2026-07-20 MCP選択正本切替）は `skills/stitch/SKILL.md` の
@@ -1376,13 +1265,7 @@ Stitch の対象外である**絵そのもの**（商品写真・HP 用画像・
 
 「画像を作って」「写真を生成して」「イラストを作って」「バナー作って」「図解を作り直して」
 「ChatGPT で画像」など。判断に迷う場合は**読む側**に倒す（読むコストは小さく、踏み直すコストは大きい）。
-
-### なぜ強制するか
-
-2026-08-05、jtt-cafe-pj の掲示物で図解を差し替えた際、手順を読まずに着手した結果、
-①自分で開いたタブが数秒で閉じる ②送信できていないのに成功と誤認 ③古い応答を最新と誤認、
-を繰り返して**10回以上リトライを空費**した。いずれも上記2ファイルに対処が書かれている
-（タブ借用ファースト / 送信の実証 / 停止ボタンでの完了判定 / 手渡し fallback）。
+強制の根拠となった実測失敗（2026-08-05）は `skills/stitch/SKILL.md` を参照。
 
 ## MCP 前提
 
@@ -1415,13 +1298,7 @@ Stitch MCPの接続definitionは`~/business/AGENT-HUB/docs/codex-mcp-definitions
 
 ### general/visual-progress-map.md
 
-<!-- [2026-07-18][refactor]
-背景:
-  - ユーザー依頼意図: 図解の発火条件を保ったまま、常時ロードされるルールを短くする。
-  - 守るべき業務ルール: L1 ASCII 既定、開発/業務の2モード、通常作業の自動発火、技術判断を平易語で聞く原則は残す。
-  - 他案不採用理由: Mermaid 専用化、skill 起動時だけの発火、単一モード化、テンプレ全文の常駐はいずれも過去の判断とコンテキスト節約に反するため不採用。
-対応: 義務とトリガーを本ルールに残し、テンプレ・実例・置換表は visual-companion references を正本とする。
--->
+<!-- CaD 全文移設（2026-08-08 ctx-slim）: ~/business/AGENT-HUB/skills/visual-companion/references/progress-map-templates.md 「visual-progress-map.md からの移設」節参照 -->
 
 # 図解・現在地マップ・非エンジニア用語ルール
 
@@ -1487,14 +1364,7 @@ skill 非起動時でも、以下のいずれかに該当したら L1 ASCII 図�
 
 ## 3. ミニ地図テンプレート（/brainstorm 用）
 
-```
-[ 現在地 ] /brainstorm Phase X/3
-✅ Phase 1: 要件聞き取り
-🔵 Phase 2: 不明点深掘り  ← 今ここ
-⬜ Phase 3: 実装方針提示
-
-次にやること: <1 文>
-```
+/brainstorm の Phase 遷移時に出す最小テンプレート。全文（移設済）: `~/business/AGENT-HUB/skills/visual-companion/references/progress-map-templates.md` 「ミニ地図テンプレート」節参照。
 
 ## 4-bis. 視覚化の 3 層（L1/L2/L3）の使い分け
 
@@ -1542,33 +1412,8 @@ skill 非起動時でも、以下のいずれかに該当したら L1 ASCII 図�
 
 ### general/worktree-rule.md
 
-<!-- [2026-05-15][feat]
-背景:
-  - ユーザー依頼意図: `/insights` レポートで「worktree を使わずに main で作業した結果、別セッションのブランチを汚染し cherry-pick で復旧した」という friction が複数件検出されたため、worktree workflow を SSOT 化する。
-  - 守るべき業務ルール: worktree 利用を強制ではなく推奨に留める。個人作業（1ファイル編集・1コミット完結タスク）まで worktree 必須にすると運用負荷が増す。並列セッション・複数 PR 同時進行のときだけ worktree を要件とする。
-  - 他案不採用理由: (1) SessionStart hook で main 作業を強制ブロックする案は、Markdown / sync-state.json の例外（branch-rule.md）と整合させる条件分岐が複雑になり、誤検出時の復旧コストが高いため不採用。(2) CLAUDE.md にインライン記述する案は、CLAUDE.md が既に 484 行で警告閾値 250 行を超過しているためコンテキスト効率上不採用。
-対応: `.claude/rules/general/worktree-rule.md` 新規作成。paths frontmatter は設定せず、全コマンドで参照される常時読み込みルールとする。
--->
-
-<!-- [2026-07-01][refactor]
-背景:
-  - ユーザー依頼意図: 「メインを掴まない」運用を AGENT-HUB だけでなく全 PJ・全 AI ツールへ広げ、
-    AI に main 直接コミットを許す例外をなくしたい。
-  - 守るべき業務ルール: AI が変更を加える通常作業では、軽量変更でも専用 worktree + feature branch + PR を使う。
-    main 最新化は `git pull` ではなく fetch-only / detached 確認で行う。
-  - 他案不採用理由: 「軽量編集なら worktree なし」を残す案は、branch-rule.md の 2026-07-01 方針変更と矛盾するため不採用。
-対応: worktree なしでよいケースから main 直接コミットを許す例外を削除し、AI 通常作業では専用 worktree を必須化。
--->
-
-<!-- [2026-07-16][refactor]
-背景:
-  - ユーザー依頼意図: 常駐ルールダイエット PR2。本ファイルが19,701Bまで肥大化し、全PJ常時読み込みのコンテキストを圧迫。
-  - 守るべき業務ルール: 内容は消さない。義務・トリガーはここに残し、復旧手順・実測gotcha・mirror追従の詳細は
-    `docs/worktree-operations.md` へ原文のまま移設する（PR1 #997 と同型の二段構え）。
-  - 他案不採用理由: 全文をここに残す案は再肥大化を放置。単純削除は復旧手順・実測知見の喪失になり不採用。
-対応: 機密symlink/mirror追従/branch contamination復旧/block-main-commit対策/共有checkout詳細を
-  `docs/worktree-operations.md` へ移設し、本ファイルは義務・トリガー・骨子だけに縮小。
--->
+<!-- 制定経緯（2026-05-15 新規作成 / 2026-07-01 main直接コミット例外全撤回 / 2026-07-16 PR2ダイエット）の
+CaD 全文は `~/business/AGENT-HUB/docs/worktree-operations.md`「決定履歴（CaD 移設）— worktree-rule.md 由来」参照 -->
 
 # Worktree 利用ルール
 
@@ -1582,11 +1427,7 @@ AI が変更を加える通常作業では、git worktree を作成して別デ�
 - **長期 feature branch**: main から離れて 1 日以上滞在する作業（途中で main を hotfix する可能性がある）
 - **軽量変更を含む AI 作業**: 例外なし。詳細は branch-rule.md 参照
 
-例:
-```
-git worktree add ../jtt-cms-feat-xyz -b feat/xyz
-cd ../jtt-cms-feat-xyz
-```
+worktree 作成コマンドの例は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
 
 ## いつ新規 worktree を作らなくてよいか
 
@@ -1651,7 +1492,8 @@ block-main-commit hook は cwd 変更を伴う複合コマンドでの main 直 
 git worktree list
 ```
 
-`~/Herd/jtt-apps` 配下には `jtt-apps-api-rate-limit-guards` / `jtt-apps-wt` / `jtt-apps-worktrees` 等の既存 worktree がある（CLAUDE.md `## プロジェクトルート規約` 参照）。新規作成前に既存 worktree の再利用可否を確認すること。
+新規作成前に既存 worktree の再利用可否を確認すること。既存 worktree の実例（jtt-apps 等）は
+`~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
 
 ---
 

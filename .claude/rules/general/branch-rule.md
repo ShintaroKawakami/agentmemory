@@ -1,17 +1,6 @@
-<!-- [2026-07-29][refactor]
-背景:
-  - ユーザー依頼意図: 常駐ルールダイエット第2弾。全PJに常駐する `branch-rule.md` が15,178字まで肥大化し、
-    現在は撤回済みの allowlist 例外の変遷史（6件のCaDコメント）と長文の手順詳細がセッション開始の
-    コンテキストを圧迫していた。
-  - 守るべき業務ルール: 内容は消さない（reference-over-hardcode.md 原則）。現行の義務・禁止事項は rule に残し、
-    撤回済みの変遷史・長文手順は移設先へ移す二段構え（PR1 #997・PR2 #1001 と同型）。
-  - 他案不採用理由: rule 側に全文を残す案は再肥大化を放置するため不採用。変遷史を単純削除する案は
-    過去の不採用判断（CaD）を再検討する際の参照材料を失うため不採用。
-対応: `.claude/rules/general/branch-rule.md` から `~/business/AGENT-HUB/docs/worktree-operations.md` へ、allowlist変遷史・
-  配布クローズアウト責任の完了条件詳細・事前計画ステップのコマンド列・pre-commit hookピボット手順を移設。
--->
-
 # ブランチ運用ルール
+
+制定経緯（CaD）: `~/business/AGENT-HUB/docs/worktree-operations.md`「決定履歴（CaD 移設）— branch-rule.md 由来」節を参照。
 
 ## main ブランチへの直接コミット・プッシュ
 
@@ -33,21 +22,6 @@ PR 導線がまだ存在しない場合だけ例外になりうる。AI はこ�
 - ツールごとに例外を残すと、Claude / Codex / Cursor / Kimi / Antigravity 間で運用がずれる
 - main の最新化は `git pull` ではなく、fetch-only と detached HEAD / 専用 verify worktree で確認すれば足りる
 
-<!-- [2026-07-30][feat] STEP 4: CI の番人を働かせる（R4: マージ根拠のドキュメント明記）
-背景:
-  - ユーザー依頼意図: 2026-07-24 に AGENT-HUB の CI pull_request トリガーを削除した結果、
-    checks が無い PR のマージ根拠が本ルールに書かれておらず、AI がマージ判断時に参照できる
-    正本が無かった（承認済みプラン claude-plans/step4-ci-gate.html の R4）。
-  - 守るべき業務ルール: 常時ロードルールへの追記は新規セクション新設ではなく、既存の
-    branch-rule.md への短い追記に留める（常時ロード台帳の規約により新規常時ロードファイルは
-    作らない）。手順の全文は skills/post-merge/SKILL.md（R2 の使い方）を正本として参照し、
-    ここへ複製しない。
-  - 他案不採用理由: 新規 rule ファイル（例: ci-gate-rule.md）を作る案は、常時ロード許可台帳
-    （registries/always-load-rules.yaml）への理由付き登録が別途必要になり、既存 branch-rule.md
-    と同じ話題（マージ時の運用根拠）が2ファイルに分裂するため不採用。
-対応: 「AGENT-HUB の CI とマージ根拠」節を新設し、R1（.github/workflows/ ありで checks 0件は
-  ローカルゲート代替検証）・R2（registries/merge-gate-suite.yaml が唯一の検査コマンド正本）の
-  要旨だけを3行で明記し、詳細は skills/post-merge/SKILL.md を参照させる。 -->
 ## AGENT-HUB の CI とマージ根拠（2026-07-30 STEP 4）
 
 AGENT-HUB の CI は `workflow_dispatch` + `ci/light` ラベル方式（pull_request 自動トリガーは 2026-07-24 に削除済み）。

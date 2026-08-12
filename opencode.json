@@ -14,6 +14,14 @@
         "agentmemory"
       ]
     },
+    "agentmemory-project-router": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "/bin/bash",
+        "/Users/shintaro/business/AGENT-HUB/scripts/agentmemory-project-router-stdio.sh"
+      ]
+    },
     "ai-worker-mcp": {
       "type": "local",
       "enabled": true,

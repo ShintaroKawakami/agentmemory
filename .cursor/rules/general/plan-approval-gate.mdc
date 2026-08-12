@@ -11,28 +11,24 @@ alwaysApply: true
 
 中規模以上の**実装に着手する前に、必ず HTML で実装プランを提示し、利用者の明示承認（「この実装でいい」）を得てから着手する**。テキストだけで合意したつもりにならない。
 
-理由: 非エンジニアの利用者には「どの画面がどう変わるか」がテキストでは伝わりにくく、着手後に手戻りが多発する。給与v1の説明 HTML のような見せ方を毎回・自動で出して認識を合わせ「手戻りゼロ」を狙う。
+理由: 非エンジニアの利用者には「どの画面がどう変わるか」がテキストでは伝わりにくく、着手後に手戻りが多発する。同様の見せ方を毎回・自動で出し「手戻りゼロ」を狙う。
 
 これは `ui-stitch-mandatory` と同じく**ルールが義務を担い、手順はスキルに置く**二段構え。手順 SSOT は `skills/plan-approval/SKILL.md`（本ルールは手順を複製せず参照する）。
 
-<!-- [2026-07-16][refactor] 常駐ルールダイエット（PR2）。
-背景:
-  - ユーザー依頼意図: 常駐コンテキスト削減のため本ファイル（10,255Bまで肥大化）を薄い義務層へ絞る。
-  - 守るべき業務ルール: 義務文言（承認なしに進まない・固定テンプレ必須・Write必須・禁止2態様・ファイルカード+open両方必須）は弱めない。「HTMLプランの中身」の部品一覧はテンプレ parts マニフェストと SKILL.md（正本）参照に一本化し複製しない。
-  - 他案不採用理由: 部品一覧を本ルールに残す案は SKILL.md/テンプレとの三重管理になり更新漏れを生むため不採用。ルール自体を skill へ落とす案は常時発火の強制力を失うため不採用。 -->
+制定経緯（CaD）: ~/business/AGENT-HUB/skills/plan-approval/SKILL.md「plan-approval-gate.md からの移設」参照。
 
 ## 必須手順
 
 1. **プラン作成基準をライブ読み**: `skills/plan-approval` が `resolve-pj-prompt.py --phase plan` を実行し、PJ 別のプラン基準（`snippet-prompts/Typinator/plan/`。専用未作成 PJ は汎用 `dev-plan`）を読む。
 2. **HTML プランを作る（固定テンプレを必ず使う・独自デザイン禁止）**: 正本テンプレをコピーし中身だけ差し替える（通常=`plan-template.html`、AI worker 委譲時=`plan-template-aiworker.html`）。必須のビジュアル要素は下記「中身」節を参照。
-3. **提示して承認を待つ（iPhone でも PC でも、両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 `open <file>` で PC ブラウザにも表示する。**タップ用ファイルカード作成と open による PC ブラウザ表示の両方を毎回必須とする**。末尾に「この実装でいいですか？（進めて / 直す / やめる）」を置き、**承認なしに実装へ進まない**。短い同意だけで進めず、次の一手を1文に要約して再確認する。保存先は作業中 PJ の gitignore 済み一時パス（`claude-plans/` 等）、slug は短く、共有 URL は1行で提示する（詳細: `skills/plan-approval/SKILL.md` §5）。
+3. **提示して承認を待つ（両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 `open <file>` で PC ブラウザにも表示する。**タップ用ファイルカード作成と open による PC ブラウザ表示の両方を毎回必須とする**。末尾に「この実装でいいですか？（進めて / 直す / やめる）」を置き、**承認なしに実装へ進まない**。保存規約（gitignore済み一時パス・短い slug・共有 URL は1行）と短い同意時の再確認は `skills/plan-approval/SKILL.md` を参照。
 4. **承認直後に 📋 コミットメント台帳を全件タスク化する**: HTML プランの台帳の各行を、着手前に `TaskCreate` で 1 行 = 1 タスク化してから実装へ進む。台帳が全消化（実施済み or 明示保留）になるまで「完了」と宣言しない。詳細は `.claude/rules/general/plan-commitment-tracking.md`。
    - **AI worker を 1 度でも使う計画は必須**: 「AI worker 摩擦時は該当正本を worktree→PR→merge→fetch-only / detached 確認→cleanup で修正」の条項を台帳に必ず入れ、タスク化する（テンプレに既定行として焼き込み済み・消さない）。
 5. **承認後は標準パイプラインを通す**: 実装（dev-guardrails）→ codexレビュー → 実装監査 → CI → SSOT 同期確認 → マージ。本番投入は人間ゲート。
 
 ## HTMLプランの中身
 
-中身の構成部品（🎯目的・🖼️前後比較・🗺️ユーザーストーリー・🔀画面遷移図・📚メニュー構成図・🧩変える物一覧・🤔AI の異見・🔭一段上の視点・📋コミットメント台帳 等の必須要素一覧）はテンプレ正本（`references/plan-template.html` の `parts` マニフェスト）と `skills/plan-approval/SKILL.md` が正本。ここに複製しない。
+構成部品一覧は `references/plan-template.html` の `parts` マニフェストと `skills/plan-approval/SKILL.md` が正本。複製しない。
 
 ## 適用トリガー
 
@@ -47,7 +43,7 @@ alwaysApply: true
 
 ## 接続・関連
 
-手順: `skills/plan-approval/SKILL.md`（テンプレ・保存規約・承認ループ・3層視覚化）。プラン基準: `snippet-prompts/Typinator/plan/[PLAN-INPUT]_<pj>-plan.md`。進捗: `visual-progress-map.md`。UI確定: `ui-stitch-mandatory.md`。承認後: `skills/dev-guardrails/SKILL.md`（各フェーズは `resolve-pj-prompt.py` 同一リゾルバ）。モデル委譲: `ai-model-selection.md`。
+手順: `skills/plan-approval/SKILL.md`。基準: `snippet-prompts/Typinator/plan/[PLAN-INPUT]_<pj>-plan.md`。進捗: `visual-progress-map.md`。UI確定: `ui-stitch-mandatory.md`。承認後: `skills/dev-guardrails/SKILL.md`。モデル委譲: `ai-model-selection.md`。
 
 ---
 
