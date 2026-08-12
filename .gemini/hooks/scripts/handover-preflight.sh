@@ -230,6 +230,30 @@ def matched_app(prompt: str, apps: list[dict[str, object]]) -> dict[str, object]
     return None
 
 
+# [2026-08-05][fix] mac-mini-server 配下の repo が non-pj へ落ちる誤判定を修正する。
+# 背景:
+# - ユーザー依頼意図: closeout で preflight が `scope: non-pj/root` を提示したが、正本である
+#   `skills/handover-manual/scripts/resolve-handover-path.py` は同じ cwd を `register/root` と解決していた。
+#   preflight を信じると handover が別 scope（non-pj）へ書かれ、次セッションが引き継ぎを見失う。
+# - 守るべき業務ルール: preflight の project 解決は resolve-handover-path.py（正本）と一致させる。
+#   正本は `/mac-mini-server/<repo>` を MAC_MINI_REPOS で個別 repo として解決するが、本 hook は
+#   hermes だけを特別扱いし、register / sales / analytics / keiei-dashboard / cron-dashboard を
+#   取りこぼしていた（2 箇所に同じ写像を持っていて片方だけ更新された典型）。
+# - 他案不採用理由:
+#   1) hook から resolve-handover-path.py を import する案: hook は各 PJ へ配布され skill の
+#      配置パスが保証されないため、実行時解決に失敗すると preflight 全体が壊れる。今回は最小差分で
+#      写像だけ揃え、DRY 化は AGENT-HUB Issue へ分離する。
+#   2) git remote 名から機械的に決める案: worktree / fork / ミラーで別名になり、既存 scope と乖離する。
+MAC_MINI_REPOS = (
+    "keiei-dashboard",
+    "cron-dashboard",
+    "hermes",
+    "analytics",
+    "sales",
+    "register",
+)
+
+
 def project_from_cwd(path: Path) -> str:
     if (path / "DISTRIBUTION.yaml").is_file() and (path / "hook-registry.yaml").is_file():
         return "AGENT-HUB"
@@ -245,6 +269,12 @@ def project_from_cwd(path: Path) -> str:
     for project, marker in checks:
         if marker in text:
             return project
+    parts = path.parts
+    if "mac-mini-server" in parts:
+        idx = parts.index("mac-mini-server")
+        if idx + 1 < len(parts) and parts[idx + 1] in MAC_MINI_REPOS:
+            return parts[idx + 1]
+        return "mac-mini-server"
     if (path / "pnpm-workspace.yaml").is_file() and (path / "apps").is_dir():
         return "jtt-system"
     return "non-pj"

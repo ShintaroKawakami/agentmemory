@@ -1,15 +1,3 @@
-<!-- [2026-07-29][refactor]
-背景:
-  - ユーザー依頼意図: 常駐ルールダイエット第2弾。全PJに常駐する `ui-stitch-mandatory.md` が6,649字まで
-    肥大化し、制定経緯の長文CaDコメント（2件）がコンテキストを圧迫していた。
-  - 守るべき業務ルール: 内容は消さない（reference-over-hardcode.md 原則）。義務・トリガー・禁止事項は rule に残し、
-    制定経緯は移設先へ移す二段構え（PR1 #997・PR2 #1001 と同型）。
-  - 他案不採用理由: rule 側に全文を残す案は再肥大化を放置するため不採用。制定経緯を削除する案は
-    過去の不採用判断（brainstorm/parallel-run skill内限定案・Stitch手順転記案 等）の参照材料を失うため不採用。
-対応: `.claude/rules/general/ui-stitch-mandatory.md` から `skills/stitch/SKILL.md` へ、
-  制定経緯（2026-05-27）・MCP選択正本のmanifest v2切替経緯（2026-07-20）を移設。
--->
-
 # UI / デザインは必ず Stitch を通すルール（強制）
 
 制定経緯（2026-05-27 新設判断・2026-07-20 MCP選択正本切替）は `skills/stitch/SKILL.md` の
@@ -49,6 +37,25 @@ Stitch 由来のファイルを散らかさないため、保存先を固定す�
 
 - 既存 UI の微修正（typo 修正・1 色だけ変更など、**見た目の方針が変わらない**もの）。
 - UI に変化を伴わない純粋なロジック修正。
+- **写真・イラスト・商品画像・掲示物の図解**（画面レイアウトではなく「絵そのもの」を作る作業）。
+  → Stitch ではなく下記「画像生成」の導線を使う。
+
+## 画像生成（写真・イラスト・図解）は手順を読んでから着手する（強制）
+
+Stitch の対象外である**絵そのもの**（商品写真・HP 用画像・バナー・掲示物の図解等）を ChatGPT で作る時は、
+**着手前に必ず `~/business/AGENT-HUB/agents/global/chatgpt-image-creator.md` と
+`~/business/AGENT-HUB/agents/config/chatgpt-image-creator.yaml` を読む**。
+
+- **サブエージェントへ委譲する時も、PM / 親セッションが自分でやる時も同じ**。
+  「自分でやるから読まなくていい」は不可（読まずに始めた結果、既知の失敗を踏み直した実測あり）。
+- 手順の正本は上記2ファイル。本ルールは義務とトリガーだけを持ち、手順を複製しない
+  （`plan-approval-gate` / 本ルール上部の Stitch と同じ二段構え）。
+
+### トリガー
+
+「画像を作って」「写真を生成して」「イラストを作って」「バナー作って」「図解を作り直して」
+「ChatGPT で画像」など。判断に迷う場合は**読む側**に倒す（読むコストは小さく、踏み直すコストは大きい）。
+強制の根拠となった実測失敗（2026-08-05）は `skills/stitch/SKILL.md` を参照。
 
 ## MCP 前提
 
@@ -73,6 +80,7 @@ Stitch MCPの接続definitionは`~/business/AGENT-HUB/docs/codex-mcp-definitions
 - `registries/harness-manifest.yaml` — global / harness type / projectの採否とsurface契約
 - `~/business/AGENT-HUB/docs/design/design-philosophy.md` — 伸太郎殿の設計思想 SSOT
 - `agents/global/stitch-screen-creator.md` — Stitch 画面作成グローバルエージェント
+- `agents/global/chatgpt-image-creator.md` / `agents/config/chatgpt-image-creator.yaml` — **画像生成（絵そのもの）の手順 SSOT**。本ルールの「画像生成」節が指す先
 
 ---
 

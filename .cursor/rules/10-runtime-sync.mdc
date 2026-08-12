@@ -45,6 +45,7 @@ alwaysApply: true
 - `.claude/rules/general/ai-model-selection.md`
 - `.claude/rules/general/branch-rule.md`
 - `.claude/rules/general/constructive-dissent.md`
+- `.claude/rules/general/gbrain-recall.md`
 - `.claude/rules/general/hooks-structure-rule.md`
 - `.claude/rules/general/latest-stack-context7.md`
 - `.claude/rules/general/mandate-registry.md`
@@ -75,7 +76,13 @@ alwaysApply: true
 - `.claude/hooks/scripts/block-skill-reverse-edit.test.sh`
 - `.claude/hooks/scripts/block-unauthorized-docs-file.sh`
 - `.claude/hooks/scripts/block-unauthorized-docs-file.test.sh`
+- `.claude/hooks/scripts/delegation-routing-backstop.sh`
+- `.claude/hooks/scripts/delegation-routing-backstop.test.sh`
+- `.claude/hooks/scripts/delegation-routing-reminder.sh`
+- `.claude/hooks/scripts/delegation-routing-reminder.test.sh`
 - `.claude/hooks/scripts/freshness-gate.sh`
+- `.claude/hooks/scripts/gbrain-recall-preflight.sh`
+- `.claude/hooks/scripts/gbrain-recall-preflight.test.sh`
 - `.claude/hooks/scripts/handover-preflight.sh`
 - `.claude/hooks/scripts/handover-preflight.test.sh`
 - `.claude/hooks/scripts/post-merge-gate.sh`
@@ -97,6 +104,7 @@ alwaysApply: true
 - `.claude/agents/implementation-auditor.md`
 - `.claude/agents/qa-reviewer.md`
 - `.claude/agents/quality-engineer.md`
+- `.claude/agents/security-reviewer.md`
 - `.claude/agents/stitch-screen-creator.md`
 - `.claude/agents/technical-writer.md`
 - `.claude/agents/test-runner.md`
@@ -104,6 +112,7 @@ alwaysApply: true
 - `.cursor/rules/general/ai-model-selection.mdc`
 - `.cursor/rules/general/branch-rule.mdc`
 - `.cursor/rules/general/constructive-dissent.mdc`
+- `.cursor/rules/general/gbrain-recall.mdc`
 - `.cursor/rules/general/hooks-structure-rule.mdc`
 - `.cursor/rules/general/latest-stack-context7.mdc`
 - `.cursor/rules/general/mandate-registry.mdc`
@@ -136,7 +145,13 @@ alwaysApply: true
 - `.cursor/hooks/scripts/block-unauthorized-docs-file.sh`
 - `.cursor/hooks/scripts/block-unauthorized-docs-file.test.sh`
 - `.cursor/hooks/scripts/cursor-command-bridge.sh`
+- `.cursor/hooks/scripts/delegation-routing-backstop.sh`
+- `.cursor/hooks/scripts/delegation-routing-backstop.test.sh`
+- `.cursor/hooks/scripts/delegation-routing-reminder.sh`
+- `.cursor/hooks/scripts/delegation-routing-reminder.test.sh`
 - `.cursor/hooks/scripts/freshness-gate.sh`
+- `.cursor/hooks/scripts/gbrain-recall-preflight.sh`
+- `.cursor/hooks/scripts/gbrain-recall-preflight.test.sh`
 - `.cursor/hooks/scripts/handover-preflight.sh`
 - `.cursor/hooks/scripts/handover-preflight.test.sh`
 - `.cursor/hooks/scripts/post-merge-gate.sh`
@@ -159,6 +174,7 @@ alwaysApply: true
 - `.cursor/agents/implementation-auditor.md`
 - `.cursor/agents/qa-reviewer.md`
 - `.cursor/agents/quality-engineer.md`
+- `.cursor/agents/security-reviewer.md`
 - `.cursor/agents/stitch-screen-creator.md`
 - `.cursor/agents/technical-writer.md`
 - `.cursor/agents/test-runner.md`

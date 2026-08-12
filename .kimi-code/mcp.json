@@ -1,16 +1,22 @@
 {
   "mcpServers": {
-    "agentmemory-agentmemory": {
+    "agentmemory": {
       "command": "/bin/bash",
       "args": [
         "/Users/shintaro/business/AGENT-HUB/scripts/agentmemory-mcp-remote.sh",
         "agentmemory"
       ]
     },
+    "agentmemory-project-router": {
+      "command": "/bin/bash",
+      "args": [
+        "/Users/shintaro/business/AGENT-HUB/scripts/agentmemory-project-router-stdio.sh"
+      ]
+    },
     "ai-worker-mcp": {
       "command": "/Users/shintaro/business/AGENT-HUB/tools/ai-worker-mcp/bin/ai-worker-mcp"
     },
-    "codebase-context-engine-agentmemory": {
+    "codebase-context-engine": {
       "command": "/bin/bash",
       "args": [
         "/Users/shintaro/business/AGENT-HUB/scripts/codex-mcp-remote-with-env.sh",

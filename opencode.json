@@ -5,13 +5,21 @@
     "CLAUDE.md"
   ],
   "mcp": {
-    "agentmemory-agentmemory": {
+    "agentmemory": {
       "type": "local",
       "enabled": true,
       "command": [
         "/bin/bash",
         "/Users/shintaro/business/AGENT-HUB/scripts/agentmemory-mcp-remote.sh",
         "agentmemory"
+      ]
+    },
+    "agentmemory-project-router": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "/bin/bash",
+        "/Users/shintaro/business/AGENT-HUB/scripts/agentmemory-project-router-stdio.sh"
       ]
     },
     "ai-worker-mcp": {
@@ -21,7 +29,7 @@
         "/Users/shintaro/business/AGENT-HUB/tools/ai-worker-mcp/bin/ai-worker-mcp"
       ]
     },
-    "codebase-context-engine-agentmemory": {
+    "codebase-context-engine": {
       "type": "remote",
       "enabled": true,
       "url": "http://shintaros-mac-mini:8847/mcp",

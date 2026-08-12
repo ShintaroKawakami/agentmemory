@@ -1,8 +1,8 @@
 {
   "tool": "kimi-sync",
   "target": "kimi-code-cli",
-  "generated_at": "2026-08-03T15:02:31.557712+00:00",
-  "source_commit": "b135841",
+  "generated_at": "2026-08-12T10:32:01.436035+00:00",
+  "source_commit": "f45caaa",
   "project_root": ".",
   "project_agents_md": ".kimi-code/AGENTS.md",
   "skills_link": "managed by sync-runtime-skills.py (manifest v2)",
@@ -20,7 +20,13 @@
     "scripts/block-skill-reverse-edit.test.sh",
     "scripts/block-unauthorized-docs-file.sh",
     "scripts/block-unauthorized-docs-file.test.sh",
+    "scripts/delegation-routing-backstop.sh",
+    "scripts/delegation-routing-backstop.test.sh",
+    "scripts/delegation-routing-reminder.sh",
+    "scripts/delegation-routing-reminder.test.sh",
     "scripts/freshness-gate.sh",
+    "scripts/gbrain-recall-preflight.sh",
+    "scripts/gbrain-recall-preflight.test.sh",
     "scripts/handover-preflight.sh",
     "scripts/handover-preflight.test.sh",
     "scripts/post-merge-gate.sh",
@@ -35,17 +41,17 @@
     "scripts/telemetry-log.sh",
     "scripts/telemetry-log.test.sh"
   ],
-  "hook_library_version": "v3.6.37",
-  "hook_count": 11,
-  "mcp_server_count": 7,
+  "hook_library_version": "v3.6.38",
+  "hook_count": 13,
+  "mcp_server_count": 8,
   "user_config_path": "${KIMI_CODE_HOME:-~/.kimi-code}/config.toml",
   "trusted_projects_path": "${KIMI_CODE_HOME:-~/.kimi-code}/trusted-projects.json",
   "default_thinking": true,
   "machine_scope": "not-run",
   "legacy_kimi_dir_cleanup": "separate-proof-gated-migration-only",
   "warnings": [
+    "PostToolUse は観測系 event のため Kimi では重い hook を生成しません: delegation-routing-backstop.sh, telemetry-log.sh",
     "SessionStart は観測系 event のため Kimi では重い hook を生成しません",
-    "SubagentStop は観測系 event のため Kimi では重い hook を生成しません",
-    "PostToolUse は観測系 event のため Kimi では重い hook を生成しません: telemetry-log.sh"
+    "SubagentStop は観測系 event のため Kimi では重い hook を生成しません"
   ]
 }

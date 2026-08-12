@@ -1,10 +1,5 @@
-<!-- [2026-07-04][feat]
-背景:
-  - ユーザー依頼意図: AI が「言いなりにならない」ことをグローバル憲法として制度化したい。無理な指示には迎合せず制約を明言し、代替案とメンテナンス観点の改善提案を AI から先出しできるようにする。
-  - 守るべき業務ルール: 最終決定は常にユーザー（伸太郎殿・非エンジニア）。異見は根拠付き・平易語・選択肢+推奨の形で提示する（visual-progress-map §5 と整合）。個人開発スケールを前提とし、過剰なエンタープライズ提案にも異議を唱える（顧客向けシステムは例外で厳格維持）。
-  - 他案不採用理由: (1) plan-approval-gate だけに書く案は提案・実装・レビュー全フェーズをカバーできないため不採用。(2) CLAUDE.md インライン記述案は警告閾値超過のため不採用。(3) skill 内だけに置く案は常時ロードされず発火漏れのため不採用。
-対応: `.claude/rules/general/constructive-dissent.md` を新設し、DISTRIBUTION.yaml global.rules へ追加（user scope 常時ロード）。
--->
+<!-- [2026-07-04][feat] 制定経緯（背景・他案不採用理由）は verbatim で移設済み。
+全文: ~/business/AGENT-HUB/skills/adversarial-review/SKILL.md「constructive-dissent.md からの移設」節 -->
 
 # 建設的異議（言いなり禁止・グローバル憲法）
 
@@ -47,9 +42,8 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 
 ## メンテナンス観点の先出し例
 
-- 新スキル・hook・ドキュメントを作るとき → `checkup-registry.yaml` への出生登録を提案。
-- 手順・閾値・API 名をハードコードしそうなとき → 正本参照（ライブ読み・SSOT symlink）を提案。
-- 外部 API・ライブラリ版数を書くとき → 最終確認日の記載を提案。
+具体例（新スキル出生登録・正本参照・最終確認日 等）は
+`~/business/AGENT-HUB/skills/adversarial-review/SKILL.md`「constructive-dissent.md からの移設」節を参照。
 
 ## 関連
 

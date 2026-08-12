@@ -1,7 +1,7 @@
 {
   "tool": "antigravity-sync",
-  "generated_at": "2026-08-03T14:57:39.219071+00:00",
-  "source_commit": "e6a0c00",
+  "generated_at": "2026-08-12T10:31:58.792006+00:00",
+  "source_commit": "f45caaa",
   "project_root": ".",
   "generated_gemini_md": true,
   "copied_agents": [
@@ -13,6 +13,7 @@
     "implementation-auditor.md",
     "qa-reviewer.md",
     "quality-engineer.md",
+    "security-reviewer.md",
     "stitch-screen-creator.md",
     "technical-writer.md",
     "test-runner.md"
@@ -34,7 +35,13 @@
     "scripts/block-skill-reverse-edit.test.sh",
     "scripts/block-unauthorized-docs-file.sh",
     "scripts/block-unauthorized-docs-file.test.sh",
+    "scripts/delegation-routing-backstop.sh",
+    "scripts/delegation-routing-backstop.test.sh",
+    "scripts/delegation-routing-reminder.sh",
+    "scripts/delegation-routing-reminder.test.sh",
     "scripts/freshness-gate.sh",
+    "scripts/gbrain-recall-preflight.sh",
+    "scripts/gbrain-recall-preflight.test.sh",
     "scripts/handover-preflight.sh",
     "scripts/handover-preflight.test.sh",
     "scripts/post-merge-gate.sh",
@@ -54,6 +61,7 @@
     "ai-model-selection.md",
     "branch-rule.md",
     "constructive-dissent.md",
+    "gbrain-recall.md",
     "hooks-structure-rule.md",
     "latest-stack-context7.md",
     "mandate-registry.md",
@@ -74,7 +82,7 @@
     "BeforeAgent",
     "BeforeTool"
   ],
-  "mcp_server_count": 7,
+  "mcp_server_count": 8,
   "warnings": [
     "backend-developer.md: agent frontmatter `model: claude-sonnet-5` は Claude 固有のため除去（Gemini 側 inherit 相当）",
     "backend-developer.md: agent frontmatter field `memory` は Gemini 互換でないため除去",
@@ -96,6 +104,10 @@
     "qa-reviewer.md: agent frontmatter field `disallowedTools` は Gemini 互換でないため `tools` へ反映",
     "qa-reviewer.md: agent frontmatter field `skills` は Gemini 互換でないため除去",
     "qa-reviewer.md: disallowedTools のみ指定されていたため、Gemini 互換の既定ツール集合から禁止ツールを除外して tools を生成",
+    "security-reviewer.md: agent frontmatter `model: claude-sonnet-5` は Claude 固有のため除去（Gemini 側 inherit 相当）",
+    "security-reviewer.md: agent frontmatter field `disallowedTools` は Gemini 互換でないため `tools` へ反映",
+    "security-reviewer.md: disallowedTools の指定を反映し、Gemini 側 tools から禁止ツールを除外",
+    "security-reviewer.md: agent frontmatter field `skills` は Gemini 互換でないため除去",
     "stitch-screen-creator.md: agent frontmatter `model: claude-sonnet-5` は Claude 固有のため除去（Gemini 側 inherit 相当）",
     "test-runner.md: agent frontmatter `model: claude-sonnet-5` は Claude 固有のため除去（Gemini 側 inherit 相当）",
     "test-runner.md: agent frontmatter field `memory` は Gemini 互換でないため除去",
@@ -104,10 +116,13 @@
     "PreToolUse matcher=Write|Edit|MultiEdit は Gemini の run_shell_command へ未変換のためスキップ",
     "PreToolUse matcher=Bash|Edit|MultiEdit|Shell|StrReplaceFile|Write|WriteFile は Gemini の run_shell_command へ未変換のためスキップ",
     "PreToolUse matcher=Skill|Task|Agent は Gemini の run_shell_command へ未変換のためスキップ",
-    "SessionStart→SessionStart は現状の runtime bridge 未対応のためスキップ",
+    "PostToolUse matcher=Edit|Write|MultiEdit は Gemini の write_file|replace へ未変換のためスキップ",
+    "PostToolUse matcher=Skill|Task|Agent は Gemini の write_file|replace へ未変換のためスキップ",
+    "UserPromptSubmit command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/delegation-routing-reminder.sh\"",
+    "UserPromptSubmit command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/gbrain-recall-preflight.sh\"",
     "UserPromptSubmit command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/handover-preflight.sh\"",
+    "SessionStart→SessionStart は現状の runtime bridge 未対応のためスキップ",
     "SubagentStop→AfterAgent は現状の runtime bridge 未対応のためスキップ",
-    "Stop→AfterAgent は現状の runtime bridge 未対応のためスキップ",
-    "PostToolUse matcher=Skill|Task|Agent は Gemini の write_file|replace へ未変換のためスキップ"
+    "Stop→AfterAgent は現状の runtime bridge 未対応のためスキップ"
   ]
 }
