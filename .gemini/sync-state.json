@@ -1,7 +1,7 @@
 {
   "tool": "antigravity-sync",
-  "generated_at": "2026-08-12T14:08:06.830440+00:00",
-  "source_commit": "116b1cf",
+  "generated_at": "2026-08-12T15:04:22.921348+00:00",
+  "source_commit": "b70fc7d",
   "project_root": ".",
   "generated_gemini_md": true,
   "copied_agents": [
@@ -39,6 +39,8 @@
     "scripts/delegation-routing-backstop.test.sh",
     "scripts/delegation-routing-reminder.sh",
     "scripts/delegation-routing-reminder.test.sh",
+    "scripts/fable-implementation-guard.sh",
+    "scripts/fable-implementation-guard.test.sh",
     "scripts/freshness-gate.sh",
     "scripts/gbrain-recall-preflight.sh",
     "scripts/gbrain-recall-preflight.test.sh",
@@ -116,6 +118,7 @@
     "PreToolUse matcher=Write|Edit|MultiEdit は Gemini の run_shell_command へ未変換のためスキップ",
     "PreToolUse matcher=Bash|Edit|MultiEdit|Shell|StrReplaceFile|Write|WriteFile は Gemini の run_shell_command へ未変換のためスキップ",
     "PreToolUse matcher=Skill|Task|Agent は Gemini の run_shell_command へ未変換のためスキップ",
+    "PostToolUse matcher=Edit|Write|MultiEdit は Gemini の write_file|replace へ未変換のためスキップ",
     "PostToolUse matcher=Edit|Write|MultiEdit は Gemini の write_file|replace へ未変換のためスキップ",
     "PostToolUse matcher=Skill|Task|Agent は Gemini の write_file|replace へ未変換のためスキップ",
     "UserPromptSubmit command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/delegation-routing-reminder.sh\"",

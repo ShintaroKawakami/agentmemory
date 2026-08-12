@@ -1,8 +1,8 @@
 {
   "tool": "kimi-sync",
   "target": "kimi-code-cli",
-  "generated_at": "2026-08-12T14:08:09.412300+00:00",
-  "source_commit": "116b1cf",
+  "generated_at": "2026-08-12T15:04:25.597362+00:00",
+  "source_commit": "b70fc7d",
   "project_root": ".",
   "project_agents_md": ".kimi-code/AGENTS.md",
   "skills_link": "managed by sync-runtime-skills.py (manifest v2)",
@@ -24,6 +24,8 @@
     "scripts/delegation-routing-backstop.test.sh",
     "scripts/delegation-routing-reminder.sh",
     "scripts/delegation-routing-reminder.test.sh",
+    "scripts/fable-implementation-guard.sh",
+    "scripts/fable-implementation-guard.test.sh",
     "scripts/freshness-gate.sh",
     "scripts/gbrain-recall-preflight.sh",
     "scripts/gbrain-recall-preflight.test.sh",
@@ -50,7 +52,7 @@
   "machine_scope": "not-run",
   "legacy_kimi_dir_cleanup": "separate-proof-gated-migration-only",
   "warnings": [
-    "PostToolUse は観測系 event のため Kimi では重い hook を生成しません: delegation-routing-backstop.sh, telemetry-log.sh",
+    "PostToolUse は観測系 event のため Kimi では重い hook を生成しません: delegation-routing-backstop.sh, fable-implementation-guard.sh, telemetry-log.sh",
     "SessionStart は観測系 event のため Kimi では重い hook を生成しません",
     "SubagentStop は観測系 event のため Kimi では重い hook を生成しません"
   ]

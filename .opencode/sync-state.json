@@ -1,8 +1,8 @@
 {
   "tool": "opencode",
-  "generated_at": "2026-08-12T23:08:04.156182+09:00",
-  "source_commit": "116b1cf",
-  "project_root": "/private/tmp/agentmemory-phase-b-20260812",
+  "generated_at": "2026-08-13T00:04:20.238001+09:00",
+  "source_commit": "b70fc7d",
+  "project_root": "/private/tmp/agentmemory-ledger2-db0e-q02N",
   "mcp_source": {
     "registry": "/Users/shintaro/business/AGENT-HUB/docs/codex-mcp-registry.yaml",
     "definitions": "/Users/shintaro/business/AGENT-HUB/docs/codex-mcp-definitions.yaml",
@@ -39,6 +39,7 @@
     "PreToolUse matcher=Bash|Edit|MultiEdit|Shell|StrReplaceFile|Write|WriteFile は OpenCode plugin へ未変換",
     "PreToolUse command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/post-merge-gate.sh\"",
     "PreToolUse matcher=Skill|Task|Agent は OpenCode plugin へ未変換",
+    "PostToolUse matcher=Edit|Write|MultiEdit は OpenCode plugin へ未変換",
     "PostToolUse matcher=Edit|Write|MultiEdit は OpenCode plugin へ未変換",
     "PostToolUse matcher=Skill|Task|Agent は OpenCode plugin へ未変換",
     "UserPromptSubmit は OpenCode plugin へ未変換のため対象外",
