@@ -17,6 +17,11 @@ command = "/bin/bash"
 args = ["/Users/shintaro/business/AGENT-HUB/scripts/agentmemory-mcp-remote.sh", "agentmemory"]
 enabled = true
 
+[mcp_servers.agentmemory-project-router]
+command = "/bin/bash"
+args = ["/Users/shintaro/business/AGENT-HUB/scripts/agentmemory-project-router-stdio.sh"]
+enabled = true
+
 [mcp_servers.ai-worker-mcp]
 command = "/Users/shintaro/business/AGENT-HUB/tools/ai-worker-mcp/bin/ai-worker-mcp"
 args = []

@@ -1,7 +1,7 @@
 {
   "tool": "antigravity-sync",
-  "generated_at": "2026-08-05T12:55:21.840417+00:00",
-  "source_commit": "6d53814",
+  "generated_at": "2026-08-12T10:37:45.252668+00:00",
+  "source_commit": "3293a23",
   "project_root": ".",
   "generated_gemini_md": true,
   "copied_agents": [
@@ -35,6 +35,10 @@
     "scripts/block-skill-reverse-edit.test.sh",
     "scripts/block-unauthorized-docs-file.sh",
     "scripts/block-unauthorized-docs-file.test.sh",
+    "scripts/delegation-routing-backstop.sh",
+    "scripts/delegation-routing-backstop.test.sh",
+    "scripts/delegation-routing-reminder.sh",
+    "scripts/delegation-routing-reminder.test.sh",
     "scripts/freshness-gate.sh",
     "scripts/gbrain-recall-preflight.sh",
     "scripts/gbrain-recall-preflight.test.sh",
@@ -78,7 +82,7 @@
     "BeforeAgent",
     "BeforeTool"
   ],
-  "mcp_server_count": 7,
+  "mcp_server_count": 8,
   "warnings": [
     "backend-developer.md: agent frontmatter `model: claude-sonnet-5` は Claude 固有のため除去（Gemini 側 inherit 相当）",
     "backend-developer.md: agent frontmatter field `memory` は Gemini 互換でないため除去",
@@ -112,11 +116,13 @@
     "PreToolUse matcher=Write|Edit|MultiEdit は Gemini の run_shell_command へ未変換のためスキップ",
     "PreToolUse matcher=Bash|Edit|MultiEdit|Shell|StrReplaceFile|Write|WriteFile は Gemini の run_shell_command へ未変換のためスキップ",
     "PreToolUse matcher=Skill|Task|Agent は Gemini の run_shell_command へ未変換のためスキップ",
-    "SessionStart→SessionStart は現状の runtime bridge 未対応のためスキップ",
+    "PostToolUse matcher=Edit|Write|MultiEdit は Gemini の write_file|replace へ未変換のためスキップ",
+    "PostToolUse matcher=Skill|Task|Agent は Gemini の write_file|replace へ未変換のためスキップ",
+    "UserPromptSubmit command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/delegation-routing-reminder.sh\"",
     "UserPromptSubmit command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/gbrain-recall-preflight.sh\"",
     "UserPromptSubmit command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/handover-preflight.sh\"",
+    "SessionStart→SessionStart は現状の runtime bridge 未対応のためスキップ",
     "SubagentStop→AfterAgent は現状の runtime bridge 未対応のためスキップ",
-    "Stop→AfterAgent は現状の runtime bridge 未対応のためスキップ",
-    "PostToolUse matcher=Skill|Task|Agent は Gemini の write_file|replace へ未変換のためスキップ"
+    "Stop→AfterAgent は現状の runtime bridge 未対応のためスキップ"
   ]
 }

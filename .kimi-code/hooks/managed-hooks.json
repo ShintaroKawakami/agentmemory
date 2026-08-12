@@ -47,6 +47,11 @@
     },
     {
       "event": "UserPromptSubmit",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/delegation-routing-reminder.sh\"",
+      "timeout": 5
+    },
+    {
+      "event": "UserPromptSubmit",
       "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/gbrain-recall-preflight.sh\"",
       "timeout": 5
     },
