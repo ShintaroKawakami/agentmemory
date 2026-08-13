@@ -40,7 +40,10 @@
     "shintaro-gbrain": {
       "type": "remote",
       "enabled": true,
-      "url": "https://gbrain-mcp.jtt.cafe/mcp"
+      "url": "https://gbrain-mcp.jtt.cafe/mcp",
+      "headers": {
+        "Authorization": "{env:GBRAIN_MCP_BEARER_SHINTARO}"
+      }
     },
     "stitch": {
       "type": "remote",
@@ -53,7 +56,10 @@
     "tech-gbrain": {
       "type": "remote",
       "enabled": true,
-      "url": "https://gbrain-mcp.jtt.cafe/mcp"
+      "url": "https://gbrain-mcp.jtt.cafe/mcp",
+      "headers": {
+        "Authorization": "{env:GBRAIN_MCP_BEARER_TECH}"
+      }
     }
   }
 }
