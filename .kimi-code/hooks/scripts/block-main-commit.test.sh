@@ -106,14 +106,20 @@ expect_block_with_script() {
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+export HOME="$tmp/home"
+mkdir -p "$HOME"
+git config --global github.user TestOwner
 
 main_repo="$tmp/main"
 feature_repo="$tmp/feature"
-mkdir -p "$main_repo" "$feature_repo"
+third_party_repo="$tmp/third-party"
+mkdir -p "$main_repo" "$feature_repo" "$third_party_repo"
 git -C "$main_repo" init -q
 git -C "$main_repo" checkout -q -b main
 git -C "$main_repo" config user.email test@example.com
 git -C "$main_repo" config user.name "Test User"
+git -C "$main_repo" remote add origin git@github.com:TestOwner/main.git
+git -C "$main_repo" remote add upstream git@github.com:ThirdParty/main.git
 echo init > "$main_repo/README.md"
 git -C "$main_repo" add README.md
 git -C "$main_repo" commit -q -m init
@@ -218,10 +224,49 @@ git -C "$feature_repo" init -q
 git -C "$feature_repo" checkout -q -b feature/test
 git -C "$feature_repo" config user.email test@example.com
 git -C "$feature_repo" config user.name "Test User"
+git -C "$feature_repo" remote add origin git@github.com:TestOwner/feature.git
+git -C "$feature_repo" remote add upstream git@github.com:ThirdParty/feature.git
 echo init > "$feature_repo/README.md"
 git -C "$feature_repo" add README.md
 git -C "$feature_repo" commit -q -m init
 git -C "$feature_repo" update-ref refs/remotes/origin/main HEAD
+
+git -C "$third_party_repo" init -q
+git -C "$third_party_repo" checkout -q -b feature/test
+git -C "$third_party_repo" config user.email test@example.com
+git -C "$third_party_repo" config user.name "Test User"
+git -C "$third_party_repo" remote add origin git@github.com:ThirdParty/feature.git
+echo init > "$third_party_repo/README.md"
+git -C "$third_party_repo" add README.md
+git -C "$third_party_repo" commit -q -m init
+
+owner_home="$HOME"
+export HOME="$tmp/empty-home"
+mkdir -p "$HOME"
+expect_allow \
+  "owner未設定でも非Git操作は許可" \
+  "$feature_repo" \
+  "echo safe"
+expect_block \
+  "owner未設定時もgithub.user設定はhook経由で拒否" \
+  "$feature_repo" \
+  "git config --global github.user TestOwner"
+export HOME="$owner_home"
+
+expect_block \
+  "設定済みgithub.userの別owner変更は拒否" \
+  "$feature_repo" \
+  "git config --global github.user ThirdParty"
+
+expect_block \
+  "設定済みgithub.userの短縮-g別owner変更は拒否" \
+  "$feature_repo" \
+  "git config -g github.user ThirdParty"
+
+expect_block \
+  "設定済みgithub.userの解除は拒否" \
+  "$feature_repo" \
+  "git config --global --unset github.user"
 git -C "$feature_repo" branch --set-upstream-to=origin/main feature/test >/dev/null 2>&1 || true
 
 expect_block \
@@ -528,6 +573,299 @@ expect_allow \
   "push --delete 複数枝を許可" \
   "$main_repo" \
   "git push origin --delete branch1 branch2 branch3"
+
+# [2026-08-13][test]
+# 背景:
+#   - ユーザー依頼意図: 全PJでthird-party upstream writeを禁止し、fork内writeだけを許可する。
+#   - 守るべき業務ルール: remote名・URL・CLI短縮形・環境変数・複合commandに関係なく、
+#     global github.user と一致するownerだけを書込み先として許可する。
+#   - 他案不採用理由: 基本形だけのsmoke testでは有効なGit/gh省略構文による回避を検出できず、
+#     文書だけの禁止では誤操作を実行時に止められないため不採用。
+expect_allow \
+  "fork owner のfeature pushは許可" \
+  "$feature_repo" \
+  "git push origin feature/test"
+
+expect_block \
+  "third-party upstream pushは拒否" \
+  "$feature_repo" \
+  "git push upstream feature/test"
+
+expect_block \
+  "third-party URL直指定pushは拒否" \
+  "$feature_repo" \
+  "git push git@github.com:ThirdParty/feature.git feature/test"
+
+expect_block \
+  "git -c pushurl上書きによるthird-party pushは拒否" \
+  "$feature_repo" \
+  "git -c remote.origin.pushurl=git@github.com:ThirdParty/feature.git push origin feature/test"
+
+expect_block \
+  "git短縮-c pushurl上書きによるthird-party pushは拒否" \
+  "$feature_repo" \
+  "git -cremote.origin.pushurl=git@github.com:ThirdParty/feature.git push origin feature/test"
+
+expect_block \
+  "git短縮-C pushはfail-close" \
+  "$feature_repo" \
+  "git -C$feature_repo push origin feature/test"
+
+expect_block \
+  "GIT_DIR上書きのthird-party pushは拒否" \
+  "$feature_repo" \
+  "GIT_DIR=$third_party_repo/.git git push origin feature/test"
+
+expect_block \
+  "GIT_CONFIG環境上書きpushは拒否" \
+  "$feature_repo" \
+  "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=remote.origin.pushurl GIT_CONFIG_VALUE_0=git@github.com:ThirdParty/feature.git git push origin feature/test"
+
+expect_block \
+  "git global option経由のthird-party pushは拒否" \
+  "$feature_repo" \
+  "git --no-pager push upstream feature/test"
+
+expect_block \
+  "絶対path git経由のthird-party pushは拒否" \
+  "$feature_repo" \
+  "/usr/bin/git push upstream feature/test"
+
+expect_block \
+  "cd先third-party originへのpushは拒否" \
+  "$feature_repo" \
+  "cd $third_party_repo && git push origin feature/test"
+
+expect_block \
+  "remote変更後のthird-party pushは拒否" \
+  "$feature_repo" \
+  "git remote set-url origin git@github.com:ThirdParty/feature.git && git push origin feature/test"
+
+expect_block \
+  "絶対path remote変更後のthird-party pushは拒否" \
+  "$feature_repo" \
+  "/usr/bin/git remote set-url origin git@github.com:ThirdParty/feature.git && /usr/bin/git push origin feature/test"
+
+expect_block \
+  "git -C remote変更後のthird-party pushは拒否" \
+  "$feature_repo" \
+  "git -C $feature_repo remote set-url origin git@github.com:ThirdParty/feature.git && git push origin feature/test"
+
+git -C "$feature_repo" remote set-url --add --push origin git@github.com:TestOwner/feature.git
+git -C "$feature_repo" remote set-url --add --push origin git@github.com:ThirdParty/feature.git
+expect_block \
+  "複数pushurlにthird-partyを含むpushは拒否" \
+  "$feature_repo" \
+  "git push origin feature/test"
+git -C "$feature_repo" config --unset-all remote.origin.pushurl
+
+expect_block \
+  "pushurl変更後のthird-party pushは拒否" \
+  "$feature_repo" \
+  "git config remote.origin.pushurl git@github.com:ThirdParty/feature.git && git push origin feature/test"
+
+expect_block \
+  "bash -c内のthird-party pushは拒否" \
+  "$feature_repo" \
+  "bash -c 'git push upstream feature/test'"
+
+expect_block \
+  "command substitution内のthird-party pushは拒否" \
+  "$feature_repo" \
+  "echo \$(git push upstream feature/test)"
+
+expect_block \
+  "backtick内のthird-party pushは拒否" \
+  "$feature_repo" \
+  'echo `git push upstream feature/test`'
+
+expect_block \
+  "Git pushInsteadOf設定変更は拒否" \
+  "$feature_repo" \
+  "git config --global url.git@github.com:ThirdParty/.pushInsteadOf https://github.com/TestOwner/"
+
+git -C "$feature_repo" config alias.publish '!git push upstream'
+expect_block \
+  "Git alias経由のthird-party pushは拒否" \
+  "$feature_repo" \
+  "git publish"
+
+expect_block \
+  "inline Git alias経由のthird-party pushは拒否" \
+  "$feature_repo" \
+  "git -calias.publish='!git push upstream' publish"
+
+expect_block \
+  "未知Git subcommandはfail-close" \
+  "$feature_repo" \
+  "git unknown-writer"
+
+expect_allow \
+  "fork内PR作成は許可" \
+  "$feature_repo" \
+  "gh pr create --repo TestOwner/feature --base main --head feature/test"
+
+expect_block \
+  "third-party upstream PR作成は拒否" \
+  "$feature_repo" \
+  "gh pr create --repo ThirdParty/feature --base main --head TestOwner:feature/test"
+
+expect_block \
+  "gh global --repo経由のthird-party PR作成は拒否" \
+  "$feature_repo" \
+  "gh --repo ThirdParty/feature pr create --base main --head TestOwner:feature/test"
+
+expect_block \
+  "重複--repo指定のthird-party PR作成は拒否" \
+  "$feature_repo" \
+  "gh pr create --repo TestOwner/feature --repo ThirdParty/feature --base main --head TestOwner:feature/test"
+
+expect_block \
+  "短縮-R直結のthird-party PR作成は拒否" \
+  "$feature_repo" \
+  "gh pr create -RThirdParty/feature --base main --head TestOwner:feature/test"
+
+expect_block \
+  "短縮-R等号のthird-party PR作成は拒否" \
+  "$feature_repo" \
+  "gh pr create -R=ThirdParty/feature --base main --head TestOwner:feature/test"
+
+expect_block \
+  "shell変数repo指定のthird-party PR作成は拒否" \
+  "$feature_repo" \
+  "TARGET_REPO=ThirdParty/feature; gh pr create --repo \"\$TARGET_REPO\" --base main --head TestOwner:feature/test"
+
+expect_block \
+  "eval経由のthird-party PR作成は拒否" \
+  "$feature_repo" \
+  "eval 'gh pr create --repo ThirdParty/feature --base main --head TestOwner:feature/test'"
+
+expect_block \
+  "Python wrapper経由のthird-party pushは拒否" \
+  "$feature_repo" \
+  "python3 -c 'import subprocess; subprocess.run([\"git\",\"push\",\"upstream\",\"feature/test\"])'"
+
+expect_block \
+  "env -S wrapper経由のthird-party pushは拒否" \
+  "$feature_repo" \
+  "env -S 'git push upstream feature/test'"
+
+expect_block \
+  "GH_REPO経由のthird-party PR作成は拒否" \
+  "$feature_repo" \
+  "GH_REPO=ThirdParty/feature gh pr create --base main --head TestOwner:feature/test"
+
+export GH_REPO=ThirdParty/feature
+expect_block \
+  "既存環境GH_REPO経由のthird-party PR作成は拒否" \
+  "$feature_repo" \
+  "gh pr create --base main --head TestOwner:feature/test"
+unset GH_REPO
+
+expect_block \
+  "export GH_REPO後のthird-party PR作成は拒否" \
+  "$feature_repo" \
+  "export GH_REPO=ThirdParty/feature; gh pr create --base main --head TestOwner:feature/test"
+
+expect_block \
+  "sh -c内のthird-party PR作成は拒否" \
+  "$feature_repo" \
+  "sh -c 'gh pr create --repo ThirdParty/feature --base main --head TestOwner:feature/test'"
+
+expect_allow \
+  "GitHub owner大小文字差のfork writeは許可" \
+  "$feature_repo" \
+  "gh issue create --repo testowner/feature --title test --body test"
+
+expect_block \
+  "third-party PR mergeは拒否" \
+  "$feature_repo" \
+  "gh pr merge --repo ThirdParty/feature 123 --merge"
+
+expect_block \
+  "third-party Issue作成は拒否" \
+  "$feature_repo" \
+  "gh issue create --repo ThirdParty/feature --title test --body test"
+
+expect_block \
+  "third-party Release作成は拒否" \
+  "$feature_repo" \
+  "gh release create --repo ThirdParty/feature v1.0.0"
+
+expect_block \
+  "third-party repo位置引数の削除は拒否" \
+  "$feature_repo" \
+  "gh repo delete ThirdParty/feature --yes"
+
+expect_block \
+  "third-party PR URLのmergeは拒否" \
+  "$feature_repo" \
+  "gh pr merge https://github.com/ThirdParty/feature/pull/123 --merge"
+
+expect_block \
+  "third-party --owner指定writeは拒否" \
+  "$feature_repo" \
+  "gh repo create test --owner ThirdParty --private"
+
+expect_block \
+  "gh alias実行はfail-close" \
+  "$feature_repo" \
+  "gh publish"
+
+expect_allow \
+  "third-party PR閲覧はread-onlyとして許可" \
+  "$feature_repo" \
+  "gh pr view --repo ThirdParty/feature 123"
+
+expect_allow \
+  "third-party repo forkはread-only upstreamからのfork作成として許可" \
+  "$feature_repo" \
+  "gh repo fork ThirdParty/feature --clone=false"
+
+expect_block \
+  "third-party orgへのfork作成は拒否" \
+  "$feature_repo" \
+  "gh repo fork ThirdParty/feature --org ThirdParty --clone=false"
+
+expect_block \
+  "third-party REST PR作成は拒否" \
+  "$feature_repo" \
+  "gh api -X POST repos/ThirdParty/feature/pulls -f head=TestOwner:feature/test -f base=main"
+
+expect_block \
+  "third-party REST --method=POST query付きは拒否" \
+  "$feature_repo" \
+  "gh api --method=POST 'repos/ThirdParty/feature/pulls?draft=true' -f head=TestOwner:feature/test"
+
+expect_block \
+  "gh global option経由のthird-party REST writeは拒否" \
+  "$feature_repo" \
+  "gh --hostname github.com api --method=POST repos/ThirdParty/feature/pulls -f head=TestOwner:feature/test"
+
+expect_block \
+  "third-party REST -XPOSTは拒否" \
+  "$feature_repo" \
+  "gh api -XPOST repos/ThirdParty/feature/issues/1/comments -f body=test"
+
+expect_block \
+  "third-party REST PATCHは拒否" \
+  "$feature_repo" \
+  "gh api --method PATCH repos/ThirdParty/feature/issues/1 -f state=closed"
+
+expect_block \
+  "third-party REST DELETEは拒否" \
+  "$feature_repo" \
+  "gh api -X DELETE repos/ThirdParty/feature/git/refs/heads/old"
+
+expect_block \
+  "owner不明のREST writeは拒否" \
+  "$feature_repo" \
+  "gh api --method=PUT user/starred/ThirdParty/feature"
+
+expect_allow \
+  "fork ownerのREST writeは許可" \
+  "$feature_repo" \
+  "gh api --method=PATCH repos/TestOwner/feature/issues/1 -f state=closed"
 
 expect_block \
   "push --delete main は拒否" \

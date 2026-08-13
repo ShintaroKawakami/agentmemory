@@ -43,7 +43,10 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null |
 # [2026-08-12] backstop と同じ cache ディレクトリを再利用する（設計で明示された配置）。
 # marker ファイル名は "fable-guard-<hash>" prefix で backstop 側の marker
 # （"<hash>" / "<hash>.backstop"）と衝突しない。
-CACHE_DIR="$PROJECT_DIR/.claude/hooks/.delegation-reminder-cache"
+# [2026-08-13][fix] #1701: runtime marker をリポ外 XDG cache へ移し git dirty を防ぐ。
+# shellcheck source=../lib/delegation-reminder-cache.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)/delegation-reminder-cache.sh"
+CACHE_DIR="$(resolve_delegation_reminder_cache_dir "$PROJECT_DIR")"
 mkdir -p "$CACHE_DIR" 2>/dev/null || true
 
 # python スクリプト1: session_id を sha256 hex 化し、stdin JSON 直下の "model" /

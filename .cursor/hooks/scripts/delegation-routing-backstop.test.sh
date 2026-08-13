@@ -24,7 +24,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOK="$SCRIPT_DIR/delegation-routing-backstop.sh"
 
 TMP_PROJECT="$(mktemp -d)"
+CACHE_DIR="$TMP_PROJECT/runtime-cache"
 trap 'rm -rf "$TMP_PROJECT"' EXIT
+export DELEGATION_REMINDER_CACHE_DIR="$CACHE_DIR"
+mkdir -p "$CACHE_DIR"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -50,8 +53,6 @@ out2="$(printf '%s' "$(payload "sess-a")" | CLAUDE_PROJECT_DIR="$TMP_PROJECT" ba
 [ -z "$out2" ] || fail "backstop2回目は無音であるべき: $out2"
 
 # 3) reminder が既に発火済みのセッションでは無音（マーカーは sha256 hex ファイル名）
-CACHE_DIR="$TMP_PROJECT/.claude/hooks/.delegation-reminder-cache"
-mkdir -p "$CACHE_DIR"
 : > "$CACHE_DIR/$(session_hash "sess-b")"
 out3="$(printf '%s' "$(payload "sess-b")" | CLAUDE_PROJECT_DIR="$TMP_PROJECT" bash "$HOOK")"
 [ -z "$out3" ] || fail "reminder発火済みセッションでbackstopが鳴った: $out3"

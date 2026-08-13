@@ -86,7 +86,10 @@ export DELEGATION_REMINDER_TOOL_WINDOW DELEGATION_REMINDER_READ_GREP_THRESHOLD D
 RAW_INPUT="$(cat 2>/dev/null || true)"
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-CACHE_DIR="$PROJECT_DIR/.claude/hooks/.delegation-reminder-cache"
+# [2026-08-13][fix] #1701: runtime marker をリポ外 XDG cache へ移し git dirty を防ぐ。
+# shellcheck source=../lib/delegation-reminder-cache.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)/delegation-reminder-cache.sh"
+CACHE_DIR="$(resolve_delegation_reminder_cache_dir "$PROJECT_DIR")"
 mkdir -p "$CACHE_DIR" 2>/dev/null || true
 
 # 古いマーカーの軽量清掃（7日超を削除。context-size-cache 系と同様ローカル状態のみ）。

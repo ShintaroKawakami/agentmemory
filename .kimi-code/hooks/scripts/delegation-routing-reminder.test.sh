@@ -40,7 +40,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOK="$SCRIPT_DIR/delegation-routing-reminder.sh"
 
 TMP_PROJECT="$(mktemp -d)"
+CACHE_DIR="$TMP_PROJECT/runtime-cache"
 trap 'rm -rf "$TMP_PROJECT"' EXIT
+export DELEGATION_REMINDER_CACHE_DIR="$CACHE_DIR"
+mkdir -p "$CACHE_DIR"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -118,7 +121,7 @@ set -e
 echo "$long_output" | grep -q "三役体制" || fail "長文入力でキーワード検知が発火しない: ${long_output:0:200}"
 
 # 7) session_id に `../` や改行を含んでも cache 外へ書き込まず、固定長 hex ファイル名になる（W2）
-find "$TMP_PROJECT/.claude/hooks/.delegation-reminder-cache" -maxdepth 1 -type f | xargs -I{} rm -f {} 2>/dev/null || true
+find "$CACHE_DIR" -maxdepth 1 -type f | xargs -I{} rm -f {} 2>/dev/null || true
 malicious_session=$'../../evil\ninjected'
 malicious_payload="$(python3 -c 'import json,sys; print(json.dumps({"user_prompt": sys.argv[1], "session_id": sys.argv[2]}))' "作って" "$malicious_session")"
 set +e
@@ -128,8 +131,10 @@ set -e
 [ "$malicious_exit" -eq 0 ] || fail "不正session_idでexit 0にならない（exit=$malicious_exit）"
 echo "$malicious_output" | grep -q "三役体制" || fail "不正session_idでも発火自体はするはず: $malicious_output"
 [ ! -e "$TMP_PROJECT/../evil" ] || fail "cache外へ書き込まれた（path traversal 成立）"
-cache_files="$(find "$TMP_PROJECT/.claude/hooks/.delegation-reminder-cache" -maxdepth 1 -type f -name '*' ! -name '.*' 2>/dev/null)"
-[ -n "$cache_files" ] || fail "cacheディレクトリにマーカーが作られていない"
+[ ! -e "$TMP_PROJECT/.claude/hooks/.delegation-reminder-cache" ] \
+  || fail "legacy リポ内 cache が作られてしまった (#1701)"
+cache_files="$(find "$CACHE_DIR" -maxdepth 1 -type f -name '*' ! -name '.*' 2>/dev/null)"
+[ -n "$cache_files" ] || fail "runtime cache にマーカーが作られていない"
 # here-string で読む（パイプにすると while がサブシェルで動き fail の exit が親に伝わらないため）
 while IFS= read -r f; do
   [ -n "$f" ] || continue

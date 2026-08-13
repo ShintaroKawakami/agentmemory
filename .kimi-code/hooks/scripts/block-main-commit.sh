@@ -552,6 +552,18 @@ PY
 # quote-aware shell-control and effective path checks.
 COMMAND_FOR_GIT_MATCH="$(sanitize_git_data_args "$COMMAND")"
 
+# [2026-08-13][feat] third-party upstream への全writeを禁止し、forkを唯一のwrite先にする。
+# 背景:
+#   - ユーザー依頼意図: 全PJでupstreamへのpush/PRを全面禁止し、必要なら必ずforkで完結させる。
+#   - 守るべき業務ルール: `git config --global github.user` のownerだけを書込先として許可し、
+#     third-party upstreamはread-only remoteに限定する。push、gh pr create、REST PR作成を同じ境界で検査する。
+#   - 他案不採用理由: remote名`upstream`だけを拒否する案は、外部remoteが`origin`のままのPJやURL直指定を
+#     見逃すため不採用。ルール文書だけの禁止も実行時の誤送信を止められないため不採用。
+UPSTREAM_GUARD_MSG='[hook:block-main-commit] third-party upstream への書込みは禁止です。\n\n対応手順:\n1. 自分のGitHubアカウントへfork\n2. forkをorigin、元リポジトリをread-only upstreamに設定\n3. pushとPRはfork内だけで実行\n\n全PJ共通ルールです。'
+guard_reason=$(python3 "$SCRIPT_DIR/../lib/upstream-write-guard.py" --cwd "$CWD" --command "$COMMAND_FOR_GIT_MATCH" 2>&1) || {
+  _emit_deny_with_telemetry "$UPSTREAM_GUARD_MSG\n\n検出理由: $guard_reason"
+}
+
 is_allowed_main_direct_path() {
   # 2026-07-01: AI hook 経由の main direct allowlist は廃止。
   # 互換テスト用に関数名は残すが、どの path も許可しない。
