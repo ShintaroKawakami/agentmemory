@@ -22,6 +22,11 @@
 #   "fable" を含む（大文字小文字無視）場合のみ、セッションごとに1回だけ PostToolUse の
 #   JSON フィードバック（decision/reason）でモデルへ気づかせる。判定不能時・エラー時は
 #   常に何もせず exit 0（fail-open）。FABLE_GUARD_DISABLED=1 で無効化できる escape hatch を持つ。
+#
+# [2026-08-13][feat] 対象モデルと強さを agents.yaml から読む（詳細 CaD は本文中の該当ブロック）。
+#   上記「対応」にあった `*fable*` の直書き判定は撤去済み。現行は
+#   model_catalog.pm_models[*].implementation_guard（tier / runtime_match / after_edits）を引き、
+#   台帳が読めない時だけ fable=strict / 1回目 へ縮退して従来挙動を保つ。
 
 set -uo pipefail
 
@@ -148,20 +153,198 @@ fi
 [ -n "$MODEL" ] || exit 0
 
 MODEL_LOWER="$(printf '%s' "$MODEL" | tr '[:upper:]' '[:lower:]')"
-case "$MODEL_LOWER" in
-  *fable*) : ;;
-  *) exit 0 ;;
-esac
 
-# Fable セッションでなければここまでで抜けている。以降は Fable セッション確定。
+# [2026-08-13][feat] リマインドの強さを agents.yaml（model_catalog.pm_models）から読む。
+# 背景:
+#   - ユーザー依頼意図: Fable は強め・Opus は軽め、という強制力の差を付けたい。
+#   - 守るべき業務ルール: hook にモデル名を直書きしない（reference-over-hardcode）。
+#     配布先PJから正本を引くため参照は絶対パス（相対だと配布先 cwd で解決できない）。
+#   - 他案不採用理由:
+#     1) 台帳が読めない時に無音化する案は、Fable での実装検知が静かに死ぬため不採用。
+#        読めない時は組み込み既定（fable=strict/1回目）へ縮退し、従来の挙動を保つ。
+#     2) PyYAML を必須依存にする案は不採用（2026-08-13 codex レビュー 🟡）。hook は
+#        これまで stdlib だけで動いており、PyYAML が無い配布先では Opus の soft ガードが
+#        「エラーも出さず一生発火しない」形で静かに落ちる。PyYAML があれば使い、無ければ
+#        implementation_guard ブロックだけを読む狭い stdlib フォールバックへ落とす。
+#     3) agents.yaml から JSON 派生ファイルを生成して hook に読ませる案も不採用。
+#        生成物が増えると「正本を変えたのに派生が古い」という、本プランで直している当の
+#        問題を新設することになる（鮮度チェックの機構も別途必要になる）。
+GUARD_LEDGER="${AGENT_HUB_AGENTS_YAML:-$HOME/business/AGENT-HUB/agents.yaml}"
+
+FABLE_GUARD_RESOLVE_TIER_PY() {
+  cat <<'PY'
+from __future__ import annotations
+
+import os
+
+model = (os.environ.get("HOOK_MODEL_LOWER") or "").strip()
+ledger = os.environ.get("HOOK_GUARD_LEDGER") or ""
+
+
+def emit(tier: str, after_edits: str, label: str) -> None:
+    print(tier)
+    print(after_edits)
+    print(label)
+
+
+def pick(pm_models: dict) -> tuple[str, str, str] | None:
+    """Return (tier, after_edits, label) for the first model matching `model`."""
+    for name, entry in pm_models.items():
+        if not isinstance(entry, dict):
+            continue
+        guard = entry.get("implementation_guard")
+        if not isinstance(guard, dict):
+            continue
+        needle = str(guard.get("runtime_match") or "").strip().lower()
+        if not needle or needle not in model:
+            continue
+        tier = str(guard.get("tier") or "strict").strip().lower()
+        try:
+            after_edits = max(1, int(guard.get("after_edits", 1)))
+        except (TypeError, ValueError):
+            after_edits = 1
+        return tier, str(after_edits), str(entry.get("display_name") or name)
+    return None
+
+
+def load_with_yaml(text: str) -> dict:
+    import yaml  # type: ignore
+
+    data = yaml.safe_load(text) or {}
+    pm_models = ((data.get("model_catalog") or {}).get("pm_models")) or {}
+    if not isinstance(pm_models, dict):
+        raise ValueError("pm_models is not a mapping")
+    return pm_models
+
+
+def load_without_yaml(text: str) -> dict:
+    """Narrow stdlib fallback for hosts without PyYAML.
+
+    Not a YAML parser: it only walks the fixed two-level shape
+    `model_catalog: -> pm_models: -> <model>: -> implementation_guard: -> <scalar>`
+    at the indentation agents.yaml actually uses.  Anything it fails to
+    recognise simply yields no match, which degrades to the same built-in
+    default as an unreadable ledger — never to a wrong tier.
+    """
+    pm_models: dict[str, dict] = {}
+    in_catalog = in_pm = False
+    current: dict | None = None
+    in_guard = False
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        stripped = line.strip()
+        if indent == 0:
+            in_catalog = stripped == "model_catalog:"
+            in_pm = False
+            current = None
+            in_guard = False
+            continue
+        if not in_catalog:
+            continue
+        if indent == 2:
+            in_pm = stripped == "pm_models:"
+            current = None
+            in_guard = False
+            continue
+        if not in_pm:
+            continue
+        if indent == 4 and stripped.endswith(":"):
+            current = {}
+            pm_models[stripped[:-1].strip()] = current
+            in_guard = False
+            continue
+        if current is None:
+            continue
+        if indent == 6:
+            in_guard = stripped == "implementation_guard:"
+            if not in_guard and ":" in stripped:
+                key, _, value = stripped.partition(":")
+                if key.strip() == "display_name":
+                    current["display_name"] = value.strip().strip('"').strip("'")
+            continue
+        if indent == 8 and in_guard and ":" in stripped:
+            key, _, value = stripped.partition(":")
+            guard = current.setdefault("implementation_guard", {})
+            guard[key.strip()] = value.strip().strip('"').strip("'")
+    return pm_models
+
+
+try:
+    with open(ledger, encoding="utf-8") as handle:
+        text = handle.read()
+    try:
+        pm_models = load_with_yaml(text)
+    except ImportError:
+        pm_models = load_without_yaml(text)
+    hit = pick(pm_models)
+    if hit is None:
+        # 台帳は読めたが該当モデルなし＝このモデルは対象外。無音にする。
+        emit("", "", "")
+    else:
+        emit(*hit)
+except Exception:
+    # 台帳が開けない・壊れている等。組み込み既定へ縮退する。
+    emit("FALLBACK", "", "")
+PY
+}
+
+GUARD_TIER=""
+GUARD_AFTER_EDITS=""
+GUARD_LABEL=""
+GUARD_RESOLVED="$(HOOK_MODEL_LOWER="$MODEL_LOWER" HOOK_GUARD_LEDGER="$GUARD_LEDGER" \
+  command python3 <(FABLE_GUARD_RESOLVE_TIER_PY) 2>/dev/null)"
+{
+  IFS= read -r GUARD_TIER || true
+  IFS= read -r GUARD_AFTER_EDITS || true
+  IFS= read -r GUARD_LABEL || true
+} <<< "$GUARD_RESOLVED"
+
+if [ -z "$GUARD_TIER" ] || [ "$GUARD_TIER" = "FALLBACK" ]; then
+  # 縮退: 従来どおり Fable だけを strict / 1回目で見る。
+  case "$MODEL_LOWER" in
+    *fable*)
+      GUARD_TIER="strict"
+      GUARD_AFTER_EDITS="1"
+      GUARD_LABEL="Fable"
+      ;;
+    *) exit 0 ;;
+  esac
+fi
+
+case "$GUARD_AFTER_EDITS" in
+  ''|*[!0-9]*) GUARD_AFTER_EDITS="1" ;;
+esac
+[ "$GUARD_AFTER_EDITS" -ge 1 ] || GUARD_AFTER_EDITS=1
+[ -n "$GUARD_LABEL" ] || GUARD_LABEL="このモデル"
+
+# 対象モデルのセッション確定。
 # セッション ID が取れなければスロットルできないため、何もせず抜ける（fail-open）。
 [ -n "$SESSION_HASH" ] || exit 0
 
 MARKER="$CACHE_DIR/fable-guard-$SESSION_HASH"
 [ -f "$MARKER" ] && exit 0
+
+# after_edits 回目の実装編集で初めて出す（soft tier 用）。1 なら従来どおり初回で出る。
+if [ "$GUARD_AFTER_EDITS" -gt 1 ]; then
+  COUNTER="$CACHE_DIR/fable-guard-$SESSION_HASH.count"
+  printf 'x' >> "$COUNTER" 2>/dev/null || true
+  EDITS="$(wc -c < "$COUNTER" 2>/dev/null | tr -d ' ')"
+  case "$EDITS" in
+    ''|*[!0-9]*) EDITS=0 ;;
+  esac
+  [ "$EDITS" -ge "$GUARD_AFTER_EDITS" ] || exit 0
+fi
+
 : > "$MARKER" 2>/dev/null || true
 
-MSG='⚠️ Fable セッションで実装編集が行われました。Fable は頭脳（設計・診断・承認判断・検証）であって実装者ではありません。実装は AI worker（agent-dispatch）または Claude サブエージェントへ委譲してください（緊急時のみ利用者の明示指示で PM 直実装可）。'
+if [ "$GUARD_TIER" = "soft" ]; then
+  MSG="💡 ${GUARD_LABEL} セッションで実装編集が続いています。${GUARD_LABEL} はなるべく頭脳（設計・診断・承認判断・検証）に使いたいモデルです。まとまった実装は AI worker（agent-dispatch）または Claude サブエージェントへ委譲できないか一度検討してください（そのまま続けても構いません）。"
+else
+  MSG="⚠️ ${GUARD_LABEL} セッションで実装編集が行われました。${GUARD_LABEL} は頭脳（設計・診断・承認判断・検証）であって実装者ではありません。実装は AI worker（agent-dispatch）または Claude サブエージェントへ委譲してください（緊急時のみ利用者の明示指示で PM 直実装可）。"
+fi
 
 # lib が無い配布先でも壊れない no-op fallback（delegation-routing-backstop と同型）。
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
