@@ -61,3 +61,20 @@ eval/data/longmemeval/
 .gemini/settings.json
 .cursor/mcp.json
 .kimi-code/mcp.json
+
+# [2026-08-13][chore]
+# 背景:
+#   - ユーザー依頼意図: closeout-debt #1701 / #1713。hook が書くセッション用マーカーと
+#     parallel-run 状態ファイルが `git status` を dirty にし、終了整理のノイズになる。
+#   - 守るべき業務ルール: どちらも個人マシン・セッション単位の一時状態でコミット対象外。
+#     AGENT-HUB `.gitignore` と同パターンを配布先でも維持する。正本キャッシュはリポ外 XDG（#1708）。
+# 対応: `.delegation-reminder-cache/` 6 surface と `.claude/parallel-run-state/` を gitignore する。
+# 関連: https://github.com/ShintaroKawakami/AGENT-HUB/issues/1701
+#       https://github.com/ShintaroKawakami/AGENT-HUB/issues/1713
+.claude/hooks/.delegation-reminder-cache/
+.codex/hooks/.delegation-reminder-cache/
+.gemini/hooks/.delegation-reminder-cache/
+.kimi/hooks/.delegation-reminder-cache/
+.kimi-code/hooks/.delegation-reminder-cache/
+.cursor/hooks/.delegation-reminder-cache/
+.claude/parallel-run-state/
