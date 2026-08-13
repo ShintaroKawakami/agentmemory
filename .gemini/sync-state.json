@@ -1,7 +1,7 @@
 {
   "tool": "antigravity-sync",
-  "generated_at": "2026-08-12T15:04:22.921348+00:00",
-  "source_commit": "b70fc7d",
+  "generated_at": "2026-08-13T07:47:00.945675+00:00",
+  "source_commit": "da4df95",
   "project_root": ".",
   "generated_gemini_md": true,
   "copied_agents": [
@@ -24,9 +24,11 @@
   "copied_hook_scripts": [
     ".hook-library-version",
     "lib/code-quality-check.md",
+    "lib/delegation-reminder-cache.sh",
     "lib/hook-io.sh",
     "lib/quality-check-common.sh",
     "lib/storage-url-common.py",
+    "lib/upstream-write-guard.py",
     "scripts/block-destructive-git.sh",
     "scripts/block-destructive-git.test.sh",
     "scripts/block-main-commit.sh",

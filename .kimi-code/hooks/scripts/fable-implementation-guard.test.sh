@@ -16,7 +16,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOK="$SCRIPT_DIR/fable-implementation-guard.sh"
 
 TMP_PROJECT="$(mktemp -d)"
+CACHE_DIR="$TMP_PROJECT/runtime-cache"
 trap 'rm -rf "$TMP_PROJECT"' EXIT
+export DELEGATION_REMINDER_CACHE_DIR="$CACHE_DIR"
+mkdir -p "$CACHE_DIR"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -40,8 +43,6 @@ print(json.dumps(obj))
 session_hash() {
   python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.argv[1].encode("utf-8", errors="surrogatepass")).hexdigest())' "$1"
 }
-
-CACHE_DIR="$TMP_PROJECT/.claude/hooks/.delegation-reminder-cache"
 
 # 1) 非Fableモデル（stdin直下）は無音
 out1="$(printf '%s' "$(payload "sess-a" "claude-sonnet-5" "")" | CLAUDE_PROJECT_DIR="$TMP_PROJECT" bash "$HOOK")"

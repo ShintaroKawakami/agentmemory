@@ -65,9 +65,11 @@ alwaysApply: true
 - `.claude/settings.json`
 - `.claude/hooks/.hook-library-version`
 - `.claude/hooks/lib/code-quality-check.md`
+- `.claude/hooks/lib/delegation-reminder-cache.sh`
 - `.claude/hooks/lib/hook-io.sh`
 - `.claude/hooks/lib/quality-check-common.sh`
 - `.claude/hooks/lib/storage-url-common.py`
+- `.claude/hooks/lib/upstream-write-guard.py`
 - `.claude/hooks/scripts/block-destructive-git.sh`
 - `.claude/hooks/scripts/block-destructive-git.test.sh`
 - `.claude/hooks/scripts/block-main-commit.sh`
@@ -135,9 +137,11 @@ alwaysApply: true
 - `.cursor/hooks.json`
 - `.cursor/hooks/.hook-library-version`
 - `.cursor/hooks/lib/code-quality-check.md`
+- `.cursor/hooks/lib/delegation-reminder-cache.sh`
 - `.cursor/hooks/lib/hook-io.sh`
 - `.cursor/hooks/lib/quality-check-common.sh`
 - `.cursor/hooks/lib/storage-url-common.py`
+- `.cursor/hooks/lib/upstream-write-guard.py`
 - `.cursor/hooks/scripts/block-destructive-git.sh`
 - `.cursor/hooks/scripts/block-destructive-git.test.sh`
 - `.cursor/hooks/scripts/block-main-commit.sh`

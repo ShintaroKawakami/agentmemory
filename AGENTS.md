@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `ff6d93d953399312511b49f884d072293a5eabb220871dd9aac83ab4656655e3`
+- effective hash: `5289d82e1627017b826f732047e5cfa446197f0daebf66aaca9b86541d688913`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -279,6 +279,19 @@ PR 導線がまだ存在しない場合だけ例外になりうる。AI はこ�
 
 （過去に運用設定・hook配布物等を段階的に allowlist で main 直接許可した経緯があるが、2026-06-23〜2026-07-01
 で全撤回済み。allowlist 変遷史の全文は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照）。
+
+## third-party upstream への書込み禁止
+
+全PJで、第三者所有の upstream への push・PR作成・branch削除など、あらゆる書込みを禁止する。
+変更が必要な場合は必ず自分のGitHubアカウントへforkし、fork内のbranchからforkのmainへPRする。
+
+- `origin`: 自分が所有するfork。唯一のwrite先
+- `upstream`: 元リポジトリ。fetch専用
+- forkが存在しない状態で書込みを続行しない
+- upstreamへ成果を還元したい場合も、この運用ではupstream PRを作らない
+
+実行時は `hook-library/scripts/block-main-commit.sh` が `git config --global github.user` と書込先ownerを照合し、
+foreign ownerへの `git push`、`gh pr create`、REST PR作成をfail-closeする。
 
 ## 理由
 

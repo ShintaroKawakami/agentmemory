@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-12T15:04:17.159479+00:00",
-  "source_commit": "b70fc7dbd97fd1a75aa0a3671934d991625776ae",
+  "generated_at": "2026-08-13T07:46:55.393500+00:00",
+  "source_commit": "da4df95cb62ba42fc50749d1c80eaf59741d3d60",
   "source_rule_files": [
     ".claude/rules/general/ai-model-selection.md",
     ".claude/rules/general/branch-rule.md",
@@ -25,9 +25,11 @@
   "source_hook_files": [
     ".claude/hooks/.hook-library-version",
     ".claude/hooks/lib/code-quality-check.md",
+    ".claude/hooks/lib/delegation-reminder-cache.sh",
     ".claude/hooks/lib/hook-io.sh",
     ".claude/hooks/lib/quality-check-common.sh",
     ".claude/hooks/lib/storage-url-common.py",
+    ".claude/hooks/lib/upstream-write-guard.py",
     ".claude/hooks/scripts/block-destructive-git.sh",
     ".claude/hooks/scripts/block-destructive-git.test.sh",
     ".claude/hooks/scripts/block-main-commit.sh",
@@ -99,9 +101,11 @@
     ".cursor/hooks.json",
     ".cursor/hooks/.hook-library-version",
     ".cursor/hooks/lib/code-quality-check.md",
+    ".cursor/hooks/lib/delegation-reminder-cache.sh",
     ".cursor/hooks/lib/hook-io.sh",
     ".cursor/hooks/lib/quality-check-common.sh",
     ".cursor/hooks/lib/storage-url-common.py",
+    ".cursor/hooks/lib/upstream-write-guard.py",
     ".cursor/hooks/scripts/block-destructive-git.sh",
     ".cursor/hooks/scripts/block-destructive-git.test.sh",
     ".cursor/hooks/scripts/block-main-commit.sh",
