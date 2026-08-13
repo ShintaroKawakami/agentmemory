@@ -32,11 +32,6 @@ command = "/bin/bash"
 args = ["/Users/shintaro/business/AGENT-HUB/scripts/codex-mcp-remote-with-env.sh", "http://shintaros-mac-mini:8847/mcp", "CODEBASE_CONTEXT_ENGINE_MCP_API_KEY"]
 enabled = true
 
-[mcp_servers.context7]
-command = "npx"
-args = ["-y", "@upstash/context7-mcp@3.2.0"]
-enabled = true
-
 [mcp_servers.shintaro-gbrain]
 command = "/bin/bash"
 args = ["/Users/shintaro/business/AGENT-HUB/scripts/mcp-remote-oauth.sh", "https://gbrain-mcp.jtt.cafe/mcp", "shintaro-gbrain"]

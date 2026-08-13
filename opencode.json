@@ -37,15 +37,6 @@
         "X-API-Key": "{env:CODEBASE_CONTEXT_ENGINE_MCP_API_KEY}"
       }
     },
-    "context7": {
-      "type": "local",
-      "enabled": true,
-      "command": [
-        "npx",
-        "-y",
-        "@upstash/context7-mcp@3.2.0"
-      ]
-    },
     "shintaro-gbrain": {
       "type": "remote",
       "enabled": true,
