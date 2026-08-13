@@ -907,12 +907,68 @@ expect_block \
 
 unclassified_out="$(run_hook "$feature_repo" "git not-a-real-subcommand" 2>&1 || true)"
 if printf '%s' "$unclassified_out" | grep -q 'permissionDecision.*deny' \
-  && printf '%s' "$unclassified_out" | grep -q 'サブコマンドを安全に分類できない' \
+  && printf '%s' "$unclassified_out" | grep -q '書込先を安全に証明できない' \
   && ! printf '%s' "$unclassified_out" | grep -q 'third-party upstream への書込みは禁止'; then
   printf '[PASS] %s\n' "未知サブコマンドは分類不能メッセージで拒否（upstream文言と混同しない）"
   PASS=$((PASS + 1))
 else
   printf '[FAIL] %s: %s\n' "未知サブコマンドは分類不能メッセージで拒否（upstream文言と混同しない）" "$unclassified_out"
+  FAIL=$((FAIL + 1))
+fi
+
+# [2026-08-13][test] issue #1746: own-repo 証明不能（HEREDOC/複合cd/パイプ）は upstream 文言と混ぜない
+# 背景:
+#   - ユーザー依頼意図: shell substitution / opaque payload / piped cd の deny が fork 誘導しないこと。
+#   - 守るべき業務ルール: deny 自体は維持。本物の third-party write は従来の upstream 文言のまま。
+#   - 他案不採用理由: HEREDOC commit の静的許可は fail-open リスクがあるため今回やらない。
+expect_unclassified_deny() {
+  local name="$1"
+  local cwd="$2"
+  local command="$3"
+  local reason_fragment="$4"
+  local out
+  out="$(run_hook "$cwd" "$command" 2>&1 || true)"
+  if printf '%s' "$out" | grep -q 'permissionDecision.*deny' \
+    && printf '%s' "$out" | grep -q '書込先を安全に証明できない' \
+    && printf '%s' "$out" | grep -q "$reason_fragment" \
+    && ! printf '%s' "$out" | grep -q 'third-party upstream への書込みは禁止'; then
+    printf '[PASS] %s\n' "$name"
+    PASS=$((PASS + 1))
+  else
+    printf '[FAIL] %s: %s\n' "$name" "$out"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+expect_unclassified_deny \
+  "shell substitution 付き commit は分類不能メッセージで拒否" \
+  "$feature_repo" \
+  'git commit -m "$(cat <<'\''EOF'\''
+docs only
+EOF
+)"' \
+  "through shell substitution"
+
+expect_unclassified_deny \
+  "opaque python payload の write は分類不能メッセージで拒否" \
+  "$feature_repo" \
+  'python3 -c "import os; os.system(\"git push origin feature/test\")"' \
+  "through opaque"
+
+expect_unclassified_deny \
+  "piped cd 付き push は分類不能メッセージで拒否" \
+  "$feature_repo" \
+  "cd /tmp | git push origin feature/test" \
+  "across conditional or piped cd"
+
+real_upstream_out="$(run_hook "$feature_repo" "git push upstream feature/test" 2>&1 || true)"
+if printf '%s' "$real_upstream_out" | grep -q 'permissionDecision.*deny' \
+  && printf '%s' "$real_upstream_out" | grep -q 'third-party upstream への書込みは禁止' \
+  && ! printf '%s' "$real_upstream_out" | grep -q '書込先を安全に証明できない'; then
+  printf '[PASS] %s\n' "本物の third-party push は upstream 文言のまま"
+  PASS=$((PASS + 1))
+else
+  printf '[FAIL] %s: %s\n' "本物の third-party push は upstream 文言のまま" "$real_upstream_out"
   FAIL=$((FAIL + 1))
 fi
 
