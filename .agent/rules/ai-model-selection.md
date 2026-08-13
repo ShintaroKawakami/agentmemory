@@ -88,6 +88,34 @@ GLM 5.2 の正式運用は high / max のみ（デフォルト high・他の値�
 
 詳細手順は `skills/agent-dispatch/` を参照（本ルールは方針、skill は手順＝DRY）。
 
+<!-- [2026-08-13][fix]
+背景:
+  - ユーザー依頼意図: 2026-08-13 に AI Worker MCP へ provider:"auto" で委譲したところ、codexbar 実測で
+    glm/ocg/kimi/antigravity の4ルートが ok（残量あり）だったにも関わらず、auto ルーターが unknown 判定の
+    opencode/latest ルートを選び、さらに agents.yaml の model_catalog に存在しない model_id
+    （opencode-go/kimi-k3）で起動し、629秒間ハートビートゼロ・0行編集のまま沈黙死した
+    （job_id 59003758-c6b7-4cb3-af0a-5470685ed4ef）。同一経路の失敗は課題 #74（empty_diff）に続く再発であり、
+    根本原因は委譲前に既存ツール `get_worker_capabilities` を呼ばず auto 任せにした PM 側の運用だった。
+  - 守るべき業務ルール: `plan-commitment-tracking.md` §3「AI worker 摩擦は観測＝即発火（正本修正）」。
+    委譲前 preflight は既存 MCP ツールを使うだけで防げる摩擦であり、義務化しないと再発する。
+  - 他案不採用理由:
+    1) auto ルーター側だけを直す案は tools/ai-worker-mcp/ のコード修正が別タスク範囲であり、
+       本追記は PM 側の運用義務（rule）を先に固定する目的のため不採用（別タスクで扱う）。
+    2) 手順を skill 側だけに書いてルールへ書かない案は、義務が「常時ロードされるルール」に無いと
+       auto 任せの再発を防げないため不採用（義務はルール、手順は skill の二段構えを維持）。
+対応: 委譲前 preflight（get_worker_capabilities 必須化・unknown ルート不採用・台帳外モデル禁止・
+  2分ハートビート早期見切り）を全PJ共通の義務として追記した。
+-->
+
+**委譲前 preflight を必須にする（2026-08-13）**: AI Worker MCP へ委譲する前に必ず `get_worker_capabilities`（`include_usage: true`）を呼び、`state: ok` のルートから **provider を明示指名**する。`provider: "auto"` 任せを既定にしない。
+
+- **`unknown` を「使える」と見なさない**: 残量が `unknown` のルートは、`ok` のルートが 1 つでも存在する限り選ばない。
+- **台帳に無いモデルを使わない**: `agents.yaml` の `model_catalog` に `availability: verified` として存在しない model_id では委譲しない。
+- **早期見切り**: 委譲後 2 分でハートビート（最初の意味のある出力）が無ければ、stale 判定を待たずキャンセルして別ルートへ振る。
+- 上記は**全 PJ 共通**の義務であり、対象 PJ を限定しない。
+
+詳細手順（preflight の呼び出し順・2分ハートビート確認手順）は `skills/agent-dispatch/SKILL.md` を参照（本ルールは義務、skill は手順＝DRY）。
+
 ---
 
 ## 8. 関連
