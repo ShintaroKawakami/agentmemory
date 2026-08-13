@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `ba57125d9160c7148fc00b50f4ac2612bf7da29b793e93dfd3a6609012b095ad`
+- effective hash: `eb673e2cde753774595b44a7265ba6deacdc6636d0a5d31d8d70a73f2ed7e701`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -156,7 +156,7 @@ Hook scripts in `src/hooks/` are standalone Node.js scripts (no iii-sdk import).
 - 1,428+ tests
 
 ## 詳細ルール
-全ルール統合版は本ファイル（AGENTS.md）に集約。編集元は PJ の `CLAUDE.md` + AGENT-HUB manifest v2 が選ぶ canonical rules とし、手動編集ではなく再生成で同期する。
+常時ロード相当のルール本文だけを本ファイル（AGENTS.md）に集約する。編集元は PJ の `CLAUDE.md` + AGENT-HUB manifest v2 が選ぶ canonical rules。条件付き（frontmatter `paths:`）ルールは索引のみ載せ、必要時に当該ファイルを Read する。手動編集ではなく再生成で同期する。
 
 <!-- [2026-07-18][fix]
 背景:
@@ -486,122 +486,6 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 ---
 
 **追記ルール: 実測事例・長文詳細・制定経緯は `docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
-
-# hooks 構造ルール
-
-<!-- [2026-04-26][feat]
-背景:
-  - ユーザー依頼意図: jtt-cms 側で運用していた hooks 構造ルール（特に削除済みファイル復活の禁止事項）を
-    AGENT-HUB の正本側にも置き、AI が hook-library / registry / deploy-hooks.py を編集する際に
-    paths frontmatter で自動ロードされる形で強制したい。
-  - 守るべき業務ルール: `security-review-check.md` を SSOT とし、重複していた `supabase-sql-review.md` は
-    削除済みのまま戻さない。registry / deploy-hooks.py / hook-library の三者で同じ判断基準を共有する。
-  - 他案不採用理由: jtt-cms 側だけにルールを置く案では AGENT-HUB を編集する AI がルールを読まず、
-    過去に発生したゾンビ復活が再発するリスクが残るため不採用。
-対応: jtt-cms `.claude/rules/general/hooks-structure-rule.md` を AGENT-HUB に上流取り込みし、
-  paths を AGENT-HUB の構造（hook-library/ / hook-registry.yaml / scripts/deploy-hooks.py）に適合させた。
--->
-
-## チェックリストMDの配置
-
-| 正しい配置                                            | 禁止                       |
-| ----------------------------------------------------- | -------------------------- |
-| `hook-library/lib/code-quality-check.md`              | `hook-library/prompts/`    |
-| `hook-library/checklists/security/security-review-check.md` | 任意の新規サブディレクトリ |
-
-配布後の PJ 側でも同じ規約に従う:
-
-| 正しい配置                                   | 禁止                       |
-| -------------------------------------------- | -------------------------- |
-| `.claude/hooks/lib/code-quality-check.md`    | `.claude/hooks/prompts/`   |
-| `.claude/hooks/lib/security-review-check.md` | 任意の新規サブディレクトリ |
-
-## 禁止事項
-
-- `prompts/` ディレクトリの作成・復活（AGENT-HUB / 配布先 PJ いずれも）
-- `quality-check-common.sh` のチェックリスト参照パスを `lib/` 以外に変更
-- `supabase-sql-review.md` の復活（`security-review-check.md` と重複していた削除済みファイル）
-- `ui-quality-gate.json` の復活（`type: "prompt"` でレビュー LLM に丸投げする方式は失敗時にプロンプト原文がチャットに漏れるため廃止。UI 品質チェックは `code-quality-check.md` の `ui-quality-jp` domain を `subagent-quality-check.sh` / `stop-quality-check.sh` がファイル参照型で reason に出す形で完結する）
-- `hook-registry.yaml` の `checklist.security` に `KNOWN_SECURITY_CHECKLISTS` allow-list 外の名前を書くこと（`scripts/deploy-hooks.py` が fail-fast で拒否する）
-- 対象PJを明示せずに hook を追加・配布すること。新規 hook は「必要な PJ」「不要な PJ」「Codex/Augment へ載せるか」を AGENT-HUB セッションで決めてから `hook-registry.yaml` に登録する。
-- `/hook-publish` の復活。project 配布applyは
-  `scripts/sync-agents.py --project <project> --project-root <clean-linked-worktree>` だけを公開入口とし、物理 hook writerを単独実行しない。
-
-## hook 追加・配布フロー
-
-1. AGENT-HUB セッションで hook の目的と対象PJを決める。
-2. `hook-library/scripts/`、`hook-library/settings/`、`scripts/deploy-hooks.py` の script map、`hook-registry.yaml` を同一PRで更新する。
-3. `scripts/sync-agents.py --project <project> --dry-run` で全 surface の同一generation差分を確認する。
-4. 実配布が必要ならcleanな専用linked worktreeを明示してfull applyする。複数PJでも明示リストを1件ずつ処理する。
-5. 個別 writer の `--all` は使わない。全PJの一括同期は別の明示承認とscope確認を必要とする。
-
-## チェックリスト注入方式
-
-| 方式                     | 説明                                                      |
-| ------------------------ | --------------------------------------------------------- |
-| ファイル参照型（採用）   | reason にファイルパスを記載し、AIがReadツールで読む       |
-| インライン注入型（廃止） | reason にチェックリスト全文を埋め込む（チャットが埋まる） |
-
-reason にチェックリスト全文を埋め込まないこと。AI が Read ツールでファイルを読む形にすることで、ユーザーのチャット視認性を確保する。
-
-## 配布スクリプトによる強制ガード（`scripts/deploy-hooks.py:merge_settings()`）
-
-| ガード | 役割 |
-| --- | --- |
-| `_strip_prompt_type_hooks()` | `type: "prompt"` の hook をマージ時に強制除去。インライン注入型の混入を配布パイプラインで遮断する |
-| `_dedupe_hooks_by_command()` | `(matcher, paths, command)` ベースで dedupe。dict 完全一致比較が空白・キー順差で破綻し、過去 jtt-cms に重複 4 件（`prettier-format` / `seo-check` / `storage-url-check` / `block-main-commit`）が混入した実績の再発防止 |
-
-これらのガードと `--all --confirm-all-hook-scope` の安全弁を外す変更は禁止。検証スクリプト `scripts/test-deploy-hooks-merge-settings.sh` がガードの挙動を回帰チェックする。
-
-## 理由
-
-`scripts/deploy-hooks.py`（テンプレート配布スクリプト）は配布先 PJ の `lib/` にチェックリストMDをデプロイする。`quality-check-common.sh`（runtime）が異なるパスを参照すると、新規 PJ セットアップ後に品質チェックリストが見つからず approve が素通りする。
-
-`security-review-check.md` の内容は SECURITY DEFINER / RLS / `crm.` schema 等 Supabase + Postgres 専用のため、Supabase を使わない PJ には配布しない（registry の `checklist.security` を空配列にする）。
-
-# 最新スタック確認ルール（context7 必須）
-
-## 対象ライブラリ（AI カットオフ後・急速更新）
-
-以下を**実装・デバッグ・設定変更する前に必ず** context7 で最新 docs を取得する。
-記憶だけで書かない（古い API を使うと動かない・型エラー・ビルド失敗を引き起こす）。
-
-| ライブラリ / フレームワーク | 主な罠 |
-|----------------------------|--------|
-| **Next.js 16+** | `middleware` → `proxy.ts` に改名（Next15→16）、`cookies()`/`headers()` は非同期＝`await` 必須（Next15で async 化・16で同期アクセス廃止）、App Router キャッシュ挙動変更 |
-| **React 19+** | Next15 以降は React19 前提。`use()`, Server Actions の型・挙動変更 |
-| **@serwist/next** / **serwist** | SW ビルド設定・`defaultCache` API が頻繁変更。Turbopack 非対応（`--webpack` 必須） |
-| **motion 12+** (`motion/react`) | `motion-plus` API、`AnimatePresence`・`useSpring` 型変更 |
-| **Tailwind CSS v4+** | `@config` 廃止・CSS ファースト設定に移行（`tailwind.config.js` 非推奨） |
-| **drizzle-orm** | マイグレーション API・スキーマ定義が毎 minor で変わりやすい |
-| **vaul** | ドロワー API・`snapPoints` 型が変わっている可能性 |
-| **sonner** | `toast()` オプション・`Toaster` props の更新 |
-
-## 必須手順
-
-1. `mcp__context7__resolve-library-id` でライブラリの context7 ID を取得
-2. `mcp__context7__query-docs` で最新 docs を取得してから実装
-3. context7 が使えない環境は `WebFetch` で公式 docs を取得（記憶補完のみでの実装禁止）
-
-```
-例: Next.js 16 の proxy.ts (旧 middleware) を実装する前に
-  → resolve-library-id "next.js" → query-docs "proxy middleware"
-例: serwist defaultCache を設定する前に
-  → resolve-library-id "@serwist/next" → query-docs "defaultCache"
-```
-
-## 古い API の使用禁止
-
-- **Next15 以前の同期 `cookies()`**: Next16 では非推奨。`await cookies()` を前提に書く（context7 で確認）
-- **`middleware.ts`（Next16 では `proxy.ts`）**: 名前が変わった。context7 で確認してから書く
-- **Pages Router 前提のコード**: App Router が前提。`getServerSideProps` 等を新規に書かない
-- **React18 前提の型**: React19 の型変化（`children: ReactNode` の必須化等）を確認してから書く
-- **旧 `motion/react` 型**: `motion-plus` の型は memory だけで書かない
-
-## 関連
-
-- `skills/dev-guardrails` — フェーズ別ワークフロー・品質ゲート
-- `skills/pwa-guardrails` — serwist 配線・PWA 品質チェックリスト（context7 が必要になる代表例を列挙）
 
 # 横断チェック台帳（mandate-registry）への登録ルール
 
@@ -978,89 +862,6 @@ AI が URL やファイルパスを出力するとき、**URL の直後に全角
 
 **追記ルール: 実測事例・長文詳細・制定経緯は `docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
 
-# レスポンシブ UI は全 viewport に足す（普遍ルール・常時適用）
-
-## 原則（絶対・例外なし）
-
-レスポンシブな画面にボタン・リンク・ナビ等の UI 要素を**新規に足す**ときは、**モバイル表示とデスクトップ表示の両方**（存在する全ブレークポイント）に足す。片方だけに足すと、もう片方の画面幅でその要素が**消える**。これは開発の普遍ルールであり、条件付きにしない。
-
-多くのレスポンシブ実装は同じ内容を画面幅で出し分ける:
-- モバイル: 上部バー等（例 `.appbar`）を表示し、サイドバーを隠す
-- デスクトップ（例 `@media (min-width:1024px)`）: サイドバー等（例 `.side-*`）を表示し、上部バーを隠す
-
-このとき片方の枠にだけ要素を足すと、もう片方では `display:none` により非表示になる。
-
-## 必須
-
-1. UI 要素を足すとき、**全 viewport バリアント**（モバイル枠 / デスクトップ枠 / その他ブレークポイント）の**すべて**に足す。
-2. 追加要素が**各画面幅で実際に表示される**ことを確認してから完了にする（該当 CSS の `display:none` / media query の出し分けを読み、隠れる枠だけに足していないか確認する）。
-3. コードレビュー・実装監査でも「新規 UI 要素が全 viewport で見えるか」を必須確認項目にする。
-
-## 実例（この規則ができた経緯）
-
-2026-07-05 cron-dashboard で「🩺 健診」ナビを最初モバイルの上部バー（`.appbar`）だけに足した結果、`.appbar` が `@media (min-width:1024px)` で `display:none` になるため **PC 幅で恒久的に非表示**になり、実装監査がブロッカーとして検出した。デスクトップのサイドバー（`.side-brand` 隣）にも足して解消。片側だけ追加は完了ではない。
-
-## 接続
-
-- `.claude/rules/general/visual-progress-map.md` — 非エンジニア用語・現在地マップ
-- `.claude/rules/general/ui-stitch-mandatory.md` — UI/デザインは Stitch を通す
-- `skills/dev-guardrails/SKILL.md` — 実装ガードレール
-
-<!-- [2026-07-07][feat]
-背景:
-  - ユーザー依頼意図: 2026-07-06 PR #742 で「自己テレメトリ配線の正当な変更が保護テスト
-    （tests/test_handover_manual.py::test_protected_paths_are_not_directly_edited）を赤にしたまま、
-    内容はレビュー済み・有効だったためマージされた」。保護パス（settings.json 等）への正当な配線変更を
-    安全に通す手順が明文化されておらず、テスト赤マージが個別対応・都度判断になっていた。
-  - 守るべき業務ルール: 保護テストは `.claude/` `.codex/` `.cursor/` `.gemini/` `.kimi-code/` `.augment/`
-    `.opencode/` `.githooks/` `claude-plans/` `node_modules/` と `.env` 系への**プレフィックス一致**で
-    広く保護判定する（`is_protected_path()`）。この粗さゆえ `.claude/rules/general/*.md` の新規ルール追加のような
-    正当な変更も毎回引っかかる。テストの検査ロジック自体を弱めず、allowlist（fix-forward）で個別許可する
-    既存パターン（PR#637 / #666 / #695 / #736）を標準手順として明文化する。
-  - 他案不採用理由: (1) 保護テストの対象プレフィックスを狭める案は、真に守りたい settings.json / hooks.json 等の
-    誤編集検知力を落とすため不採用。(2) 都度アドホックに allowlist へ足すだけで手順化しない案は、
-    #742 のように「テスト赤のままマージ」を再発させるため不採用（手順として明文化し merge ゲートと接続する）。
-対応: 保護パスの検査対象・allowlist機構・共存手順（配布経由を優先→どうしても直接編集ならallowlist追加→
-  テスト赤のままマージしない）を明文化する。
--->
-
-# settings.json 等の保護テストと正当な配線変更の共存ルール
-
-## 原則
-
-`.claude/` `.codex/` `.cursor/` `.gemini/` `.kimi-code/` `.augment/` `.opencode/` `.githooks/`
-`claude-plans/` `node_modules/` 配下および `.env` / `.env.*` は、`tests/test_handover_manual.py::test_protected_paths_are_not_directly_edited`
-が **プレフィックス一致で広く保護対象と判定**する（実装: `skills/handover-manual/scripts/resolve-handover-path.py` の `is_protected_path()`、
-`PROTECTED_PREFIXES`）。テストは `origin/main` とのマージベース以降 + working tree + staged の変更ファイルを走査し、
-保護対象なのに `allowed_managed_placements`（テスト内のallowlist）に無いパスがあれば **fail** する。
-
-この判定は粗い（ディレクトリ丸ごと保護）ため、telemetry 配線・新規ルール追加・hook 再配備など
-**正当な変更でも毎回検知される**。これは仕様であり、バグではない。正当な変更を安全に通す手順は以下。
-
-## 必須手順
-
-1. **まず中央配布経路で済まないか確認する**: project harness は `scripts/sync-agents.py --project <pj> --dry-run`
-   で全surfaceを確認し、承認後だけcleanな専用linked worktreeへfull applyする。個別writerを手で連結しない。
-2. **どうしても直接編集が必要なら、同一PRで `allowed_managed_placements` に追加する**:
-   `tests/test_handover_manual.py::test_protected_paths_are_not_directly_edited` 内のセットへ、
-   変更した具体パスと日付・理由コメントを添えて追記する（例: `# [YYYY-MM-DD][fix] PR#nnn で〜が弾かれた。理由。`）。
-   既存の fix-forward 例（PR#637 `ai-model-selection.md` / PR#666 `constructive-dissent.md` /
-   PR#695 `responsive-both-viewports.md` / PR#736 `dotfiles/.env.example`）と同じパターンに倣う。
-3. **保護テストの検査ロジック自体を弱めない**: `is_protected_path()` のプレフィックス判定や
-   `changed_paths_for_protected_check()` の走査範囲を変更・無効化しない。許可は必ず allowlist の
-   個別パス追加で行う（一括 skip・正規表現の緩和は禁止）。
-4. **テスト赤のままマージしない**: `python3 -m pytest tests/test_handover_manual.py -q` を PR 作成前に
-   ローカル実行し green を確認する。CI の同テストが赤の状態での merge は `branch-rule.md` の
-   CI 緑ゲートに反する（#742 の再発防止）。
-
-## 関連
-
-- `.claude/rules/general/branch-rule.md` — main 直接コミット禁止・CI緑ゲート
-- `.claude/rules/general/plan-commitment-tracking.md` — workaround 自問（正本修正を先送りしない）
-- `.claude/rules/general/hooks-structure-rule.md` — hook 配置の隣接ルール（配布経由の管理配置）
-- `tests/test_handover_manual.py` — 保護テスト本体・allowlist 実体
-- `skills/handover-manual/scripts/resolve-handover-path.py` — `is_protected_path()` / `PROTECTED_PREFIXES` 実装
-
 # サブエージェント Scope Contract
 
 サブエージェント（Task / Agent tool）に作業を委譲するとき、delegate 元のプロンプトに**必ず以下 3 項目（コード探索を伴う場合は §4、UI/デザインを伴う場合は §5 を足す）を含める**。制定経緯・テンプレート全文は `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` を参照。
@@ -1425,3 +1226,11 @@ git worktree list
 ---
 
 **追記ルール: 実測事例・復旧手順・長文詳細は移設先（references / docs）へ書き、本ルールには義務とトリガーだけ足す（再肥大化防止）。**
+
+## 条件付きルール索引（on-demand Read）
+以下は Claude Code / Cursor では `paths:` / `globs` で条件付きロードされる。Codex 等の AGENTS.md 注入経路では本文を常時載せないため、該当ファイルを触る作業では一覧のパスを Read してから判断する。
+
+- `.claude/rules/general/hooks-structure-rule.md` — hooks構造ルール — チェックリストMDの配置制約とゾンビ復活禁止 (inheritance_id=`47d7849e1bc9d609`)
+- `.claude/rules/general/latest-stack-context7.md` — 最新スタック確認ルール — Next.js/React/serwist等の急速更新ライブラリは実装前にcontext7で最新docsを取得 (inheritance_id=`6cbb121d4707f75f`)
+- `.claude/rules/general/responsive-both-viewports.md` — レスポンシブ画面にUI要素(ボタン/リンク/ナビ)を足す時は必ず全viewport(モバイル/デスクトップ)に足し、各画面幅で表示を確認してから完了にする普遍ルール (inheritance_id=`f1de976176e1cfe6`)
+- `.claude/rules/general/settings-protection-coexistence.md` — settings.json等の保護テスト（直接編集ブロック）と、telemetry配線等の正当な変更を共存させる手順。テスト赤のままマージしない (inheritance_id=`b2c20a61aba97c16`)
