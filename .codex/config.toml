@@ -34,7 +34,7 @@ enabled = true
 
 [mcp_servers.shintaro-gbrain]
 command = "/bin/bash"
-args = ["/Users/shintaro/business/AGENT-HUB/scripts/mcp-remote-oauth.sh", "https://gbrain-mcp.jtt.cafe/mcp", "shintaro-gbrain"]
+args = ["/Users/shintaro/business/AGENT-HUB/scripts/codex-mcp-remote-with-env.sh", "https://gbrain-mcp.jtt.cafe/mcp", "GBRAIN_MCP_BEARER_SHINTARO"]
 enabled = true
 
 [mcp_servers.stitch]
@@ -46,7 +46,7 @@ X-Goog-Api-Key = "STITCH_API_KEY"
 
 [mcp_servers.tech-gbrain]
 command = "/bin/bash"
-args = ["/Users/shintaro/business/AGENT-HUB/scripts/mcp-remote-oauth.sh", "https://gbrain-mcp.jtt.cafe/mcp", "tech-gbrain"]
+args = ["/Users/shintaro/business/AGENT-HUB/scripts/codex-mcp-remote-with-env.sh", "https://gbrain-mcp.jtt.cafe/mcp", "GBRAIN_MCP_BEARER_TECH"]
 enabled = true
 
 # <<< AGENT-HUB MANAGED CODEX MCP END
