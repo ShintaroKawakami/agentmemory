@@ -43,12 +43,19 @@ eval/data/longmemeval/
 .agents/skills/*
 .claude/agents/*
 .claude/commands/*
+.claude/hooks/.delegation-reminder-cache/
+.claude/parallel-run-state/
 .claude/skills/*
 .codex/agents/*
+.codex/hooks/.delegation-reminder-cache/
 .cursor/agents/*
+.cursor/hooks/.delegation-reminder-cache/
 .cursor/skills/*
 .gemini/agents/*
+.gemini/hooks/.delegation-reminder-cache/
+.kimi-code/hooks/.delegation-reminder-cache/
 .kimi-code/skills/*
+.kimi/hooks/.delegation-reminder-cache/
 .opencode/agents/*
 # AGENT-HUB MANAGED: harness-generated-surfaces END
 

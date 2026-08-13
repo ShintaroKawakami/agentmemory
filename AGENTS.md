@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `5289d82e1627017b826f732047e5cfa446197f0daebf66aaca9b86541d688913`
+- effective hash: `cddda2b0637b1eadd7cf67339dd0477cebda476dde072d7e8761aec848f13569`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -438,6 +438,10 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 | 作業再開・引き継ぎ・「あの続き」 | `agentmemory`（continuation） | 「〇〇の続き」「前回どこまでやったか」 |
 
 判断に迷う場合は検索する側に倒す（誤爆コストは低く、未検索コストは高い）。
+
+## 1-bis. 道具が無いときは止まって待つ
+
+§1 の検索先 MCP（`shintaro-gbrain` / `tech-gbrain`）のツールがこのセッションの道具一覧に無いときは、推測で読んだつもりにせず作業を進めない。利用者へ一文だけ伝える: 「G-Brain の2つ（shintaro-gbrain / tech-gbrain）がOFFです。MCPパネルでONにしてから続けます」。ONになるまで待つ。Claude Code / Codex では通常この分岐に入らない（配線済みなら道具がある）。
 
 ## 2. 検索実行の判断はモデル側に残す
 
