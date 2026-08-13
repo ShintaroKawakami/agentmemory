@@ -329,13 +329,16 @@ def has_git_target_environment(tokens: list[str], git_index: int) -> bool:
     return any(key in os.environ for key in dangerous) or any(key.startswith("GIT_CONFIG_") for key in os.environ)
 
 
+# [2026-08-13][fix] issue #1733: `git cherry` は read-only（upstream との未取り込みコミット比較）。
+# `cherry-pick` だけ既知だと closeout 監査の複合 read-only が「unknown Git subcommand cherry」で
+# third-party write と誤表示される。書き込み系を増やさず比較専用 cherry だけ追加する。
 KNOWN_GIT_SUBCOMMANDS = {
     "add", "am", "apply", "archive", "bisect", "blame", "branch", "bundle",
-    "cat-file", "check-ignore", "check-ref-format", "checkout", "cherry-pick",
-    "clean", "clone", "commit", "config", "describe", "diff", "diff-tree",
-    "fetch", "for-each-ref", "format-patch", "fsck", "gc", "grep", "hash-object",
-    "init", "lfs", "log", "ls-files", "ls-remote", "maintenance", "merge",
-    "merge-base", "mv", "notes", "pull", "push", "range-diff", "rebase",
+    "cat-file", "check-ignore", "check-ref-format", "checkout", "cherry",
+    "cherry-pick", "clean", "clone", "commit", "config", "describe", "diff",
+    "diff-tree", "fetch", "for-each-ref", "format-patch", "fsck", "gc", "grep",
+    "hash-object", "init", "lfs", "log", "ls-files", "ls-remote", "maintenance",
+    "merge", "merge-base", "mv", "notes", "pull", "push", "range-diff", "rebase",
     "reflog", "remote", "reset", "restore", "rev-list", "rev-parse", "revert",
     "rm", "show", "show-ref", "sparse-checkout", "stash", "status", "submodule",
     "switch", "tag", "update-index", "update-ref", "worktree",

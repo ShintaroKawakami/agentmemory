@@ -877,6 +877,45 @@ expect_block \
   "$main_repo" \
   "git push origin --delete feature/old && git commit -m docs"
 
+# [2026-08-13][test] issue #1733: git cherry と複合 read-only closeout 監査を誤停止しない
+# 背景:
+#   - ユーザー依頼意図: status/diff/log/cherry だけの複合 read-only 監査を通し、
+#     未分類サブコマンドの文言を third-party upstream 書込みと混同させない。
+#   - 守るべき業務ルール: cherry 単体と read-only 複合は許可。同じ複合に commit/push があれば
+#     従来どおり fail-closed。未知サブコマンドは分類不能メッセージで deny。
+#   - 他案不採用理由: cherry を全面許可せず cherry-pick だけ既知のままにする案は、
+#     closeout 監査の複合コマンドを毎回分割させるため不採用。
+expect_allow \
+  "git cherry 単体は許可" \
+  "$feature_repo" \
+  "git cherry origin/main feature/test"
+
+expect_allow \
+  "status/diff/log/cherry の複合 read-only は許可" \
+  "$feature_repo" \
+  "git status --short --branch && git diff --stat && git log --oneline && git cherry origin/main feature/test"
+
+expect_block \
+  "read-only 複合に third-party push を混ぜると拒否" \
+  "$feature_repo" \
+  "git status --short && git diff --stat && git log --oneline && git cherry origin/main feature/test && git push upstream feature/test"
+
+expect_block \
+  "read-only 複合に main commit を混ぜると拒否" \
+  "$main_repo" \
+  "git status --short && git cherry origin/main feature/test && git commit --allow-empty -m unsafe"
+
+unclassified_out="$(run_hook "$feature_repo" "git not-a-real-subcommand" 2>&1 || true)"
+if printf '%s' "$unclassified_out" | grep -q 'permissionDecision.*deny' \
+  && printf '%s' "$unclassified_out" | grep -q 'サブコマンドを安全に分類できない' \
+  && ! printf '%s' "$unclassified_out" | grep -q 'third-party upstream への書込みは禁止'; then
+  printf '[PASS] %s\n' "未知サブコマンドは分類不能メッセージで拒否（upstream文言と混同しない）"
+  PASS=$((PASS + 1))
+else
+  printf '[FAIL] %s: %s\n' "未知サブコマンドは分類不能メッセージで拒否（upstream文言と混同しない）" "$unclassified_out"
+  FAIL=$((FAIL + 1))
+fi
+
 TOTAL=$((PASS + FAIL))
 printf '\n=== block-main-commit.test.sh: %d/%d PASS ===\n' "$PASS" "$TOTAL"
 
