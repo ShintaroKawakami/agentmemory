@@ -14,6 +14,17 @@ dist/
 !.claude/rules/
 !.claude/rules/general/
 !.claude/rules/general/*
+# [2026-08-13][fix] ハーネス hook を追跡対象へ戻す。
+# 背景:
+#   - ユーザー依頼意図: 「安全装置(hook)が全リポに届いているか」を毎晩の健診で
+#     見つけられるようにしたい。
+#   - 実測: 上の `.claude/*` が `.claude/hooks/` ごと無視していたため、本リポだけ
+#     14 hook が 1 つも配布されていなかった（harness-baseline-audit で hub_only 14 件）。
+#     配布の公開入口は使い捨ての linked worktree へ書くため、追跡外だと primary checkout に
+#     一生届かない構造だった。他 PJ（gas-shift / google-docs-mcp 等）は `.claude/hooks/` を追跡している。
+#   - 他案不採用理由: primary checkout へ直接 deploy-hooks を流す案は、公開入口
+#     （sync-agents.py --project-root <clean linked worktree>）の単一 writer 契約を壊すため不採用。
+!.claude/hooks/
 
 # MCP接続設定は各マシンのローカル設定（sync-agents が生成）
 .mcp.json

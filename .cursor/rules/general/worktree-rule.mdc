@@ -69,6 +69,21 @@ block-main-commit hook は cwd 変更を伴う複合コマンドでの main 直 
 
 **専用 worktree 作成 → 編集/commit/push → PR 作成 → マージ → fetch-only / detached 確認 → clean（worktree/branch 削除）まで、必ず一連で最後まで閉じる。** 「PR を出した」「マージした」で止めない。詳細コマンド列は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
 
+### Cursor チャットが紐づく worktree を先に消さない（必須）
+
+クライアント差: Claude Code / Codex は worktree 削除後の主害が **cwd 消滅**（次コマンド失敗・`cd` で復帰しやすい）。
+Cursor は birth path の **project cache**（`~/.cursor/projects/<slug>/`）が残り、Connected でも **0 tools**、
+追加 migrate が消えた path で `git ENOENT` になるのが差。Cursor 専用の削除ガードが必要で、全クライアント一律禁止にはしない。
+
+`move_agent_to_root` が成功しても slug / キャッシュが残ったまま path を消すと上の Cursor 症状が出る。
+
+**禁止:** 今のチャットの cwd（または祖先）になっている worktree、または直近 24h に `agent-transcripts` が更新されている
+worktree を、別フォルダへ移った確証前に削除すること（`mcps/` 残存だけでは拒否しない）。  
+**手順:** ① 生き残るフォルダへ Open / `move_agent_to_root` ② MCP tools>0 を確認 ③  
+`python3 scripts/check-cursor-workspace-before-remove.py <path>` が OK ④ それから削除。  
+`merge-pr` は Cursor 紐づけ検知時に **その worktree の remove だけ遅延**し、remote / local branch と他 worktree
+の掃除は続行する。明示フラグ `--allow-active-cursor-workspace-cleanup` だけが当該 WT 削除の上書き（人間確認後）。
+
 ### AI が `main` で「やらないこと / 代わりにやること」
 
 - **やらない**: `git checkout main` / `git switch main` / `git pull` while on `main` / `git branch -f main`。
