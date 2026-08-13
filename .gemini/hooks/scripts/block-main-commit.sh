@@ -560,8 +560,18 @@ COMMAND_FOR_GIT_MATCH="$(sanitize_git_data_args "$COMMAND")"
 #   - 他案不採用理由: remote名`upstream`だけを拒否する案は、外部remoteが`origin`のままのPJやURL直指定を
 #     見逃すため不採用。ルール文書だけの禁止も実行時の誤送信を止められないため不採用。
 UPSTREAM_GUARD_MSG='[hook:block-main-commit] third-party upstream への書込みは禁止です。\n\n対応手順:\n1. 自分のGitHubアカウントへfork\n2. forkをorigin、元リポジトリをread-only upstreamに設定\n3. pushとPRはfork内だけで実行\n\n全PJ共通ルールです。'
+# [2026-08-13][fix] issue #1733: 未分類サブコマンド／alias は third-party write と別メッセージにする。
+# 検出理由に subcommand 名は既にあるが、先頭文言が「upstream 書込み禁止」だと原因を取り違える。
+UNCLASSIFIED_GIT_GUARD_MSG='[hook:block-main-commit] Git サブコマンドを安全に分類できないため停止しました。\n\nこれは third-party upstream への書込み検査とは別です。read-only の既知サブコマンドだけを複合実行するか、書き込みが必要なら単発の明確な git/gh コマンドに分けてください。'
 guard_reason=$(python3 "$SCRIPT_DIR/../lib/upstream-write-guard.py" --cwd "$CWD" --command "$COMMAND_FOR_GIT_MATCH" 2>&1) || {
-  _emit_deny_with_telemetry "$UPSTREAM_GUARD_MSG\n\n検出理由: $guard_reason"
+  case "$guard_reason" in
+    *"unknown Git subcommand"*|*"Git alias"*)
+      _emit_deny_with_telemetry "$UNCLASSIFIED_GIT_GUARD_MSG\n\n検出理由: $guard_reason"
+      ;;
+    *)
+      _emit_deny_with_telemetry "$UPSTREAM_GUARD_MSG\n\n検出理由: $guard_reason"
+      ;;
+  esac
 }
 
 is_allowed_main_direct_path() {
