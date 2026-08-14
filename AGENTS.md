@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `0ff623ce2a56635e505dbb6aec686ed12b3f911ace5e419e6af5a69359c11f6b`
+- effective hash: `8418452e186d41ee5d4bb48e473d346729134759c9502811ee9c4fd6fcbd813e`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -457,12 +457,13 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 
 ## 1. 発火条件表
 
-会話の中でユーザー発話や作業内容が次のいずれかに該当したら、応答を出す前に該当 brain を検索する。
+**毎回の発言では探さない。** 相談・直し・判断のときだけ、応答を出す前に該当 brain を検索する。
 
 | 発話・作業の性質 | 検索する先 | 例 |
 |---|---|---|
-| バグ修正・障害調査・回帰の原因特定 | `tech-gbrain`（`mcp__tech-gbrain__search` / `recall`） | 「〇〇が直らない」「なぜこのエラーが出るか」「前も似た不具合あったはず」 |
-| 経営相談・戦略・クレーム対応・売上・オペレーション改善 | `shintaro-gbrain`（`mcp__shintaro-gbrain__search` / `recall`） | 「この施策どう思う」「クレームにどう対応すべきか」「オペレーションを改善したい」 |
+| 相談・直し・判断（意見・修正方針） | **`shintaro-gbrain` と `tech-gbrain` の両方** | 「どう思う？」「直して」「修正して」「どうすれば」「どういう風に」 |
+| バグ修正・障害調査・回帰の原因特定（上記に当たらない純粋な調査） | `tech-gbrain`（`mcp__tech-gbrain__search` / `recall`） | 「〇〇が直らない」「なぜこのエラーが出るか」「前も似た不具合あったはず」 |
+| 経営相談・戦略・クレーム対応・売上・オペレーション改善（上記に当たらない） | `shintaro-gbrain`（`mcp__shintaro-gbrain__search` / `recall`） | 「この施策の戦略は」「クレームにどう対応すべきか」「売上を改善したい」 |
 | 作業再開・引き継ぎ・「あの続き」 | `agentmemory`（continuation） | 「〇〇の続き」「前回どこまでやったか」 |
 
 判断に迷う場合は検索する側に倒す（誤爆コストは低く、未検索コストは高い）。
