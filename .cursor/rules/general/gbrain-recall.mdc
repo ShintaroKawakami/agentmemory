@@ -38,7 +38,7 @@ alwaysApply: true
 
 ## 1-bis. 道具が無いときは止まって待つ
 
-§1 の検索先 MCP（`shintaro-gbrain` / `tech-gbrain`）のツールがこのセッションの道具一覧に無いときは、推測で読んだつもりにせず作業を進めない。利用者へ一文だけ伝える: 「G-Brain の2つ（shintaro-gbrain / tech-gbrain）がOFFです。MCPパネルでONにしてから続けます」。ONになるまで待つ。Claude Code / Codex では通常この分岐に入らない（配線済みなら道具がある）。
+§1 の検索先 MCP（`shintaro-gbrain` / `tech-gbrain`）のツールがこのセッションの道具一覧に無いときは、推測で読んだつもりにせず作業を進めない。利用者へ一文だけ伝える: 「G-Brain の2つ（shintaro-gbrain / tech-gbrain）がOFFです。MCPパネルでONにしてから続けます」。ONになるまで待つ。配線は harness type 依存であり、Claude Code / Codex でも片方または両方が無いことがある。道具一覧を見て判断し、「通常あるはず」で進めない。
 
 ## 2. 検索実行の判断はモデル側に残す
 
