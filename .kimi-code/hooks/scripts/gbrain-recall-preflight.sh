@@ -51,32 +51,41 @@ def prompt_from_payload(text: str) -> str:
 
 # .claude/rules/general/gbrain-recall.md §1 の発火条件表と同じキーワード群。
 # 語の追加・変更はルール本体と同一 PR で行う（二重管理防止）。
-TECH_KEYWORDS = [
-    "バグ", "直して", "不具合", "障害", "エラー", "直らない", "原因", "回帰",
+# [2026-08-14][feat] 相談・直し・判断は両方リマインド（片方だけにしない）
+CONSULT_BOTH_KEYWORDS = [
+    "どう思う", "直して", "修正", "修正して", "どうすれば", "どういう風に", "相談", "判断",
 ]
-BUSINESS_KEYWORDS = [
-    "相談", "戦略", "クレーム", "どうすれば", "オペレーション改善", "施策", "売上",
+TECH_ONLY_KEYWORDS = [
+    "バグ", "不具合", "障害", "エラー", "直らない", "原因", "回帰",
+]
+BUSINESS_ONLY_KEYWORDS = [
+    "戦略", "クレーム", "オペレーション改善", "施策", "売上",
 ]
 
-TECH_RE = re.compile("|".join(re.escape(w) for w in TECH_KEYWORDS))
-BUSINESS_RE = re.compile("|".join(re.escape(w) for w in BUSINESS_KEYWORDS))
+CONSULT_BOTH_RE = re.compile("|".join(re.escape(w) for w in CONSULT_BOTH_KEYWORDS))
+TECH_ONLY_RE = re.compile("|".join(re.escape(w) for w in TECH_ONLY_KEYWORDS))
+BUSINESS_ONLY_RE = re.compile("|".join(re.escape(w) for w in BUSINESS_ONLY_KEYWORDS))
 
 raw = os.environ.get("HOOK_INPUT", "")
 prompt = prompt_from_payload(raw)
 forced = os.environ.get("GBRAIN_RECALL_PREFLIGHT_FORCE", "0") == "1"
 
-tech_hit = bool(TECH_RE.search(prompt))
-business_hit = bool(BUSINESS_RE.search(prompt))
+consult_both_hit = bool(CONSULT_BOTH_RE.search(prompt))
+tech_hit = bool(TECH_ONLY_RE.search(prompt))
+business_hit = bool(BUSINESS_ONLY_RE.search(prompt))
+any_hit = consult_both_hit or tech_hit or business_hit
 
-if not forced and not (tech_hit or business_hit):
+if not forced and not any_hit:
     raise SystemExit(0)
 
 print("gbrain-recall preflight:")
-if not (tech_hit or business_hit):
+if not any_hit:
     print("- 該当キーワードなし（FORCE 表示）")
-if tech_hit:
+if consult_both_hit:
+    print("- shintaro-gbrain と tech-gbrain の両方を検索してから着手（相談・直し・判断）")
+elif tech_hit:
     print("- tech-gbrain を検索してから着手（バグ修正・障害調査・回帰）")
-if business_hit:
+elif business_hit:
     print("- shintaro-gbrain を検索してから着手（経営相談・戦略・クレーム対応）")
 print("- 詳細: .claude/rules/general/gbrain-recall.md")
 PY
