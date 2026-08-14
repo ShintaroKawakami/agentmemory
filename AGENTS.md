@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `3a5f2281874de184114213b35caf7ca6a0b8899badcfdfe76219913acf35db9a`
+- effective hash: `b174cb204dd052b720e6f3395e809a8333bc059207746a5e810e876299e3d633`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -470,7 +470,7 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 
 ## 1-bis. 道具が無いときは止まって待つ
 
-§1 の検索先 MCP（`shintaro-gbrain` / `tech-gbrain`）のツールがこのセッションの道具一覧に無いときは、推測で読んだつもりにせず作業を進めない。利用者へ一文だけ伝える: 「G-Brain の2つ（shintaro-gbrain / tech-gbrain）がOFFです。MCPパネルでONにしてから続けます」。ONになるまで待つ。Claude Code / Codex では通常この分岐に入らない（配線済みなら道具がある）。
+§1 の検索先 MCP（`shintaro-gbrain` / `tech-gbrain`）のツールがこのセッションの道具一覧に無いときは、推測で読んだつもりにせず作業を進めない。利用者へ一文だけ伝える: 「G-Brain の2つ（shintaro-gbrain / tech-gbrain）がOFFです。MCPパネルでONにしてから続けます」。ONになるまで待つ。配線は harness type 依存であり、Claude Code / Codex でも片方または両方が無いことがある。道具一覧を見て判断し、「通常あるはず」で進めない。
 
 ## 2. 検索実行の判断はモデル側に残す
 
