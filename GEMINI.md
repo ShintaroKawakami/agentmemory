@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `583d1daf0e934d8128b673dc13bb55d64c0dcd6bb391a44fec887aa851b72c49`
+- effective hash: `bb4cb7ef5178cbb38c68c308eea78fe21d91496c0a78dba77f2cf3fad61caa41`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -205,7 +205,7 @@ Hook scripts in `src/hooks/` are standalone Node.js scripts (no iii-sdk import).
 対応: 判断理由だけを CaD に残し、詳細な実測ログは agent-dispatch references を正本とする。
 -->
 
-# AI モデル選定指標（GLM 5.2 / Kimi K2.7・K3）
+# AI モデル選定指標（GLM 5.3 / Kimi K2.7・K3）
 
 全 PJ 共通。コード実装をAIエージェントに任せる際の初期ヒューリスティック。
 
@@ -254,7 +254,7 @@ Hook scripts in `src/hooks/` are standalone Node.js scripts (no iii-sdk import).
 
 | タスク種別 | 第一候補 | 理由 |
 |-----------|---------|------|
-| 仕様が明確・クリーンさ重視・UI/結線・お手本コード | **GLM 5.2** | 簡潔・範囲内に収まりやすい・速い |
+| 仕様が明確・クリーンさ重視・UI/結線・お手本コード | **GLM 5.3** | 簡潔・範囲内に収まりやすい・速い |
 | 複雑・セキュリティ/堅牢性が重要なバックエンド | **Kimi K2.7 Code** | 安全性を自力で深掘り・テスト厚い |
 | 巨大 context の読み込み・リポ横断調査 | **Kimi K3** | 長大 context（ルーティング条件は `agents.yaml` 正本） |
 | どちらでも可 | いずれか | ただし下記ガードを必ず付ける |
@@ -267,7 +267,7 @@ Hook scripts in `src/hooks/` are standalone Node.js scripts (no iii-sdk import).
 - 選定結果: `reason_code` / `selected_model` / `estimated_context` / `fallback_reason` を必ず残す。
 - K3切替: 新sessionを開始し、必要情報の要約だけを渡す。履歴を丸ごと移送しない。
 
-GLM 5.2 の正式運用は high / max のみ（デフォルト high・他の値はルーティングのバリデーションで拒否される）。母数は n=4 の初期観測であり法則ではない（冒頭⚠️参照）。
+GLM 5.3 の reasoning_effort は low / high / max（thinking 無効化は不可。コーディング既定は max。low / high は明示指定時のみ。他の値はルーティングのバリデーションで拒否される）。母数は n=4 の初期観測であり法則ではない（冒頭⚠️参照）。
 
 ---
 
@@ -283,7 +283,7 @@ GLM 5.2 の正式運用は high / max のみ（デフォルト high・他の値�
 
 ## 6. 候補提案とディスパッチ
 
-実装委譲・並列実装の話題が出たら §4 を根拠に「GLM 5.2 向き / Kimi向き」を 1 行理由つきで先に提案し、Kimi内のK2.7/K3は上記契約で選ぶ。ディスパッチ実行は `agent-dispatch` スキルへ（未導入環境では §4・§5 のみ使う）。役割分担: 方針選定・委譲・進捗確認・結果回収 = Claude / Codex。実行は `agents.yaml` の有効 provider だけを AI Worker MCP 経由で行う。プロンプトには §5 の必須ガードを必ず織り込む。
+実装委譲・並列実装の話題が出たら §4 を根拠に「GLM 5.3 向き / Kimi向き」を 1 行理由つきで先に提案し、Kimi内のK2.7/K3は上記契約で選ぶ。ディスパッチ実行は `agent-dispatch` スキルへ（未導入環境では §4・§5 のみ使う）。役割分担: 方針選定・委譲・進捗確認・結果回収 = Claude / Codex。実行は `agents.yaml` の有効 provider だけを AI Worker MCP 経由で行う。プロンプトには §5 の必須ガードを必ず織り込む。
 
 詳細手順は `skills/agent-dispatch/` を参照（本ルールは方針、skill は手順＝DRY）。
 
