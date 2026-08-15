@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `73c7b0c9111076b41aedfd9e3d079cd8adc09bf0040859b9e2cd78b6d87893fe`
+- effective hash: `3cacf1572c95bf483c53ff73a5823e273cd01add44b409e723e3509ca0c1f043`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -891,6 +891,11 @@ AI が URL やファイルパスを出力するとき、**URL の直後に全角
 - `existing CaD コメントを削除しない`
 - **`.claude/hooks/` / `hook-library/` のガード hook（block-main-commit 等）をデバッグ目的で一時編集しない**（deny 原因調査はログ・分割コマンド・worktree 委譲で行う。2026-08-12 jtt-system 配布インシデント再発防止）
 - **検査・テスト・受け入れ条件を通すために timestamp・実行者ID・実行していないコマンドの出力・確認内容などの値を捏造しない**。指示と検査要求が矛盾したら通す側に倒さず、報告だけで済ませず**停止**して呼び出し元へ確認する（詳細: `~/business/AGENT-HUB/skills/plan-approval/SKILL.md`。2026-08-14 実測）
+- **`git stash` 系（pop / apply / drop / clear）を実行しない**。stash はリポジトリ共有であり、隔離 worktree にいても他セッションの未コミット作業を壊しうる（2026-08-15 実測: 隔離 worktree での検証中に他ブランチの stash を pop し conflict 発生。衝突しなければ気付かず消えていた）
+- 自分が作っていない**他ブランチの reflog / git config を変更しない**
+- 自分が作っていない **worktree・リモートブランチを削除しない**
+
+理由: `allowed_files` はワークツリー内のファイルしか縛れず、リポジトリ共有の状態（stash / reflog / config / remote branch）は素通りするため。
 
 ## 3. verify before return（返却前の検証手順）
 
