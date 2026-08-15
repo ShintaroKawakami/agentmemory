@@ -17,11 +17,11 @@
 ## 0-bis. Codex 指名時の固定ルール
 
 - **`codexで実装` / `Codexで実装` / `codex実装` / `Codex実装`** と言われた時だけ、Codex 実装として扱う。
-- Codex 実装の正式設定名は **model = `gpt-5.3-codex-spark`**, **model_reasoning_effort = `high`**（既定。旧既定 `medium`。SWE-Bench Pro 実測で high→xhigh の上げ幅は1pt未満のため常時 xhigh は費用対効果が低い）。
-- 起動例は `codex exec -m gpt-5.3-codex-spark -c model_reasoning_effort=high`。
-- **`xhigh` はユーザーが明示指定した時だけ使う**。軽微タスクは `medium` を明示指定する。AI が自動・既定・推測で `xhigh` を選ばない。
+- Codex 実装の正式設定名は **model = `gpt-5.3-codex-spark`**, **model_reasoning_effort = `xhigh`**（2026-08-15 レーン方針。職人メイン。medium / high は明示時）。
+- 起動例は `codex exec -m gpt-5.3-codex-spark -c model_reasoning_effort=xhigh`。
+- **`xhigh` が Spark 実装の既定**。軽微タスクは `medium` を明示指定する。
 - **「実装」だけでは Codex 固定にしない**。Cursor / Kimi / GLM / Claude / Codex のどれで進めるかを文脈で判断し、不明なら確認する。
-- **Spark は AI Worker MCP の auto routing 候補に対等参加する**（適材適所＋残量バランス・絶対優先ではない）。原因不明バグ・設計判断・DB移行・大規模リファクタ・コンテキストが大きい仕事は Spark に固執せず、auto が適材適所で他 worker（GLM/Kimi/Gemini）へ回避する。
+- **Spark は職人メインの1本**（GLM 5.3 / Gemini 3.7 Flash / Spark）。原因不明バグ・設計判断・DB移行・大規模リファクタ・コンテキストが大きい仕事は Spark に固執せず、GLM / Gemini へ回避する。
 - **「レビュー」または「codexでレビュー」** は既存の `codex-review` 導線を使う。実装専用の `gpt-5.3-codex-spark` 固定には巻き込まない。
 
 ---
@@ -47,7 +47,7 @@
 
 **境界（2026-08-08）**: 見積り10分未満の小実装とガバナンス領域（`.claude/` `hook` 等の worker 編集不可領域）は Claude サブエージェント内製、大タスク・並列・大量読みは worker（判定手順は `skills/agent-dispatch` が正本）。
 
-**三役の呼称（2026-08-09）**: 監督=PM（Claude）／参謀=Kimi 長大 context（設計・大量読み）／職人=実装 worker。調査は3段振り分け（小=監督が context-engine 直・中〜大=参謀・急ぎのみ Claude Explore）。正本: `agents.yaml` の `role_titles`／詳細: `docs/model-catalog-policy.md`「三役体制」節。
+**三役の呼称（2026-08-15）**: 監督=Claude / Codex 5.6 Sol or Terra / Cursor（PM クライアント）／参謀=Kimi K3／職人メイン=GLM 5.3 max・Gemini 3.7 Flash Medium+High・Codex Spark xhigh。OpenCode Go は予備。正本: `agents.yaml` の `role_titles` と `worker_delegation.lane_policy`。
 
 **Fable 使用条件（2026-08-11・ctx-save）**: Fable は難所（設計・承認判断／原因不明バグの診断／ガバナンス領域編集）限定。調査・大量読み・軽作業は使わない。重い調査が主目的のセッションは、セッションモデル自体を Sonnet 既定で開始する（第二弾 2026-08-11）。正本・境界の全文は `agents.yaml` の `task_routing.fable_usage_policy`（`session_model_default` 含む）を参照（複製しない）。
 
@@ -55,10 +55,11 @@
 
 | タスク種別 | 第一候補 | 理由 |
 |-----------|---------|------|
-| 仕様が明確・クリーンさ重視・UI/結線・お手本コード | **GLM 5.3** | 簡潔・範囲内に収まりやすい・速い |
-| 複雑・セキュリティ/堅牢性が重要なバックエンド | **Kimi K2.7 Code** | 安全性を自力で深掘り・テスト厚い |
-| 巨大 context の読み込み・リポ横断調査 | **Kimi K3** | 長大 context（ルーティング条件は `agents.yaml` 正本） |
-| どちらでも可 | いずれか | ただし下記ガードを必ず付ける |
+| 仕様が明確・クリーンさ重視・UI/結線・お手本コード | **GLM 5.3 max** | 職人メイン。範囲内に収まりやすい |
+| 通常の実装 / DB・認証・本番・横断 | **Gemini 3.7 Flash Medium / High** | 職人メイン。難所は High |
+| 小〜中の明確な実装 | **Codex Spark xhigh** | 職人メイン。128k超過は他へ |
+| 複雑バックエンド・メイン枯渇時 | **Kimi K2.7 Code**（予備） | メイン3本が足りない時、または堅牢性確認 |
+| 巨大 context の読み込み・リポ横断調査 | **Kimi K3**（参謀） | 実装メインではない |
 
 ### Kimi 内モデル選択（決定論的）
 
