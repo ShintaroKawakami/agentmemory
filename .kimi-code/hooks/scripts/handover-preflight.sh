@@ -354,7 +354,7 @@ def print_hint(app: dict[str, object] | None, forced: bool) -> None:
     # 他案不採用理由: 候補を全件GBrainへ送る案は確認負荷と重複を増やすため不採用。
     print("- closeout: 未完了 / 次回やること / Tech G-Brain候補 / GBrain候補 / SSOT昇格候補を分ける")
     print("- gbrain: 技術名・PJ固有名・短期状態は候補にせず、人間の判断原則へ抽象化")
-    print("- handover_update: 未完了がある時だけ current.md を更新")
+    print("- handover_update: 終了整理のたびに current.md を最新化（未完了なしでも書く。「更新不要」は使わない）")
     if forced and app is None:
         print("- alias: 未検出。cwdから推定")
     elif app is not None:
