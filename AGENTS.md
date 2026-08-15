@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `fd14f0786b62b2a7a46bdb3db51a176a58d5c00bbc40879144909b07065c4cf2`
+- effective hash: `73c7b0c9111076b41aedfd9e3d079cd8adc09bf0040859b9e2cd78b6d87893fe`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -593,6 +593,13 @@ JTT 関連の MCP（asana-mcp / jtt-smaregi-mcp / smaregi-docs / google-chat-mcp
 5. **管理対象ファイルでの URL クエリパラメータ方式（`?api_key=...`）禁止**。Cloud Run の監査ログに URL ごとキーが残るため、`.mcp.json` / `~/.claude.json` / `.codex/config.toml` など AGENT-HUB が生成する設定は `headers: {"X-API-Key": "${...}"}` のヘッダー方式に統一する
 
 **Claude.ai 例外**: Claude.ai コネクタで `X-API-Key` ヘッダーを設定できない場合のみ、asana-mcp は `https://asana-mcp-vaibinqqva-an.a.run.app/mcp?api_key=<ASANA_MCP_API_KEY>` 形式を使ってよい。この例外は Claude.ai 手動登録専用で、AGENT-HUB の生成物には書かない。
+
+## PJ 横断の第三者個人情報（PII）の退避規範（2026-08-14〜）
+
+PJ 横断で扱う第三者の個人情報（PII）は、API キーと同じ扱いで **git 管理対象へ入れない**。実値は
+`~/.config/agent-hub/<用途>-private/`（実例: `~/.config/agent-hub/prompts-private/cloud-common-system-prompt.json`）へ
+退避し、git 側は**トークン名（プレースホルダ）だけ**を持つ。gitignore 必須・sync スクリプトだけが実値展開する点は
+上記 API キー規範と同一とする。
 
 ## 再発防止: sync スクリプトのハードエラー化
 
