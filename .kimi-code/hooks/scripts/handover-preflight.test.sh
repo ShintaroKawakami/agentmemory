@@ -119,7 +119,7 @@ grep -q "reflection-policy" <<< "$closeout_output" \
   || fail "作業終了で reflection-policy が出ない: $closeout_output"
 grep -q "未完了 / 次回やること / Tech G-Brain候補 / GBrain候補 / SSOT昇格候補" <<< "$closeout_output" \
   || fail "分類分離の案内が出ない: $closeout_output"
-grep -q "未完了がある時だけ current.md を更新" <<< "$closeout_output" \
+grep -q "終了整理のたびに current.md を最新化" <<< "$closeout_output" \
   || fail "handover更新条件の案内が出ない: $closeout_output"
 
 jtt_apps_reflection_output="$(run_hook "jtt-appsにふり返りを依頼")"
