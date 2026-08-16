@@ -51,10 +51,12 @@ AGENT-HUB から各 PJ へ配布した差分は、配布を実行した AI / 担
 
 配布先 PJ に tracked 差分が出た場合は、feature branch 作成 → 配布差分だけ commit → PR 作成 → CI/review 確認 →
 `merge-pr` でマージ → fetch-only + detached HEAD / verify worktree で取り込み確認 → worktree/branch cleanup →
-`git status --short` clean 確認、まで一連で完了する（詳細な完了条件・禁止・例外の全文は `~/business/AGENT-HUB/docs/worktree-operations.md` 参照）。
+`git status --short` clean 確認 → **配布先 checkout への catch-up pull（`git -C <絶対パス> pull --ff-only`）と届いたことの grep 実測**、
+まで一連で完了する（詳細な完了条件・禁止・例外の全文は `~/business/AGENT-HUB/docs/worktree-operations.md` 参照）。
 
 禁止: 「これは自分が修正したファイルではない」として配布差分を放置する／未コミットのまま終了する／
-main 直接 push で済ませる／`--push` の成功だけで完了扱いにする。
+main 直接 push で済ませる／`--push` の成功だけで完了扱いにする／**マージしただけで「届いた」と報告する
+（catch-up pull と grep 実測まで済ませていない）**。
 
 例外（dry-run のみ・差分なし・既存WIPで安全に branch できない・権限やCI failureで merge できない）の場合も、
 対象 PJ・残っている差分・止めた理由・次の安全な一手を報告する。
