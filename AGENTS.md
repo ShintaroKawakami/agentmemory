@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `892cfdc28ec505680774b7554349003776775cefae077dbea786ca0f739cb04b`
+- effective hash: `850d04870d53f680e773c1a5bfb1786f434a075649d1a769c7d477863c7db874`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -1242,7 +1242,7 @@ catch-up pull は人間ゲートにせず、**AI が自分で実行して最後�
 
 **必須ガード**:
 
-1. 事前に `git -C <path> status --short` を確認し、**未コミット変更があれば pull せず報告する**（他セッションが作業中の可能性）。
+1. 事前に `git -C <path> status --porcelain --untracked-files=no` を確認し、**tracked な未コミット変更があれば pull せず報告する**（他セッションが作業中の可能性）。**untracked ファイルだけなら pull してよい**（`--ff-only` は untracked を壊す取り込みを git 自身が中止するため安全）。`git status --short` で判定すると untracked のゴミ1個で配布が永久に止まる（実測 2026-08-16）。
 2. `git -C <path> branch --show-current` が `main` でない、または detached の場合は **pull しない**。
 3. **届いたことを実測する**。変更した文字列を配布先で `grep` して確認し、pull の成功出力だけを根拠にしない。
 4. 配布したら pull まで閉じる（`branch-rule.md`「配布クローズアウト責任」の完了条件）。「マージした＝届いた」で終えない。
