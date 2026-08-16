@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-14T12:10:47.759187+00:00",
-  "source_commit": "ea807613fffd9e2ab3b1c819ace91c4a0b3ac8c9",
+  "generated_at": "2026-08-16T16:15:17.164789+00:00",
+  "source_commit": "bdf403e14ff0f66139f28047f8be65b8a0178bd8",
   "source_rule_files": [
     ".claude/rules/general/ai-model-selection.md",
     ".claude/rules/general/branch-rule.md",
@@ -153,7 +153,24 @@
     ".cursor/agents/test-runner.md"
   ],
   "generated_mcp_files": [],
-  "generated_skill_files": [],
+  "generated_skill_files": [
+    ".cursor/skills/adversarial-review",
+    ".cursor/skills/agent-dispatch",
+    ".cursor/skills/agentmemory-routing",
+    ".cursor/skills/ai-project-rules",
+    ".cursor/skills/brainstorm",
+    ".cursor/skills/cc-context-optimizer",
+    ".cursor/skills/ci-credit-optimizer",
+    ".cursor/skills/codex-review",
+    ".cursor/skills/create-pr",
+    ".cursor/skills/cursor-cloud",
+    ".cursor/skills/dev-guardrails",
+    ".cursor/skills/handover-manual",
+    ".cursor/skills/mcp-dev-kit",
+    ".cursor/skills/plan-approval",
+    ".cursor/skills/post-merge",
+    ".cursor/skills/skill-audit"
+  ],
   "generated_environment_files": [
     ".cursor/environment.json"
   ],
