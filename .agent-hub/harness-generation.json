@@ -19,7 +19,7 @@
   },
   "resolver_version": "1.1.0",
   "schema_version": 2,
-  "source_fingerprint": "sha256:dd2a652c235e20c6008d93732eacca7d85abc9d495a1f2e769d61b0adc8a040c",
+  "source_fingerprint": "sha256:2be533939056d9a02cc0a59f923c7a8a12c06c3d41b1be055d3ddcff69460c57",
   "surfaces": [
     {
       "asset_revisions": [
@@ -167,9 +167,9 @@
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:87251cd30d43d9f18329fbcfe11a58cdc85ecd9ec5cb47a6a18bbb9819775105",
+      "content_digest": "sha256:681d4b635459805e6ae1caa4dc4b76ef178f63632badd3f916c5906fb05ed8e2",
       "kind": "command",
-      "materialization_digest": "sha256:8a056138802eadf11187b55224be9268ecae2fe93829958a1faddf7a165da68f",
+      "materialization_digest": "sha256:f7361c753d9b5c72c2b1f8cf9c3612beaa9077529fe0ccb2e5c8dd7bb249f315",
       "probe": "fresh-command-discovery",
       "source_revision": "sha256:5cde231fcbe613654b6398fca2e3c6ee111b526c66344e0d22ea861bd0c98e7d",
       "symlink_policy": "forbidden",
@@ -687,9 +687,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:87251cd30d43d9f18329fbcfe11a58cdc85ecd9ec5cb47a6a18bbb9819775105",
+      "content_digest": "sha256:681d4b635459805e6ae1caa4dc4b76ef178f63632badd3f916c5906fb05ed8e2",
       "kind": "command",
-      "materialization_digest": "sha256:a4d128cbaee12079074eb6177210f72980b9cf7311aa02e82e6cc30205d6a3ef",
+      "materialization_digest": "sha256:127da307be9e45049063ea33dac564bb1521a070c85d152f01ac2bd86590f052",
       "probe": "fresh-command-discovery",
       "source_revision": "sha256:5cde231fcbe613654b6398fca2e3c6ee111b526c66344e0d22ea861bd0c98e7d",
       "symlink_policy": "forbidden",
@@ -1067,9 +1067,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:de5592cd5a30e6bb0df650b3d4079117d4a27c12eaeb15fd139195d02be93149",
+      "content_digest": "sha256:7e0807dccc5e34284fd91d4ac71c8a9a212ad338ef30058536f80b7a1da6720d",
       "kind": "skill",
-      "materialization_digest": "sha256:7fd745202057a765e9ec77e711637e18cdaee622797cf28ca91e695327bb0699",
+      "materialization_digest": "sha256:6ef219f9f8e4694746906a4896a51468c35e174d3b961678f94478f114e6064e",
       "probe": "fresh-skill-discovery",
       "source_revision": "sha256:4b4bcb6faa240e8e6f5a7ca50cf918bf14010df109ee3a7a97ba852df8c8330c",
       "symlink_policy": "forbidden",
@@ -1129,9 +1129,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:3ce796d5790448f256cd3a38e6ca49985d21dfe44c720d4fd105b7835a95a028",
+      "content_digest": "sha256:04fedf93342a2e573447c0dd8bb7718b58346a898f8583aa7aa049bbe72ca55b",
       "kind": "subagent",
-      "materialization_digest": "sha256:65f58f463748375c7a392750cbd419964a60ceb394ed4f0852ecd8811bd82cbc",
+      "materialization_digest": "sha256:51a1a823b0e8b1beed167e396872dd9ce06a68d1833079f8faa4440fe83683fa",
       "probe": "fresh-agent-discovery",
       "source_revision": "sha256:eff25b868abdb7285f6ffabfa875249fa7dae64e9e39f9ea0504b2ec81a808db",
       "symlink_policy": "forbidden",
@@ -1613,9 +1613,9 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:3ce796d5790448f256cd3a38e6ca49985d21dfe44c720d4fd105b7835a95a028",
+      "content_digest": "sha256:04fedf93342a2e573447c0dd8bb7718b58346a898f8583aa7aa049bbe72ca55b",
       "kind": "subagent",
-      "materialization_digest": "sha256:54b6283efbb227f679e75b94d0deb1a53f90c09994f950b594e0f2b80e679e37",
+      "materialization_digest": "sha256:339fd4c21c1710ad7fb4af88d56a7bcbee694b804dcb433e8aadb34a0c17e01f",
       "probe": "fresh-agent-discovery",
       "source_revision": "sha256:eff25b868abdb7285f6ffabfa875249fa7dae64e9e39f9ea0504b2ec81a808db",
       "symlink_policy": "forbidden",
@@ -2575,9 +2575,9 @@
         }
       ],
       "client": "opencode",
-      "content_digest": "sha256:e78fcfa80d89a9636bbcdb09e8694e98ab1e46799593a8f3a8265f3571d8136e",
+      "content_digest": "sha256:46a4d4a1a92d1ed62e5334d89cd80e5d7df709f916fff08a9da24a9cf20f9d8d",
       "kind": "ai_client",
-      "materialization_digest": "sha256:b26fe13b0fb7220885140cd13fdc1d96604d5194e5cf241ce2fb9f7e8931115c",
+      "materialization_digest": "sha256:fb5adadcbfd520c92181180360295486e2c2e8ba434d427e7313752da00811d4",
       "probe": "stable-sync-state",
       "source_revision": "sha256:4a244311b9f5fc8a04b79628d359a5fc68274acc74a61666df7d1878391918ec",
       "symlink_policy": "forbidden",
