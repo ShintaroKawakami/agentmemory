@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `9828eb0b5b385a391335aaca5d01efd01a1c63e107effa6753eda5c06133e2c0`
+- effective hash: `c4cbe68e2956a9a4ea6282ebadee080aa0747505df0f5d14a51f0dbcdae3e237`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -386,10 +386,12 @@ AGENT-HUB から各 PJ へ配布した差分は、配布を実行した AI / 担
 
 配布先 PJ に tracked 差分が出た場合は、feature branch 作成 → 配布差分だけ commit → PR 作成 → CI/review 確認 →
 `merge-pr` でマージ → fetch-only + detached HEAD / verify worktree で取り込み確認 → worktree/branch cleanup →
-`git status --short` clean 確認、まで一連で完了する（詳細な完了条件・禁止・例外の全文は `~/business/AGENT-HUB/docs/worktree-operations.md` 参照）。
+`git status --short` clean 確認 → **配布先 checkout への catch-up pull（`git -C <絶対パス> pull --ff-only`）と届いたことの grep 実測**、
+まで一連で完了する（詳細な完了条件・禁止・例外の全文は `~/business/AGENT-HUB/docs/worktree-operations.md` 参照）。
 
 禁止: 「これは自分が修正したファイルではない」として配布差分を放置する／未コミットのまま終了する／
-main 直接 push で済ませる／`--push` の成功だけで完了扱いにする。
+main 直接 push で済ませる／`--push` の成功だけで完了扱いにする／**マージしただけで「届いた」と報告する
+（catch-up pull と grep 実測まで済ませていない）**。
 
 例外（dry-run のみ・差分なし・既存WIPで安全に branch できない・権限やCI failureで merge できない）の場合も、
 対象 PJ・残っている差分・止めた理由・次の安全な一手を報告する。
@@ -1288,13 +1290,31 @@ worktree を、別フォルダへ移った確証前に削除すること（`mcps
 
 ### AI が `main` で「やらないこと / 代わりにやること」
 
-- **やらない**: `git checkout main` / `git switch main` / `git pull` while on `main` / `git branch -f main`。
+- **やらない**: `git checkout main` / `git switch main` / `git branch -f main` / **共有 checkout へ入って**の `git pull`（`cd <repo> && git pull` のように cwd を main へ移す形）。
+- **やる**: 配布物を実際に届ける早送りは `git -C <対象PJの絶対パス> pull --ff-only` の単発コマンドで **AI が自分で実行する**（下記「catch-up pull」節）。
 - **やる**: `git fetch origin +refs/heads/main:refs/remotes/origin/main` で remote tracking ref を更新する。確認が必要な時は `git worktree add --detach <verify-dir> origin/main` で detached 確認。
 - merge は worktree 内から `gh` / `skills/post-merge/scripts/merge-pr.py --confirm-read` で行う。
 - **cleanup は自分が作った worktree / branch だけ**削除する。`git worktree list --porcelain` で他セッションのものを確認し**温存する**。
 - allowlist 対象の生成 config を main 直コミットする時の stale-main 注意は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
 
 要するに「編集だけ worktree、merge/pull は共有 checkout」をやめる。**着手から cleanup まで一貫して専用 worktree**で閉じる。例外的に人間が明示して main checkout を使う場合は、AI が占有している状態でないことと例外理由を作業ログへ残す。
+
+### catch-up pull は AI が自分で閉じる（全 PJ・全 AI ツール共通・2026-08-16）
+
+配布・修正をマージしても、実際に読まれるのは各 PJ の checkout 上のファイルである。そこへ早送りする
+catch-up pull は人間ゲートにせず、**AI が自分で実行して最後まで閉じる**。人間ゲートは戻せない外向きの操作に絞る。
+
+**形を固定する**: `git -C <対象PJの絶対パス> pull --ff-only` の**単発コマンド**だけを使う。`cd` を伴う複合コマンド・
+`--rebase`・refspec 指定・`--ff-only` を外した pull は使わない（cwd を移さないため共有 checkout の HEAD を掴まない）。
+
+**必須ガード**:
+
+1. 事前に `git -C <path> status --short` を確認し、**未コミット変更があれば pull せず報告する**（他セッションが作業中の可能性）。
+2. `git -C <path> branch --show-current` が `main` でない、または detached の場合は **pull しない**。
+3. **届いたことを実測する**。変更した文字列を配布先で `grep` して確認し、pull の成功出力だけを根拠にしない。
+4. 配布したら pull まで閉じる（`branch-rule.md`「配布クローズアウト責任」の完了条件）。「マージした＝届いた」で終えない。
+
+制定経緯・実測は `~/business/AGENT-HUB/docs/worktree-operations.md`「catch-up pull は AI が自分で閉じる — 制定経緯と実測」を参照。
 
 ## 既存 worktree の確認
 
