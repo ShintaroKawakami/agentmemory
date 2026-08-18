@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `f5e497121dd772bae508a4386f6e463e5e8d0f3cdf5bde649a806039ded3fc56`
+- effective hash: `4694f74c1f58dbb1b4d39b384ed157fc772c67ca9f30e2c70c60e006ceeadfe0`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -1192,8 +1192,10 @@ block-main-commit hook は cwd 変更を伴う複合コマンドでの main 直 
 2. isolation 指定ができない場合のみ、GitHub API / connector で remote feature branch commit → PR → CI → merge の fallback を使う（main 直更新は禁止のまま）。
 3. commit/push を含まない操作（`git add` / `git status` / `gh pr create` 等）はメインセッションから直接 `cd <worktree> && ...` してよい。
 4. hook 検査を `bash -c` 等で素通りさせる回避は**禁止**。
+5. **`EnterWorktree`（`path` に対象 worktree）でセッション自体の cwd を worktree へ移してから `git push` する経路も使える**（先に試してよい実用経路。①②を置き換えない）。block-main-commit は cwd 自身のブランチで判定するため、main checkout を cwd にしたまま `git -C <worktree> push` すると main 扱いで拒否される（2026-08-18 実測）。作業後は `ExitWorktree`（`action: "keep"`）で main checkout へ戻す。
+6. **`skills/post-merge/scripts/merge-pr.py` は実行元 HEAD が対象 PR の `headRefOid` と一致することを要求する**（不一致は fail-closed でマージ拒否）。**対象 PR の worktree を cwd にして実行する**こと。main checkout や別 PR の worktree からは実行できない（2026-08-18 実測）。
 
-サブエージェントの worktree が古いベース（origin/main 以前）から切られる問題への対処、外側隔離 worktree の残存・cleanup 手順、Codex fallback の実測経緯は
+サブエージェントの worktree が古いベース（origin/main 以前）から切られる問題への対処、外側隔離 worktree の残存・cleanup 手順、Codex fallback・EnterWorktree/ExitWorktree 経路・merge-pr.py headRefOid 要件の実測経緯は
 `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
 
 ## 共有 checkout / main 非占有ルール（全 PJ・全 AI ツール共通）
