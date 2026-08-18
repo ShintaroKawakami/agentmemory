@@ -38,12 +38,15 @@
       }
     },
     "shintaro-gbrain": {
-      "type": "remote",
+      "type": "local",
       "enabled": true,
-      "url": "https://gbrain-mcp.jtt.cafe/mcp",
-      "headers": {
-        "Authorization": "{env:GBRAIN_MCP_BEARER_SHINTARO}"
-      }
+      "command": [
+        "/bin/bash",
+        "/Users/shintaro/business/AGENT-HUB/scripts/gbrain-mcp-preregistered-client.sh",
+        "https://gbrain-mcp.jtt.cafe/mcp",
+        "GBRAIN_MCP_CLIENT_ID_SHINTARO",
+        "GBRAIN_MCP_CLIENT_SECRET_SHINTARO"
+      ]
     },
     "stitch": {
       "type": "remote",
@@ -54,12 +57,15 @@
       }
     },
     "tech-gbrain": {
-      "type": "remote",
+      "type": "local",
       "enabled": true,
-      "url": "https://gbrain-mcp.jtt.cafe/mcp",
-      "headers": {
-        "Authorization": "{env:GBRAIN_MCP_BEARER_TECH}"
-      }
+      "command": [
+        "/bin/bash",
+        "/Users/shintaro/business/AGENT-HUB/scripts/gbrain-mcp-preregistered-client.sh",
+        "https://gbrain-mcp.jtt.cafe/mcp",
+        "GBRAIN_MCP_CLIENT_ID_TECH",
+        "GBRAIN_MCP_CLIENT_SECRET_TECH"
+      ]
     }
   }
 }
