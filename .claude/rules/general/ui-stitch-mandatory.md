@@ -1,3 +1,17 @@
+---
+description: UI / デザインは必ず Stitch を通す
+paths:
+  - "**/*.tsx"
+  - "**/*.jsx"
+  - "**/*.vue"
+  - "**/*.css"
+  - "**/*.html"
+  - "**/*.blade.php"
+  - "**/.stitch/**"
+  - "**/DESIGN.md"
+  - "skills/stitch/**"
+---
+
 # UI / デザインは必ず Stitch を通すルール（強制）
 
 制定経緯（2026-05-27 新設判断・2026-07-20 MCP選択正本切替）は `skills/stitch/SKILL.md` の

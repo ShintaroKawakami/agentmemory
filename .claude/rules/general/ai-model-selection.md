@@ -1,3 +1,13 @@
+---
+description: AI モデル選定指標
+paths:
+  - "registries/harness-manifest.yaml"
+  - "agents.yaml"
+  - "skills/agent-dispatch/**"
+  - "tools/ai-worker-mcp/**"
+  - ".claude/rules/general/ai-model-selection.md"
+---
+
 <!-- [2026-07-18][fix]
 背景:
   - ユーザー依頼意図: 常駐ルールを短くしても、Codex effort 方針を変えた理由と旧判断を追跡できる状態を保つ。
