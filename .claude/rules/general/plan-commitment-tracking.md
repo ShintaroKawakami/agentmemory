@@ -1,3 +1,13 @@
+---
+description: 承認済みプラン条項を実装で拾う
+paths:
+  - "scripts/**/*.py"
+  - "src/**"
+  - "apps/**"
+  - "skills/**"
+  - ".claude/rules/general/plan-commitment-tracking.md"
+---
+
 <!-- CaD 履歴（2026-06-26 新規作成の経緯／2026-07-16 常駐ダイエットPR2／2026-08-03 worker検証コマンド未実行対策、
 それぞれの背景・守るべき業務ルール・他案不採用理由）は verbatim で
 ~/business/AGENT-HUB/skills/plan-approval/references/commitment-examples.md 「plan-commitment-tracking.md からの移設」節参照。 -->

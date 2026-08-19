@@ -1,3 +1,14 @@
+---
+description: ハードコード排除・参照型設計
+paths:
+  - "**/*.yaml"
+  - "**/*.yml"
+  - "**/*.json"
+  - "scripts/**/*.py"
+  - ".claude/rules/**/*.md"
+  - "skills/**/*.md"
+---
+
 # ハードコード排除・参照型設計（グローバル憲法）
 
 制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「reference-over-hardcode.md からの移設」節を参照。
