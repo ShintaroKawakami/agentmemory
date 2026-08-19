@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `8cf434b00bdfb7abde8d54f42386dfd4bb321a33f73d472fddd12704512cd9cb`
+- effective hash: `680c6200af9c7b75107d12e84a72aaf2603afa3da8b372e7af7075d566edc79a`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
