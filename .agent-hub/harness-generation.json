@@ -4,13 +4,13 @@
   ],
   "canonical_project": "agentmemory",
   "effective_hashes": {
-    "antigravity": "e0aba3a01266e1807b325d4d0ffe7c0a517c5222e2525c7ce8ed331b18de539a",
-    "claude": "e0aba3a01266e1807b325d4d0ffe7c0a517c5222e2525c7ce8ed331b18de539a",
-    "codex": "e0aba3a01266e1807b325d4d0ffe7c0a517c5222e2525c7ce8ed331b18de539a",
-    "cursor": "e0aba3a01266e1807b325d4d0ffe7c0a517c5222e2525c7ce8ed331b18de539a",
-    "kimi": "e0aba3a01266e1807b325d4d0ffe7c0a517c5222e2525c7ce8ed331b18de539a",
-    "opencode": "e0aba3a01266e1807b325d4d0ffe7c0a517c5222e2525c7ce8ed331b18de539a",
-    "warp": "e0aba3a01266e1807b325d4d0ffe7c0a517c5222e2525c7ce8ed331b18de539a"
+    "antigravity": "67a5878a0f84aa60aaeac952a31a39757a35bdbf5bf686fbf81a4e7a73bdd228",
+    "claude": "67a5878a0f84aa60aaeac952a31a39757a35bdbf5bf686fbf81a4e7a73bdd228",
+    "codex": "67a5878a0f84aa60aaeac952a31a39757a35bdbf5bf686fbf81a4e7a73bdd228",
+    "cursor": "67a5878a0f84aa60aaeac952a31a39757a35bdbf5bf686fbf81a4e7a73bdd228",
+    "kimi": "67a5878a0f84aa60aaeac952a31a39757a35bdbf5bf686fbf81a4e7a73bdd228",
+    "opencode": "67a5878a0f84aa60aaeac952a31a39757a35bdbf5bf686fbf81a4e7a73bdd228",
+    "warp": "67a5878a0f84aa60aaeac952a31a39757a35bdbf5bf686fbf81a4e7a73bdd228"
   },
   "harness_type": "mcp-server",
   "ledger_writer": {
@@ -19,7 +19,7 @@
   },
   "resolver_version": "1.1.0",
   "schema_version": 2,
-  "source_fingerprint": "sha256:a50cae5fef15ff991d90915834ba7af0c055c717d1202b2a2864a24462bf2d94",
+  "source_fingerprint": "sha256:43c49596192c88a93eb6ee8cd44813f6536bfa43f1d42025fb87f6c5a401505e",
   "surfaces": [
     {
       "asset_revisions": [
@@ -167,9 +167,9 @@
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:923a28284970ef41014ae428cba01ff1c41c2a19855bda34d8c4bf5e03462b70",
+      "content_digest": "sha256:aaf0a0849b115a0461cca30f03f8dae96272e6482ba3cf780355532f9fc50afe",
       "kind": "command",
-      "materialization_digest": "sha256:101f4b5675f0a6222a509758bb1e162a55fe5db57fb7f582e8970a61b6f1127e",
+      "materialization_digest": "sha256:aa27894e206edbdaccba1719651a6098ce3999e521f32b1c0795f16c530694d7",
       "probe": "fresh-command-discovery",
       "source_revision": "sha256:0d84309c3ee9a4defff0df5fbba2247c59922da67777193185be11e1a4580350",
       "symlink_policy": "forbidden",
@@ -197,9 +197,9 @@
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:0f88c7994a94c2da390dc6d20e69e83baf3172526cdcb65c312d7acbcd5e8940",
+      "content_digest": "sha256:accd2c13031000877468c752ca17bf8fc505ce4dca69d633341c48e638d58174",
       "kind": "constitution",
-      "materialization_digest": "sha256:3385622edb1fb0133875dd4278e028717eac83de5cc45dd9980fdf839bbc4dc8",
+      "materialization_digest": "sha256:3ac22c6903d100059b92f7ccd55bec82be3b999c43439c202f9e7dca6d12349d",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -687,9 +687,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:923a28284970ef41014ae428cba01ff1c41c2a19855bda34d8c4bf5e03462b70",
+      "content_digest": "sha256:aaf0a0849b115a0461cca30f03f8dae96272e6482ba3cf780355532f9fc50afe",
       "kind": "command",
-      "materialization_digest": "sha256:956d31c1d5cba95565cff0ebaf37063efa8a4a562dfec57ab3ac54b7fa6cdf46",
+      "materialization_digest": "sha256:967b4794ef56f9636fef58403c61ed089423b52895df37261d704472638186ae",
       "probe": "fresh-command-discovery",
       "source_revision": "sha256:0d84309c3ee9a4defff0df5fbba2247c59922da67777193185be11e1a4580350",
       "symlink_policy": "forbidden",
@@ -717,9 +717,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:1e5777813b84e663462417b815d874ecd72c2ed1e127da847a8f9823f34786ab",
+      "content_digest": "sha256:3cfa50419f5050c2d1edb500183aff346363ba8116187e4d0bb50227548cc3b2",
       "kind": "constitution",
-      "materialization_digest": "sha256:32bcbcd6de19759c9224aef3fff62fb3e056f000cf2c345996be7729aa4eda98",
+      "materialization_digest": "sha256:8a85d714fb5cf9efdd55fdbec127288293b307905d52d8fc126c4d7eddef87e6",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -1063,7 +1063,7 @@
         },
         {
           "asset_id": "post-merge",
-          "source_revision": "1facc3d366739688ad3cd5674aff26219e60522b439c1505271453665e5bbc7c"
+          "source_revision": "f36506c63e74d39ea89eca835933f9e30989cbd823d049adfea174cac4538c62"
         },
         {
           "asset_id": "project-prompt-review",
@@ -1079,11 +1079,11 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:15899ce6cb9195d0b00476d4441ab85c7dd25956d15540a06969b0b108307f33",
+      "content_digest": "sha256:bad15b5e0d48fae0b5dbc6e83fc1ae0a4e841cf1fadb767a2a42449de29b1543",
       "kind": "skill",
-      "materialization_digest": "sha256:659a477171571397d57f7d29bb2a52c8db972fec36c25ad4699e072018b2222f",
+      "materialization_digest": "sha256:e7c357e37089521af4584128f350a0b5e6441ad737e5789e4861271a4b2300d1",
       "probe": "fresh-skill-discovery",
-      "source_revision": "sha256:8c9ea8b76568a56e000915a781326829dae7b082d134bdc9d83185009c176fa9",
+      "source_revision": "sha256:e94fe637f6740aeb219f8ea6907b669f211da5e243a0437134057c78044bf75d",
       "symlink_policy": "forbidden",
       "target": ".claude/skills",
       "writer_id": "sync-runtime-skills",
@@ -1141,9 +1141,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:be0e720c10d1539c6a6f5b42185068f256f05498e1ec662d2f07995cf046b3fd",
+      "content_digest": "sha256:a00589d3b21193fa16ae9ca77972e8dc8df97fb36e6ea40209318135fcaf825e",
       "kind": "subagent",
-      "materialization_digest": "sha256:e188d892eed2893b0bc497f5bc40bd110a51aeddb8b53fbd2c29c6138fcc6c11",
+      "materialization_digest": "sha256:2b49b3aaac4fbf3ee86ab2b4ecd68e921778d52d7903a0c731439dbb969fe39e",
       "probe": "fresh-agent-discovery",
       "source_revision": "sha256:14b60d51ff8566159fa312985a37ccaebefb9ec12f105ba6cc4a1eafc30c0212",
       "symlink_policy": "forbidden",
@@ -1213,9 +1213,9 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:2275cbd662a75ee70000c3d08a3824edb9daa61815e87a34940397e9bea1548f",
+      "content_digest": "sha256:73d8ad72046963e7c3acb7f9dbd1dcc36c9bfb691be88c9871f60dcfdc59dbef",
       "kind": "constitution",
-      "materialization_digest": "sha256:16c6fd986e84bb9d749c3b423c1c5e8d3fda723460e4d3e9cb246db9a6af5062",
+      "materialization_digest": "sha256:40a6df3d8f0077cb2f484f2a23c1b348ad7eaa64616542337d2a91ec4dcc4bc9",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -1485,9 +1485,9 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:2275cbd662a75ee70000c3d08a3824edb9daa61815e87a34940397e9bea1548f",
+      "content_digest": "sha256:73d8ad72046963e7c3acb7f9dbd1dcc36c9bfb691be88c9871f60dcfdc59dbef",
       "kind": "rule",
-      "materialization_digest": "sha256:39b30646dd0d806d0a0e330c7574d449633ffeec96933dfcc9007df59466c10d",
+      "materialization_digest": "sha256:aeb2a2dc24284e0d9e927a673c2a644e9fbcc533152f51c582e9bacc0f6b5501",
       "probe": "fresh-rule-discovery",
       "source_revision": "sha256:ed4a03daf6bd9a42ccadc9c6f2dd0eea1658062434e039e7575775b313f576ea",
       "symlink_policy": "forbidden",
@@ -1559,7 +1559,7 @@
         },
         {
           "asset_id": "post-merge",
-          "source_revision": "1facc3d366739688ad3cd5674aff26219e60522b439c1505271453665e5bbc7c"
+          "source_revision": "f36506c63e74d39ea89eca835933f9e30989cbd823d049adfea174cac4538c62"
         },
         {
           "asset_id": "project-prompt-review",
@@ -1577,9 +1577,9 @@
       "client": "codex",
       "content_digest": "sha256:73ab398b7d4f8c3f7e6ecc718a368fd3a7079fde3add987ed7a335690e13c39a",
       "kind": "skill",
-      "materialization_digest": "sha256:bed8dbf67ce6fb17b96b22b163926fb8ded0e219c931c7f461a1a2a0b269524b",
+      "materialization_digest": "sha256:62103db9384b1b763be09778b157ad2ee42ef7ead5385f5f22fcbeb346768fe6",
       "probe": "fresh-skill-discovery",
-      "source_revision": "sha256:8c9ea8b76568a56e000915a781326829dae7b082d134bdc9d83185009c176fa9",
+      "source_revision": "sha256:e94fe637f6740aeb219f8ea6907b669f211da5e243a0437134057c78044bf75d",
       "symlink_policy": "forbidden",
       "target": ".agents/skills",
       "writer_id": "sync-runtime-skills",
@@ -1637,9 +1637,9 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:be0e720c10d1539c6a6f5b42185068f256f05498e1ec662d2f07995cf046b3fd",
+      "content_digest": "sha256:a00589d3b21193fa16ae9ca77972e8dc8df97fb36e6ea40209318135fcaf825e",
       "kind": "subagent",
-      "materialization_digest": "sha256:7d08bf0f18e385c02d0c025ab3db2dd7d307a8f9bf6519cb0cc5a1d4e21184d1",
+      "materialization_digest": "sha256:df90629aae5cc150eea52ee07bf0bf135175004c86c8c4612b1acf69c43c4334",
       "probe": "fresh-agent-discovery",
       "source_revision": "sha256:14b60d51ff8566159fa312985a37ccaebefb9ec12f105ba6cc4a1eafc30c0212",
       "symlink_policy": "forbidden",
@@ -1751,9 +1751,9 @@
         }
       ],
       "client": "cursor",
-      "content_digest": "sha256:2275cbd662a75ee70000c3d08a3824edb9daa61815e87a34940397e9bea1548f",
+      "content_digest": "sha256:73d8ad72046963e7c3acb7f9dbd1dcc36c9bfb691be88c9871f60dcfdc59dbef",
       "kind": "constitution",
-      "materialization_digest": "sha256:3adb5f962091f718eb9b074d833f82551b014c73b5ee5f68a3070df8b1f0151e",
+      "materialization_digest": "sha256:cc53c2142405b1238f054f81b5fc23076e03df144c3992345a95ce5c8b6ffd55",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -2097,7 +2097,7 @@
         },
         {
           "asset_id": "post-merge",
-          "source_revision": "1facc3d366739688ad3cd5674aff26219e60522b439c1505271453665e5bbc7c"
+          "source_revision": "f36506c63e74d39ea89eca835933f9e30989cbd823d049adfea174cac4538c62"
         },
         {
           "asset_id": "project-prompt-review",
@@ -2115,9 +2115,9 @@
       "client": "cursor",
       "content_digest": "sha256:73ab398b7d4f8c3f7e6ecc718a368fd3a7079fde3add987ed7a335690e13c39a",
       "kind": "skill",
-      "materialization_digest": "sha256:24adf1c88b5ea752fabbcfad823d2c1755328efc86625be726a4e3571d092157",
+      "materialization_digest": "sha256:d2e0c16575167ea2259a7f3dff175c63e445336510a1dc299570626c18f94670",
       "probe": "fresh-skill-discovery",
-      "source_revision": "sha256:8c9ea8b76568a56e000915a781326829dae7b082d134bdc9d83185009c176fa9",
+      "source_revision": "sha256:e94fe637f6740aeb219f8ea6907b669f211da5e243a0437134057c78044bf75d",
       "symlink_policy": "forbidden",
       "target": ".cursor/skills",
       "writer_id": "sync-runtime-skills",
@@ -2219,7 +2219,7 @@
       "client": "kimi",
       "content_digest": "sha256:b6d1568b0c737e790b17d2058cbe957949de38159dc291aa70994d66dec7e072",
       "kind": "ai_client",
-      "materialization_digest": "sha256:df36fc8d65af6cd3549479ac356e3ba63ca4540a90e3da2d8b21a869d8f64729",
+      "materialization_digest": "sha256:4d87cbcb7f1d4f2eaa5692d469569559f9353deb0bc44178b974d2c1a0206446",
       "probe": "stable-client-instruction",
       "source_revision": "sha256:4a244311b9f5fc8a04b79628d359a5fc68274acc74a61666df7d1878391918ec",
       "symlink_policy": "forbidden",
@@ -2289,9 +2289,9 @@
         }
       ],
       "client": "kimi",
-      "content_digest": "sha256:2275cbd662a75ee70000c3d08a3824edb9daa61815e87a34940397e9bea1548f",
+      "content_digest": "sha256:73d8ad72046963e7c3acb7f9dbd1dcc36c9bfb691be88c9871f60dcfdc59dbef",
       "kind": "constitution",
-      "materialization_digest": "sha256:a0cdfe2dc5bc9ab204971d3994f149e588f5a1e1366eb23cc41001d9d162686b",
+      "materialization_digest": "sha256:c590679a4d4eddda9b1c764ed055ac34b0d2db7c4d12fd84dfe030951b527ddc",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -2491,9 +2491,9 @@
         }
       ],
       "client": "kimi",
-      "content_digest": "sha256:2275cbd662a75ee70000c3d08a3824edb9daa61815e87a34940397e9bea1548f",
+      "content_digest": "sha256:73d8ad72046963e7c3acb7f9dbd1dcc36c9bfb691be88c9871f60dcfdc59dbef",
       "kind": "rule",
-      "materialization_digest": "sha256:70182fa44961588044df03571da7a5feab8160c01507f19a5edee22a34c75a6a",
+      "materialization_digest": "sha256:ca84247f36b867ce7072500f90282c5f4433d11b4f9c100bfd032152b9063c21",
       "probe": "fresh-rule-discovery",
       "source_revision": "sha256:ed4a03daf6bd9a42ccadc9c6f2dd0eea1658062434e039e7575775b313f576ea",
       "symlink_policy": "forbidden",
@@ -2565,7 +2565,7 @@
         },
         {
           "asset_id": "post-merge",
-          "source_revision": "1facc3d366739688ad3cd5674aff26219e60522b439c1505271453665e5bbc7c"
+          "source_revision": "f36506c63e74d39ea89eca835933f9e30989cbd823d049adfea174cac4538c62"
         },
         {
           "asset_id": "project-prompt-review",
@@ -2583,9 +2583,9 @@
       "client": "kimi",
       "content_digest": "sha256:73ab398b7d4f8c3f7e6ecc718a368fd3a7079fde3add987ed7a335690e13c39a",
       "kind": "skill",
-      "materialization_digest": "sha256:c6e3ae878d11d86ed81eef37abb6dd44db077616dafb76016f2c0164298ba5da",
+      "materialization_digest": "sha256:dfb81fdc6e9f5dff2dd7479a44e3961f9a0f27e0fe6e2371cf68e373544b494a",
       "probe": "fresh-skill-discovery",
-      "source_revision": "sha256:8c9ea8b76568a56e000915a781326829dae7b082d134bdc9d83185009c176fa9",
+      "source_revision": "sha256:e94fe637f6740aeb219f8ea6907b669f211da5e243a0437134057c78044bf75d",
       "symlink_policy": "forbidden",
       "target": ".kimi-code/skills",
       "writer_id": "sync-runtime-skills",
@@ -2623,9 +2623,9 @@
         }
       ],
       "client": "opencode",
-      "content_digest": "sha256:4df3b78b83aa273fc48e61ca90147e560762319572e12b4aa5c51f7e9341fa32",
+      "content_digest": "sha256:6ff135c556b1996999c33f5cdc9d6f13be9e6e4acbbf7d534a62f37aac389f85",
       "kind": "ai_client",
-      "materialization_digest": "sha256:7b1fe9f695529977a615cba14c7b5bff8898c2d22acd77e8773f51e5109b353d",
+      "materialization_digest": "sha256:132da6288c153a04d5b0f4cafe9eaa495b7e96259009f5de343ec3a7b75735c5",
       "probe": "stable-sync-state",
       "source_revision": "sha256:4a244311b9f5fc8a04b79628d359a5fc68274acc74a61666df7d1878391918ec",
       "symlink_policy": "forbidden",
