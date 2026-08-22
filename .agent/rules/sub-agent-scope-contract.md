@@ -1,3 +1,11 @@
+<!-- agents-md-card:start -->
+### CARD: sub-agent-scope-contract — 委譲は3点必須
+- **いつ**: Task/Agent に作業を委譲するとき
+- **何を**: allowed_files / forbidden_actions / verify before return を必ず書く。探索ならcontext-engine先、UIならdesign-philosophy先
+- **できた状態**: 委譲先が範囲外編集・stash破壊・捏造検証をしていない
+- **詳細**: `.claude/rules/general/sub-agent-scope-contract.md`
+<!-- agents-md-card:end -->
+
 # サブエージェント Scope Contract
 
 サブエージェント（Task / Agent tool）に作業を委譲するとき、delegate 元のプロンプトに**必ず以下 3 項目（コード探索を伴う場合は §4、UI/デザインを伴う場合は §5 を足す）を含める**。制定経緯・テンプレート全文は `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` を参照。

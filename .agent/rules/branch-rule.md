@@ -1,3 +1,11 @@
+<!-- agents-md-card:start -->
+### CARD: branch-rule — main 直コミット禁止
+- **いつ**: commit / push / PR 作成するとき
+- **何を**: 専用 worktree + feature branch → PR。main へ直接書かない。第三者 upstream へ書かない（origin=自分のforkのみ）
+- **できた状態**: 作業は feature branch 上。upstream は fetch のみ
+- **詳細**: `.claude/rules/general/branch-rule.md`
+<!-- agents-md-card:end -->
+
 # ブランチ運用ルール
 
 制定経緯（CaD）: `~/business/AGENT-HUB/docs/worktree-operations.md`「決定履歴（CaD 移設）— branch-rule.md 由来」節を参照。

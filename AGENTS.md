@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `f0d2f8fc710e927542d6f8152ca690dfe30e02ead905e677d9c91ab0949c24c4`
+- effective hash: `a950f600f79b125d85bd5d330741fcf4b6886809e8c4dfd81ced241a167af51d`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -39,943 +39,112 @@ agentmemory is a persistent memory system for AI coding agents, built on iii-eng
 - **Engine**: iii-sdk (WebSocket to iii-engine on port 49134)
 - **State**: File-based SQLite via iii-engine's StateModule (`./data/state_store.db`)
 - **Build**: TypeScript → ESM via tsdown, output to `dist/`
-- **Test**: vitest (`npm test` excludes integration tests)
 
-## Consistency Rules
-
-**When adding or removing MCP tools, you MUST update ALL of the following:**
-1. `src/mcp/tools-registry.ts` — tool definition + `getAllTools()` array
-2. `src/mcp/server.ts` — handler case in the `mcp::tools::call` switch
-3. `src/triggers/api.ts` — REST endpoint registration
-4. `src/index.ts` — function registration + endpoint count in the log line
-5. `test/mcp-standalone.test.ts` — tool count assertion
-6. `README.md` — tool counts (search for "MCP tools")
-7. `plugin/.claude-plugin/plugin.json` — tool count in description
-8. `plugin/plugin.json` and `plugin/.mcp.copilot.json` (when present) — tool count or MCP exposure
-
-**When adding REST endpoints, you MUST update:**
-1. `src/triggers/api.ts` — endpoint registration
-2. `src/index.ts` — endpoint count in the log line
-3. `README.md` — endpoint count (search for "REST endpoints" and "endpoints on port")
-
-**When bumping version, you MUST update ALL of the following:**
-1. `package.json` — version field
-2. `src/version.ts` — VERSION constant and type union
-3. `src/types.ts` — ExportData version union
-4. `src/functions/export-import.ts` — supportedVersions set
-5. `test/export-import.test.ts` — version assertion
-6. `plugin/.claude-plugin/plugin.json` — version field
-7. `plugin/plugin.json` (when present) — version field
-
-**When adding new KV scopes:**
-1. `src/state/schema.ts` — add to the KV object
-2. `src/types.ts` — add the corresponding interface
-
-**When adding new audit operations:**
-1. `src/types.ts` — add to AuditEntry.operation union type
-
-## Code Patterns
-
-### Function Registration
-```typescript
-sdk.registerFunction(
-  "mem::your-function",
-  async (data: { ... }) => {
-    // validate inputs
-    // do work via kv.get/kv.set/kv.list
-    // record audit via recordAudit()
-    return { success: true, ... };
-  },
-);
-```
-
-### REST Endpoint Registration
-```typescript
-sdk.registerFunction("api::your-endpoint", async (req: ApiRequest) => {
-  const denied = checkAuth(req, secret);
-  if (denied) return denied;
-  const body = req.body as Record<string, unknown>;
-  // validate + whitelist fields (never pass raw body to sdk.trigger)
-  const result = await sdk.trigger({
-    function_id: "mem::your-function",
-    payload: { ... },
-  });
-  return { status_code: 200, body: result };
-});
-sdk.registerTrigger({
-  type: "http",
-  function_id: "api::your-endpoint",
-  config: { api_path: "/agentmemory/your-path", http_method: "POST" },
-});
-```
-
-### MCP Tool Handler
-```typescript
-case "memory_your_tool": {
-  // validate args with typeof checks
-  // parse CSV args: args.field.split(",").map(t => t.trim()).filter(Boolean)
-  const result = await sdk.trigger({
-    function_id: "mem::your-function",
-    payload: { ... },
-  });
-  return { status_code: 200, body: { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] } };
-}
-```
-
-### Hook Scripts
-Hook scripts in `src/hooks/` are standalone Node.js scripts (no iii-sdk import). They read JSON from stdin, make HTTP calls to the REST API, and exit. There are two patterns depending on whether Claude Code consumes the script's stdout:
-
-- **Context-injecting hooks** (`pre-tool-use`, `pre-compact`, `session-start`) write recalled context to stdout for Claude Code to inject. These MUST use `try/catch` with `await fetch(..., { signal: AbortSignal.timeout(N) })` — the script has to wait for the response before exiting, and the timeout is the only bound on hang time.
-- **Telemetry-only hooks** (`notification`, `post-tool-failure`, `post-tool-use`, `prompt-submit`, `stop`, `session-end`, `subagent-start`, `subagent-stop`, `task-completed`) write nothing to stdout. These MUST use fire-and-forget `fetch(..., { signal: AbortSignal.timeout(N) }).catch(() => {})` paired with `setTimeout(() => process.exit(0), 500).unref()`. The unawaited fetch dispatches the request; the unref'd `setTimeout` force-exits the process after the request has been flushed to the local daemon's socket buffer (~500ms is enough for single-request hooks; use 1500ms for multi-request hooks like `stop` and `session-end` so all fetches have time to start, especially when `AGENTMEMORY_URL` points to a remote daemon). Without the `setTimeout` Node keeps the event loop alive waiting for any in-flight fetch to settle, which means the hook still blocks Claude Code's next-prompt boundary for up to the AbortSignal duration — exactly the bug fire-and-forget is meant to fix.
-
-## Coding Standards
-
-- TypeScript, ESM only (`"type": "module"`)
-- No code comments explaining WHAT — use clear naming instead
-- Use `fingerprintId()` for content-addressable dedup, `generateId()` for unique IDs
-- Parallel operations where possible (`Promise.all` for independent kv writes/reads)
-- Input validation at system boundaries (MCP handlers, REST endpoints)
-- REST endpoints must whitelist fields — never pass raw request body to `sdk.trigger()`
-- Use `recordAudit()` for state-changing operations
-- Timestamps: capture once with `new Date().toISOString()` and reuse
-
-## Testing
-
-- All tests must pass before PR: `npm test` (1,428+ tests)
-- Mock pattern: `vi.mock("iii-sdk")` with mock `sdk.trigger`, `kv.get/set/list`
-- Test files go in `test/` with `.test.ts` extension
-- Follow existing patterns in `test/crystallize.test.ts` for function tests
-
-## Current Stats (v0.9.28)
-
-- 54 MCP tools (8 visible by default, `AGENTMEMORY_TOOLS=all` for all)
-- 130 REST endpoints
-- 6 MCP resources, 3 MCP prompts
-- 12 hooks, 15 skills
-- 260+ iii functions
-- 1,428+ tests
-
-## 詳細ルール
-常時ロード相当のルール本文だけを本ファイル（AGENTS.md）に集約する。編集元は PJ の `CLAUDE.md` + AGENT-HUB manifest v2 が選ぶ canonical rules。条件付き（frontmatter `paths:`）ルールは索引のみ載せ、必要時に当該ファイルを Read する。手動編集ではなく再生成で同期する。
-
-# ブランチ運用ルール
-
-制定経緯（CaD）: `~/business/AGENT-HUB/docs/worktree-operations.md`「決定履歴（CaD 移設）— branch-rule.md 由来」節を参照。
-
-## main ブランチへの直接コミット・プッシュ
-
-AI エージェントの通常作業では、**main ブランチへの直接コミット・プッシュは禁止**。
-
-Markdown、`sync-state.json`、AI ツール設定、AGENT-HUB 運用設定、MCP 台帳などの軽量変更でも、
-AI は main へ直接 commit / push しない。必ず専用 worktree + feature branch を作成し、PR 経由でマージする。
-
-人間が明示的に「今回は main に直接反映してよい」と承認した場合、または初回 repo 作成直後で
-PR 導線がまだ存在しない場合だけ例外になりうる。AI はこの例外を自己判断で使わず、理由を作業ログに残す。
-
-（過去に運用設定・hook配布物等を段階的に allowlist で main 直接許可した経緯があるが、2026-06-23〜2026-07-01
-で全撤回済み。allowlist 変遷史の全文は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照）。
-
-## third-party upstream への書込み禁止
-
-全PJで、第三者所有の upstream への push・PR作成・branch削除など、あらゆる書込みを禁止する。
-変更が必要な場合は必ず自分のGitHubアカウントへforkし、fork内のbranchからforkのmainへPRする。
-
-- `origin`: 自分が所有するfork。唯一のwrite先
-- `upstream`: 元リポジトリ。fetch専用
-- forkが存在しない状態で書込みを続行しない
-- upstreamへ成果を還元したい場合も、この運用ではupstream PRを作らない
-
-実行時は `hook-library/scripts/block-main-commit.sh` が `git config --global github.user` と書込先ownerを照合し、
-foreign ownerへの `git push`、`gh pr create`、REST PR作成をfail-closeする。
-
-## 理由
-
-- main checkout は複数 AI / 複数セッションで共有されやすく、軽量変更でも HEAD を掴むと競合や cleanup 失敗の原因になる
-- Markdown や設定だけでも、PR にするとレビュー履歴・CI・merge 後確認・worktree cleanup が同じ型で残る
-- ツールごとに例外を残すと、Claude / Codex / Cursor / Kimi / Antigravity 間で運用がずれる
-- main の最新化は `git pull` ではなく、fetch-only と detached HEAD / 専用 verify worktree で確認すれば足りる
-
-## AGENT-HUB の CI とマージ根拠（2026-07-30 STEP 4）
-
-AGENT-HUB の CI は `workflow_dispatch` + `ci/light` ラベル方式（pull_request 自動トリガーは 2026-07-24 に削除済み）。
-PR に checks が無い場合のマージ根拠は `merge-pr.py` のローカル軽量ゲート（`registries/merge-gate-suite.yaml`）。
-台帳未整備のリポでは従来どおり checks 0 件で通す（詳細: `skills/post-merge/SKILL.md`）。
-
-## 配布クローズアウト責任
-
-AGENT-HUB から各 PJ へ配布した差分は、配布を実行した AI / 担当者が最後まで閉じる。
-
-対象: `scripts/deploy-agent-bundle.py` / `scripts/deploy-hooks.py` / `scripts/sync-agents.py` /
-`scripts/bootstrap-skills.py` / `scripts/deploy-skills.py` / `scripts/deploy-rules.py` /
-`/publish-deploy` など、上記を呼ぶ配布コマンド。
-
-配布先 PJ に tracked 差分が出た場合は、feature branch 作成 → 配布差分だけ commit → PR 作成 → CI/review 確認 →
-`merge-pr` でマージ → fetch-only + detached HEAD / verify worktree で取り込み確認 → worktree/branch cleanup →
-`git status --short` clean 確認 → **配布先 checkout への catch-up pull（`git -C <絶対パス> pull --ff-only`）と届いたことの grep 実測**、
-まで一連で完了する（詳細な完了条件・禁止・例外の全文は `~/business/AGENT-HUB/docs/worktree-operations.md` 参照）。
-
-禁止: 「これは自分が修正したファイルではない」として配布差分を放置する／未コミットのまま終了する／
-main 直接 push で済ませる／`--push` の成功だけで完了扱いにする／**マージしただけで「届いた」と報告する
-（catch-up pull と grep 実測まで済ませていない）**。
-
-例外（dry-run のみ・差分なし・既存WIPで安全に branch できない・権限やCI failureで merge できない）の場合も、
-対象 PJ・残っている差分・止めた理由・次の安全な一手を報告する。
-
-## 事前計画ステップ
-
-タスク開始時、変更を伴う作業か確認する（コード変更・JSON/YAML変更・`*.sh`変更・Markdown/sync-state/AIツール設定などの軽量変更）。
-AI 作業で変更がある場合、**最初に専用 worktree + feature branch を作成**してから編集を始める。AI 作業では `main` を checkout しない。
-コマンド列は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
-
-読み取りだけの場合、またはすでに専用 worktree / feature branch 内にいる場合は新規 worktree を作らなくてよい。
-AGENT-HUB から各 PJ へ配布した tracked 差分も「配布クローズアウト責任」に従う。
-
-## pre-commit hook 違反後のピボット
-
-万一 hook（`hook-library/scripts/block-main-commit.sh`）にブロックされた場合は、変更を退避（stash/patch）→
-専用 worktree で feature branch 作成 → 変更復元 → commit/push → PR 作成、の順で復旧する。main の HEAD は
-無変更のまま維持されることを確認する。詳細手順は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
-
-## 関連フック
-
-`hook-library/scripts/block-main-commit.sh` が上記ルールを自動判定・ブロックする。
-
-## 関連ルール
-
-- `.claude/rules/general/worktree-rule.md` — 並列セッション時の worktree 利用
-- `.claude/rules/general/sub-agent-scope-contract.md` — サブエージェント delegate 時の制約
-- `~/business/AGENT-HUB/docs/worktree-operations.md` — allowlist変遷史・配布クローズアウト責任詳細・事前計画コマンド列・pre-commit hookピボット手順の正本
-
----
-
-**追記ルール: 実測事例・変遷史・長文手順は `~/business/AGENT-HUB/docs/worktree-operations.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
-
-<!-- [2026-07-04][feat] 制定経緯（背景・他案不採用理由）は verbatim で移設済み。
-全文: ~/business/AGENT-HUB/skills/adversarial-review/SKILL.md「constructive-dissent.md からの移設」節 -->
-
-# 建設的異議（言いなり禁止・グローバル憲法）
-
-## 原則
-
-AI は**言いなりにならない**。ユーザー指示が現実・制約・過去の不採用判断（CaD）と衝突するとき、迎合せず次の 3 点を必ず行う。
-
-1. **現実的制約の明確な指摘** — 無理なものは「無理です」と根拠付きで言う（時間・技術・運用・既存 SSOT・過去の不採用理由）。
-2. **根拠付きの代替案** — 達成したい意図を保ちつつ、実行可能な別ルートを 2〜3 択で提示する（推奨を 1 行添える）。
-3. **保守・メンテナンス観点の改善提案** — 指示に従うだけでなく、「こういう仕組みを入れるべき」と AI から先出しする（出生登録・正本参照・陳腐化防止など）。
-
-**最終決定は常にユーザー**。AI は異見を述べたうえで、ユーザーが選んだ方向に従う。
-
-## 発火場面
-
-| フェーズ | 異議の出し方 |
-|---------|-------------|
-| **提案・設計** | plan-approval の HTML プランに「🤔 AI の異見」欄で記載（テンプレ側は別 PR で欄追加予定）。プラン提示前に衝突があれば先に異議を出す |
-| **実装** | 着手前または実装中に制約・不採用判断との衝突を検知したら、実装を止めて代替案を提示 |
-| **レビュー** | codex-review 等の指摘が個人開発スケールに過剰なときも、レビュー結果に対して異議・優先度の再整理を提案できる |
-
-判断に迷う場合は**異議を出す側**に倒す（後から「言ってくれれば」の手戻りを防ぐ）。
-
-## 作法
-
-- **根拠必須**: 「良くない」だけでなく、なぜ無理か・何が起きるかを平易語で 1〜2 文。
-- **平易語 + 選択肢**: visual-progress-map §5 に従い、技術用語だけで問わない。速さ・安全・見た目への影響など、ユーザーが判断できる軸に翻訳する。
-- **推奨を添える**: 2〜3 択のうち推奨を明示（「（推奨）」+ 理由 1 行）。
-- **短い同意への再確認**: ユーザーが「お願い」「はい」だけ返したとき、次の一手を 1 文で要約してから進める（response-style と整合）。
-
-## 個人開発スケールと例外
-
-- **前提**: 本リポ群は個人開発（1 人・非エンジニアオーナー）。大規模チーム向けのプロセス・過度な抽象化・仮想的大規模負荷対策を**無条件で推奨しない**。
-- **過剰エンタープライズ提案への異議**: 「全 PJ に同じ監査パイプライン」「専用 infra チーム前提の運用」等は、意図が明確でない限り異議を唱える。
-- **例外（厳格維持）**:
-  - **(a)** セキュリティ・データ消失・金銭に関わる指摘はスケールに関係なく常に厳格。
-  - **(b)** 顧客向けシステム（jtt-cms の予約・お客様導線・決済・個人情報を扱う画面/API）はエンタープライズ相当の厳格さを維持。
-
-codex-review のレビュー観点にも同校正が内蔵されている（プロンプト文字列参照）。
-
-## メンテナンス観点の先出し例
-
-具体例（新スキル出生登録・正本参照・最終確認日 等）は
-`~/business/AGENT-HUB/skills/adversarial-review/SKILL.md`「constructive-dissent.md からの移設」節を参照。
-
-## 関連
-
-- `.claude/rules/general/response-style.md` — 出力簡潔性・確認の書き方
-- `.claude/rules/general/visual-progress-map.md` — 非エンジニア用語・技術判断の平易化（§5）
-- `.claude/rules/general/plan-approval-gate.md` — 実装前 HTML プラン承認（🤔 AI の異見欄と接続）
-- `.claude/rules/general/plan-commitment-tracking.md` — 承認済みプラン条項の実行追跡
-- `skills/adversarial-review/SKILL.md` — **本ルールの手順 SSOT**（dev / business の 2 モード・発火条件・証拠水準・自己反証・分布点検）。本ルールは義務、スキルは手順の二段構えとし、手順本文をここへ複製しない
-- `skills/codex-review/SKILL.md` — レビュー時の個人開発スケール校正
-
-# G-Brain リコール層（会話中の「読む側」発火条件）
-
-制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「gbrain-recall.md からの移設」節を参照。
-
-## 0. scope 宣言（重複防止・複製しない）
-
-本ルールは **非 plan の日常会話における「読む側」の発火条件だけ** を定義する。以下は別の正本が担当し、
-本ルールでは内容を複製しない（G-Brain ハーネス設計仕様書 D9 役割分担表）:
-
-| 責務 | 正本（変更しない・本ルールは複製しない） |
-|------|------|
-| plan 入口の preflight（読む） | `skills/plan-approval/plan-commitment-registry.yaml` seq 0.1 / 0.15 |
-| 保存先の3層判断（書く） | `skills/agentmemory-routing/SKILL.md` + `agent-memory/registry/placement-policy.md` |
-| put_page の安全手順・承認ゲート・合図式保存 | `skills/shintaro-gbrain/SKILL.md` |
-| closeout 時の GBrain 候補承認キュー | `skills/handover-manual/SKILL.md`（合図式＝会話中の即時承認、closeout＝session 末の候補提示で別物） |
-| auto-memory の参照 | `.claude/rules/general/memory-lookups.md`（相互参照のみ、内容は複製しない） |
-| 敵対的レビュー手順（business） | `skills/adversarial-review/references/business-review.md` |
-
-## 1. 発火条件表
-
-**毎回の発言では探さない。** 相談・直し・判断のときだけ、応答を出す前に該当 brain を検索する。
-
-| 発話・作業の性質 | 検索する先 | 例 |
-|---|---|---|
-| 相談・直し・判断（意見・修正方針） | **`shintaro-gbrain` と `tech-gbrain` の両方** | 「どう思う？」「直して」「修正して」「どうすれば」「どういう風に」 |
-| バグ修正・障害調査・回帰の原因特定（上記に当たらない純粋な調査） | `tech-gbrain`（`mcp__tech-gbrain__search` / `recall`） | 「〇〇が直らない」「なぜこのエラーが出るか」「前も似た不具合あったはず」 |
-| 経営相談・戦略・クレーム対応・売上・オペレーション改善（上記に当たらない） | `shintaro-gbrain`（`mcp__shintaro-gbrain__search` / `recall`） | 「この施策の戦略は」「クレームにどう対応すべきか」「売上を改善したい」 |
-| 作業再開・引き継ぎ・「あの続き」 | `agentmemory`（continuation） | 「〇〇の続き」「前回どこまでやったか」 |
-
-判断に迷う場合は検索する側に倒す（誤爆コストは低く、未検索コストは高い）。
-
-## 1-bis. 道具が無いときは止まって待つ
-
-§1 の検索先 MCP（`shintaro-gbrain` / `tech-gbrain`）のツールがこのセッションの道具一覧に無いときは、推測で読んだつもりにせず作業を進めない。利用者へ一文だけ伝える: 「G-Brain の2つ（shintaro-gbrain / tech-gbrain）がOFFです。MCPパネルでONにしてから続けます」。ONになるまで待つ。配線は harness type 依存であり、Claude Code / Codex でも片方または両方が無いことがある。道具一覧を見て判断し、「通常あるはず」で進めない。
-
-## 2. 検索実行の判断はモデル側に残す
-
-本ルールは「検索しに行くべきタイミング」を定義するだけで、検索実行を強制する hook ではない。
-`hook-library` の UserPromptSubmit hook（`gbrain-recall-preflight`）は軽量キーワード検知による
-短いリマインドだけを担い、実際に検索するかどうかの判断はモデル自身が行う（仕様書 D6）。
-
-## 3. 関連
-
-- 手順・落とし穴の詳細: `skills/shintaro-gbrain/SKILL.md`
-- 保存先判断の詳細: `skills/agentmemory-routing/SKILL.md`
-- 仕様書: `claude-plans/2026-08-04-jtt-gbrain-harness-spec.md`（D6 / D9）
-
----
-
-**追記ルール: 実測事例・長文詳細・制定経緯は `docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
-
-# 横断チェック台帳（mandate-registry）への登録ルール
-
-制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「mandate-registry.md からの移設」節を参照。
-
-## 原則
-
-「これは全アプリで必要だ」という横断的な気づきは、ルール追記だけで終わらせず**台帳へ1行登録する**。
-
-理由: ルールファイルへの追記は**新規開発にしか効かない**。既存アプリへの適用漏れは、機械が乖離を提示しない限り再指摘が起きるまで発火しない。台帳へ登録しておけば `mandate-audit.py` が未対応アプリを一覧化し、記憶や注意力に頼らず気づける。
-
-## 発火条件（トリガー）
-
-伸太郎殿が以下のような**横断指摘**をしたとき:
-
-- 「これは全アプリで必要」
-- 「横展開すべき」
-- 「他のアプリでも同じ対応が要る」
-
-判断に迷う場合は**登録する側**に倒す（後から「言ってくれれば」の手戻りを防ぐ）。
-
-## 必須手順
-
-1. **重複確認**: `registries/mandate-registry.yaml` を `id` / `title_ja` で grep し、同種の項目が既に無いか確認する（複数 AI による二重登録防止）。
-2. **1行登録**: 無ければ台帳へ1エントリ追加する。`reason` には経緯1行＋日付を必須で入れる。
-3. **報告**: 登録したことを利用者へ報告する（黙って追加しない）。
-
-## 監査
-
-「横断監査して」等の発話で `python3 scripts/mandate-audit.py` を実行し、結果を提示する。作業対象アプリが決まっているセッションでは `--app <app名>` で絞り込む。
-
-## 回答の記録
-
-台帳の `status` フィールドは利用者の回答をそのまま反映する:
-
-| 利用者の回答 | 記録する値 |
-|------|-----------|
-| 「後で」 | `snoozed:YYYY-MM-DD` |
-| 「対象外」 | `na` |
-| 対応 PR がマージされた | `done` |
-
-## 限界の明示
-
-`check: manual` の項目は**目視消込**であり、**監査が緑でも全部 OK を意味しない**。機械（`mandate-audit.py`）が見えるのは台帳に記録された静的な項目だけであり、実装が実際にルールへ適合しているかは別途確認が要る。
-
-## スキーマ・規約の正本
-
-台帳のフィールド定義・規約①②（`check:script` の実行前提・登録前の重複確認義務）は `registries/mandate-registry.yaml` のヘッダコメントが正本。本ルールへ複製しない。
-
-## 試行フェーズ
-
-2026-08-17 目安で、登録実績・提案件数・`status` 更新のコストを振り返る。セッション開始 hook による自動提案の採否は、その振り返りを踏まえて別プランで判断する（今は hook 化しない）。
-
----
-
-**追記ルール: 実測事例・長文手順・制定経緯は台帳ヘッダ／`docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
-
-# MCP API キー管理規範（AGENT-HUB SSOT）
-
-制定経緯（CaD）: `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md`「決定履歴（CaD 移設）— mcp-key-management.md 由来」節（#12 圧縮経緯・#13/#14 条件付きロード降格の試行と撤回経緯）を参照。本ルールはセキュリティ規範（API キー管理）のため常時ロードを維持する（constructive-dissent.md「個人開発スケールと例外」例外(a)）。
-
-JTT 関連の MCP（asana-mcp / jtt-smaregi-mcp / smaregi-docs / google-chat-mcp / google-docs-mcp / jtt-spreadsheet-mcp 等）の API キーは **AGENT-HUB を SSOT として一元管理**する。
-
-詳細手順（復旧・ローテーション・実装経緯・実例）の全文は `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` を参照。本ルールは義務・禁止事項だけを持つ。
-
-## SSOT
-
-| 役割 | 場所 | 状態 |
-|------|------|------|
-| 実値（秘匿） | `~/.config/agent-hub/.env` | コミット対象外、各マシンで作成 |
-| 名前テンプレート（公開） | `~/business/AGENT-HUB/dotfiles/.env.example` | git 管理、新マシン bootstrap で参照 |
-| 環境変数 export | `~/.zshrc.local` の `set -a; source ~/.config/agent-hub/.env; set +a` | bootstrap.sh が初期セットアップ |
-
-## スコープ振り分け規範
-
-| MCP 種別 | 配布先 | 同期スクリプト |
-|---------|--------|---------------|
-| 全 PJ 共通で必要な MCP | `asset_contract.global.include.mcp` から各clientの宣言surfaceへ | manifestが所有者として指す単一writer |
-| harness type共通の MCP（例: Laravel Boost） | `asset_contract.harness_types.<type>.include.mcp` からProject scopeへ | `sync-agents.py` generation batch内の単一writer |
-| PJ 固有の業務 MCP | `asset_contract.projects.<pj>.include.mcp` からProject scopeへ | `sync-agents.py` generation batch内の単一writer |
-| PJ 個別環境の例外（例: Supabase stg/prod） | project layerと明示local-exception契約へ宣言 | writerが保護・描画。生成surfaceの手編集は禁止 |
-
-理由: User scope に PJ 固有 MCP を入れると「使わない PJ でも表示・接続試行・認証エラー表示」が起きる。PJ別の使用意図はmanifestのproject layerが表現し、client別catalogは選択根拠にしない。
-
-**Gmail の扱い（2026-05-25 更新 / 2026-07-20選択経路更新）**: 自前 gmail-mcp は 2026-05-21 に一度凍結したが、公式 Gmail のツール不足（ラベル CRUD / Triage / 添付取得欠如）が判明し **2026-05-25 に Project scope (jtt-cafe-pj) で復活**。接続definitionはStreamable HTTP `/mcp` + X-API-Keyを維持する。採否はjtt-cafe-pjのmanifest project layer、client対応可否は同じeffective MCPに対するsurface契約で判定する。
-
-**Supabase の stg / prod 2 環境並列 (jtt-cms)**: `supabase-prod` / `supabase-stg` の2 assetを命名規約として必須にする（`supabase` 単独名・env-agnostic な `mcp__supabase__*` 表記は禁止）。実例・OAuth手順の詳細は `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` を参照。
-
-## Claude Code の `${VAR}` 補間仕様
-
-**Claude Code は `mcpServers[*].headers["X-API-Key"]` 等の値を `${VAR}` 補間しない**（User scope / Project scope どちらも同じ）。
-
-→ sync スクリプトは `~/.config/agent-hub/.env` から実値を読み出し、`<pj>/.mcp.json` / `~/.claude.json` には実値を書き込む。
-
-→ よって `.mcp.json` は **gitignore 必須**（実値がコミットされないように）。AGENT-HUB の SSOT は環境変数名のみ保持し、各マシンで sync 実行時に実値展開する。同じ理由で `~/.claude.json` / `.gemini/settings.json` / `.cursor/mcp.json` / `.kimi-code/mcp.json` も全て gitignore 必須（対象ファイルと生成元の gitignore 必須リストは `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` を参照）。
-
-## 禁止事項
-
-1. **`~/mcp-servers/<svc>/.env` へ直書き禁止**。`asana-mcp/.env` `jtt-smaregi-mcp/.env` 等に API キーを置かない。発見次第 `~/.config/agent-hub/.env` へ移行し、ローカル `.env` は `# moved to ~/.config/agent-hub/.env (AGENT-HUB SSOT)` のコメントだけ残す
-2. **`~/.zshrc.local` に `_mcp_load_key_from_env` のような分散ロード関数を新設禁止**。AGENT-HUB SSOT の bootstrap フロー（`set -a; source ~/.config/agent-hub/.env; set +a`）を使う
-3. **git 管理対象ファイルに API キー実値を平文で書かない**。ドキュメント（README / SKILL.md / 設計書）では `<API_KEY_PLACEHOLDER>` または env 変数名 `${ASANA_MCP_API_KEY}` で表記する
-4. **ローカル生成物へ手作業で API キー実値を書かない**。`.mcp.json` / `~/.claude.json` は gitignore 済みであることを前提に、sync スクリプトだけが `~/.config/agent-hub/.env` から実値展開して書き込む
-5. **管理対象ファイルでの URL クエリパラメータ方式（`?api_key=...`）禁止**。Cloud Run の監査ログに URL ごとキーが残るため、`.mcp.json` / `~/.claude.json` / `.codex/config.toml` など AGENT-HUB が生成する設定は `headers: {"X-API-Key": "${...}"}` のヘッダー方式に統一する
-
-**Claude.ai 例外**: Claude.ai コネクタで `X-API-Key` ヘッダーを設定できない場合のみ、asana-mcp は `https://asana-mcp-vaibinqqva-an.a.run.app/mcp?api_key=<ASANA_MCP_API_KEY>` 形式を使ってよい。この例外は Claude.ai 手動登録専用で、AGENT-HUB の生成物には書かない。
-
-## PJ 横断の第三者個人情報（PII）の退避規範（2026-08-14〜）
-
-PJ 横断で扱う第三者の個人情報（PII）は、API キーと同じ扱いで **git 管理対象へ入れない**。実値は
-`~/.config/agent-hub/<用途>-private/`（実例: `~/.config/agent-hub/prompts-private/cloud-common-system-prompt.json`）へ
-退避し、git 側は**トークン名（プレースホルダ）だけ**を持つ。gitignore 必須・sync スクリプトだけが実値展開する点は
-上記 API キー規範と同一とする。
-
-## 再発防止: sync スクリプトのハードエラー化
-
-`scripts/sync-claude-global-mcp.py`、`scripts/sync-claude-project-mcp.py`、`scripts/sync-codex-mcp-configs.py`、`scripts/sync-cursor-mcp-configs.py`、`skills/{gemini,kimi,opencode,augment}-sync/scripts/sync-*-from-cc.py` は、env_key が未解決（`~/.config/agent-hub/.env` に無い／空文字）の場合に **literal `${VAR}` を書き込まず exit 1** すること。
-
-理由・過去の実害（jtt-cms で `smaregi-docs` MCP の認証エラーが反復した根本原因）は `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` を参照。
-
-## 再発防止: MANAGED block の重複キー除去 + TOML 検証（Codex / 2026-06-02〜）
-
-`scripts/lib/user_mcp_sync_lib.py` の `replace_managed_block` は、①同名野良エントリの自動除去 ②書き込み前 TOML パース検証、を担保する（MANAGED 対象でない手書き MCP は保護する）。実装経緯・障害の症状は `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` の「Codex config TOML 重複キー」節を参照。
-
-## 復旧手順（MCP Auth エラー時）
-
-詳細は `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md`。要旨: ①env が読めているか確認 ②`~/.claude.json` の literal `${VAR}` 残存検査 ③対象projectを公開入口から再同期 ④Claude Code を再起動。
-
-## ローテーション手順
-
-API キーローテーション時の 7 ステップ（新キー発行 → SSOT 更新 → dry-run 確認 → full apply → 個別sync禁止 → 各PJ再起動 → 旧キー失効）の全文は `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` を参照。旧キーを `dotfiles/.env.example` のコメントに「廃止済み」として残してはいけない。
-
-## User scope MCP 同期フレームワーク (2026-05-21〜)
-
-User scope MCP (`~/.<tool>/...`) の SSOT 一元管理は **user-mcp スキル**が管轄する（User scope / Project scope の設計と担当 sync スクリプトの対応表は `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` を参照）。新エージェント追加 5 ステップ (手順本文: `~/business/AGENT-HUB/docs/architecture/claude-md-cad-archive.md` §D 参照): `skills/user-mcp/SKILL.md`。
-
-## 関連
-
-- `dotfiles/.env.example` — 名前テンプレート
-- `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` — 復旧手順・ローテーション手順・実装経緯・User scope同期フレームワーク対応表の詳細正本
-- `skills/user-mcp/SKILL.md` — User scope MCP 5 ツール統一管理スキル（sync スクリプト一覧はここに集約）
-- `scripts/lib/user_mcp_sync_lib.py` — 5 sync 共通 lib (env / registry / MANAGED block / 検証)
-- `scripts/sync-claude-project-mcp.py` — Project scope 同期
-- `scripts/codex-mcp-remote-with-env.sh` — Codex 用 SSE → stdio bridge
-- `~/business/AGENT-HUB/docs/codex-mcp-registry.yaml` `~/business/AGENT-HUB/docs/codex-mcp-definitions.yaml` — 台帳
-- `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` — 障害復旧ランブック
-- `docs/reference/project-roots.md` — プロジェクトルート規約
-
----
-
-**追記ルール: 実測事例・復旧手順・長文詳細は `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
-
-# メモリ参照ルール
-
-制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「memory-lookups.md からの移設」節を参照。
-
-## 基本方針
-
-memory は、前回までの作業状態・人物名・用語・過去の判断を思い出すための**参照補助**である。
-売上・タスク・勤怠・予約・確定ルールの正本ではない。
-
-以下のケースに該当するとき、応答を出す前に `~/.claude/projects/*/memory/MEMORY.md` および同階層の個別メモリファイルを検索する:
-
-- **人名・略称・愛称**に遭遇したとき（読み方・関係性が記録されている可能性）
-- **PJ 固有用語・コードネーム**に遭遇したとき
-- **過去の不採用判断**を覆そうとしているとき
-- ユーザーが「あの〜」「以前話した〜」等の指示語で参照しているとき
-
-## 固定用語（ハーネス語彙・memory より先にこれを使う）
-
-| 用語 | 意味（要約） | 正本 |
-|------|--------------|------|
-| **イラストマニュアル** | 従業員が絵を見て数秒で直感理解するための**掲示セット**。A4 は紙の単位（場面 N → だいたい N 枚）。長文手順書・Google Doc ではない | `docs/reference/illust-manual-vocabulary.md` |
-
-「イラストマニュアル」と言われたら長文 Docs を書かず、上記正本 → `cafe-image-assistant` / `chatgpt-image-creator` 経路へ進む。
-bare「マニュアル」だけなら「長文手順書か、イラスト掲示か」を確認する。
-
-## 検索手順
-
-`~/.claude/projects/*/memory/` 配下を検索し、`MEMORY.md` のインデックスから該当する個別ファイルを特定して読み、応答に反映する。
-
-## 該当メモリがあった場合
-
-- メモリの内容を踏まえて応答する
-- メモリの記述が古い可能性がある場合は、現在の状態（コード・設定・正本MCP・Markdown SSOT）と突き合わせる
-- 矛盾があれば**現状を優先**し、メモリの更新を提案する
-
-## JTT 業務情報の正本
-
-| 情報 | 正本 |
-|------|------|
-| 売上・取引・商品実績 | スマレジ / `jtt-smaregi-mcp` |
-| 施策・担当・期限・進捗 | Asana / `asana-mcp` |
-| 勤怠・シフト・出勤者 | 出パンダ / 将来の Depanda MCP |
-| 予約・来店予定 | よやくま / 将来の Yoyakuma MCP |
-| 確定した方針・ルール・議事録 | プロジェクトの Markdown SSOT |
-| 横断分析・再利用する学び | G-Brain |
-| 作業途中の短期文脈 | Claude / Codex / Hermes の memory |
-
-memory と正本が矛盾する場合は、正本を優先する。G-Brain は検索・分析・要約の層であり、MCP から取得した生データの保管先にはしない。
-
-**Asana のどこに何があるか**（workspace / project gid / section 構造 / 周期 PJ の命名規則）は
-`~/business/AGENT-HUB/docs/reference/asana-project-map.md` が地図。gid を推測せず、まずこの地図を引く。
-地図には参照先だけがあり、タスクの中身は載せない（中身は `asana-mcp` でその場で取る）。
-
-## 該当メモリがなかった場合
-
-- 推測で補完せず、ユーザーに直接確認する
-- 確認後、必要に応じて新規メモリとして記録する（auto memory ルール参照）
-
-## 関連
-
-- グローバル auto memory: Claude Code ハーネス標準の Memory 機能（旧 CLAUDE.md「auto memory」セクションは廃止済み・保存実体は下記 PJ 別ディレクトリ）
-- PJ 別 auto memory: `~/.claude/projects/<encoded-path>/memory/`
-
----
-
-**追記ルール: 実測事例・長文詳細・制定経緯は `docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
-
-# 実装前に HTML プランで承認を仰ぐルール（強制）
-
-## 原則
-
-中規模以上の**実装に着手する前に、必ず HTML で実装プランを提示し、利用者の明示承認（「この実装でいい」）を得てから着手する**。テキストだけで合意したつもりにならない。
-
-理由: 非エンジニアの利用者には「どの画面がどう変わるか」がテキストでは伝わりにくく、着手後に手戻りが多発する。同様の見せ方を毎回・自動で出し「手戻りゼロ」を狙う。
-
-これは `ui-stitch-mandatory` と同じく**ルールが義務を担い、手順はスキルに置く**二段構え。手順 SSOT は `skills/plan-approval/SKILL.md`（本ルールは手順を複製せず参照する）。
-
-制定経緯（CaD）: ~/business/AGENT-HUB/skills/plan-approval/SKILL.md「plan-approval-gate.md からの移設」参照。
-
-## 必須手順
-
-1. **プラン作成基準をライブ読み**: `skills/plan-approval` が `resolve-pj-prompt.py --phase plan` を実行し、PJ 別のプラン基準（`snippet-prompts/Typinator/plan/`。専用未作成 PJ は汎用 `dev-plan`）を読む。
-2. **HTML プランを作る（固定テンプレを必ず使う・独自デザイン禁止）**: 正本テンプレをコピーし中身だけ差し替える（通常=`plan-template.html`、AI worker 委譲時=`plan-template-aiworker.html`）。必須のビジュアル要素は下記「中身」節を参照。
-3. **提示して承認を待つ（両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 `open <file>` で PC ブラウザにも表示する。**タップ用ファイルカード作成と open による PC ブラウザ表示の両方を毎回必須とする**。末尾に「この実装でいいですか？（進めて / 直す / やめる）」を置き、**承認なしに実装へ進まない**。保存規約（gitignore済み一時パス・短い slug・共有 URL は1行）と短い同意時の再確認は `skills/plan-approval/SKILL.md` を参照。
-4. **承認直後に 📋 コミットメント台帳を全件タスク化する**: HTML プランの台帳の各行を、着手前に `TaskCreate` で 1 行 = 1 タスク化してから実装へ進む。台帳が全消化（実施済み or 明示保留）になるまで「完了」と宣言しない。詳細は `.claude/rules/general/plan-commitment-tracking.md`。
-   - **AI worker を 1 度でも使う計画は必須**: 「AI worker 摩擦時は該当正本を worktree→PR→merge→fetch-only / detached 確認→cleanup で修正」の条項を台帳に必ず入れ、タスク化する（テンプレに既定行として焼き込み済み・消さない）。
-5. **承認後は標準パイプラインを通す**: 実装（dev-guardrails）→ codexレビュー → 実装監査 → CI → SSOT 同期確認 → マージ。本番投入は人間ゲート。
-
-## HTMLプランの中身
-
-構成部品一覧は `references/plan-template.html` の `parts` マニフェストと `skills/plan-approval/SKILL.md` が正本。複製しない。
-
-## 適用トリガー
-
-新機能・新画面、データの形を変える変更（DB 構造変更）、複数ファイルにまたがる実装、画面の見た目・挙動が変わる変更。判断に迷う場合は提示する側に倒す。
-
-## 例外（HTMLプラン不要）
-
-- 誤字・1行修正など、見た目・挙動の方針が変わらないもの
-- 純粋な調査・質問への回答、会話だけで完結する話
-- 利用者が「今回は要らない」と明示したとき
-- UI に変化を伴わない純粋なロジック修正（ただし複数ファイル・データ変更を伴うなら提示する）
-
-## 接続・関連
-
-手順: `skills/plan-approval/SKILL.md`。基準: `snippet-prompts/Typinator/plan/[PLAN-INPUT]_<pj>-plan.md`。進捗: `visual-progress-map.md`。UI確定: `ui-stitch-mandatory.md`。承認後: `skills/dev-guardrails/SKILL.md`。モデル委譲: `ai-model-selection.md`。
-
----
-
-**追記ルール: 実測事例・復旧手順・長文詳細は移設先（references / docs）へ書き、本ルールには義務とトリガーだけ足す（再肥大化防止）。**
-
-# 出力簡潔性ルール
-
-制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「response-style.md からの移設」節を参照。
-
-## 基本方針
-
-- 中間状態（「これからこうします」「次にこれを実行します」）の冗長な説明を避ける
-- 概念的な説明より具体例・差分・コマンドを優先する
-- 段落より bullet list を優先する
-- 同じ情報を 2 回繰り返さない（タスクツールで進捗を可視化している場合は、テキストで重ねて述べない）
-
-## 避けるべき出力パターン
-
-- 「〜について説明します」「以下に〜します」等の予告フレーズ
-- 完了済みタスクの再要約（diff や git log が SSOT）
-- 「もし〜の場合は〜」の仮定列挙（実行結果を待ってから判断する）
-- 「これは〜という意味です」型の自明な解説
-
-## 確認するときの書き方
-
-ユーザーに判断を仰ぐときは、選択肢を簡潔に列挙し、推奨案を 1 行で示す:
-
-良い例: `Tier 2 まで実行 / REN-1 のみ / 全部 のどれにしますか？推奨: Tier 2 まで`
-
-悪い例（冗長すぎ）: 長文で各選択肢のメリット・デメリットを 3 段落ずつ説明
-
-## 完了報告の書き方
-
-- 変更したファイル一覧（path のみ）
-- 主な変更点（1 行ずつ）
-- 確認してほしい点（あれば、1-2 件）
-
-過剰な「お疲れさまでした」「素晴らしい結果でした」等の挨拶は不要。
-
-## URL・リンクの出力
-
-AI が URL やファイルパスを出力するとき、**URL の直後に全角括弧・句読点（`）` `。` `、` `」` など）を隣接させない**。ターミナルや Markdown のリンク解釈がその記号まで URL に取り込み、リンクが壊れる（404）ため。
-
-- URL は原則**独立した行**に置く（前後に説明文があっても URL 単独の行にする）。
-- 文中に置く場合は URL の直後に**半角スペースか改行**を入れ、全角記号を隣接させない。必要なら `< >` または バッククォートで囲む。
-- 悪い例: `詳細は https://example.com/path）。`（`）。` まで URL に食われて 404）。
-- 良い例: 説明文の後に改行して `https://example.com/path` を単独行で出す。
-
----
-
-**追記ルール: 実測事例・長文詳細・制定経緯は `docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
-
-# サブエージェント Scope Contract
-
-サブエージェント（Task / Agent tool）に作業を委譲するとき、delegate 元のプロンプトに**必ず以下 3 項目（コード探索を伴う場合は §4、UI/デザインを伴う場合は §5 を足す）を含める**。制定経緯・テンプレート全文は `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` を参照。
-
-## 1. allowed_files（編集を許可するファイル）
-
-委譲先が編集してよいファイルパスを明示的に列挙する。
-
-例: `「allowed_files: src/api/auth.ts のみ。他は read-only」`
-
-## 2. forbidden_actions（禁止する操作）
-
-委譲先が**してはいけない**操作を明示する。よくある禁止例:
-
-- `auto-format で quote replacement や import 並び替えを実行しない`
-- `スコープ外のファイルを編集しない（読み取りは可）`
-- `テストの skip / xit を追加しない`
-- `existing CaD コメントを削除しない`
-- **`.claude/hooks/` / `hook-library/` のガード hook（block-main-commit 等）をデバッグ目的で一時編集しない**（deny 原因調査はログ・分割コマンド・worktree 委譲で行う。2026-08-12 jtt-system 配布インシデント再発防止）
-- **検査・テスト・受け入れ条件を通すために timestamp・実行者ID・実行していないコマンドの出力・確認内容などの値を捏造しない**。指示と検査要求が矛盾したら通す側に倒さず、報告だけで済ませず**停止**して呼び出し元へ確認する（詳細: `~/business/AGENT-HUB/skills/plan-approval/SKILL.md`。2026-08-14 実測）
-- **`git stash` 系（pop / apply / drop / clear）を実行しない**。stash はリポジトリ共有であり、隔離 worktree にいても他セッションの未コミット作業を壊しうる（2026-08-15 実測: 隔離 worktree での検証中に他ブランチの stash を pop し conflict 発生。衝突しなければ気付かず消えていた）
-- 自分が作っていない**他ブランチの reflog / git config を変更しない**
-- 自分が作っていない **worktree・リモートブランチを削除しない**
-
-理由: `allowed_files` はワークツリー内のファイルしか縛れず、リポジトリ共有の状態（stash / reflog / config / remote branch）は素通りするため。
-
-## 3. verify before return（返却前の検証手順）
-
-委譲先が作業完了を報告する前に実行する検証を指定する。
-
-例:
-- `git diff --name-only で編集ファイル一覧が allowed_files と一致することを確認`
-- `lint / typecheck を実行してエラーが出ないことを確認`
-- `想定外の編集があった場合は revert してから報告`
-
-## 4. context-engine first（コード探索を伴う委譲・Explore 含む）
-
-委譲タスクが**コードの場所・関数・route・呼び出し関係・影響範囲の探索**を含むなら、prompt に必ず入れる:
-
-- 「まず `codebase-context-engine` を使う（`grep`/`Read` を先に走らせない）。遅延ツールは
-  `select:mcp__codebase-context-engine__list_projects,hybrid_search,search_graph,get_code_snippet` でロード」
-- **解決済みの `project` 名を親が渡す**（親が `list_projects` を見て明示）。
-  `preferred_project` がある場合はそれを使う。
-  `project_scope: ambiguous_worktrees` の場合は、現在の cwd と一致する `root_path` / `preferred_project_candidates` を親が選んでから渡す。
-  subagent に `private-tmp-cbm-...` の長いミラー名を推測させない。
-- 「索引はミラー＝当日新規/変更したファイルは未反映なので、その分だけ `Read` 併用」
-
-理由: 候補圧縮で速く・低コスト（多数 grep/Read を回避）。subagent は本ルールを自動継承しないため親が prompt 注入必須（追加経緯は詳細ドキュメント参照）。
-
-## 5. design-philosophy first（UI/デザインを伴う委譲時）
-
-委譲タスクが**UI・画面・デザイン・レイアウト・コンポーネントの作成/変更**を含むなら、親が prompt に必ず入れる:
-
-- 「まず `~/business/AGENT-HUB/docs/design/design-philosophy.md`（伸太郎殿の設計思想 SSOT）を Read してから着手する」を**必読指定**する。
-- 必ず該当ファイルの**絶対パス**（`~/business/AGENT-HUB/docs/design/design-philosophy.md`）を渡す（委譲先の実行 cwd は消費先PJであり、相対パスでは解決不能なため）。
-- Stitch を使う画面作成は、`stitch-screen-creator` グローバルエージェント（設計思想を step0 で必読にしている）へ委譲するのが既定。
-
-理由: AI Worker（Kimi/Codex/Cursor/GLM 等）自身にデザインセンスが無くても、親が設計思想 doc を必読で渡せば思想に沿った画面を作れる。渡さないと委譲先が自己流判断でずれる。
-
-## delegate プロンプトのテンプレート・親側の verify ステップ
-
-テンプレート全文と、親セッションが `git diff --stat` / `git diff -- <files>` で確認する verify コマンド列は
-`~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` を参照。allowed_files 外に変更が混入していた場合は
-revert し、delegate にやり直しを指示する。
-
----
-
-**追記ルール: 制定経緯・テンプレート全文の詳細は `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` へ書き、本ルールには義務・トリガーだけ足す（再肥大化防止）。**
-
-<!-- CaD 全文移設（2026-08-08 ctx-slim）: ~/business/AGENT-HUB/skills/visual-companion/references/progress-map-templates.md 「visual-progress-map.md からの移設」節参照 -->
-
-# 図解・現在地マップ・非エンジニア用語ルール
-
-全 AI・全作業共通の SSOT。ユーザー（非エンジニア）が現在地・ゴール・次の一手を必ず把握できる状態を保つための図解描画ルール。**通常の実装・Issue/PR/PRD 確認・調査でも、§1-bis のトリガーに該当したら skill 抜きで図解を出す**。
-
-**テンプレ・実例・置換表の全文は references へ。本ルールは義務とトリガーだけ（再肥大化防止）。**
-
-## 0. モード判定（開発 / 業務）
-
-この図解は **2 モード**を持つ。テンプレは共通で、語彙は references の置換表で読み替える（DRY）。
-
-| モード | 対象 PJ（デフォルト） | 性質 | ペア guardrails |
-|--------|---------------------|------|----------------|
-| **開発** | jtt-apps / jtt-cms / jtt-shift-mobile-app / *-mcp 等 | GitHub PR フロー中心 | dev-guardrails |
-| **業務** | jtt-cafe-pj / non-pj | 戦略・施策・KPI 中心 | business-guardrails |
-
-- `jtt-cafe-pj` は business PJ。曖昧なら §5 に従い平易語で確認してから描く（推測しない）。
-- 最小読み替え: PR/Issue/merge/本番投入 → 戦略スコープ/KPI/意思決定/本番運用。詳細は references。
-
-## 1. 地図描画タイミング
-
-| タイミング | 出すもの |
-|-----------|---------|
-| セッション開始直後 | `.claude/parallel-run-state/*.json` があれば冒頭で全体地図を ASCII 表示（複数あれば選択を仰ぐ） |
-| /brainstorm 各フェーズ遷移時 | Phase 1→2→3 移行直前にミニ地図（§3） |
-| /parallel-run 各ステップ完了時 | Step 完了報告＋次 Step 前に全体地図を再描画 |
-| 通常作業中 | §1-bis 該当時は skill 抜きでも L1 ASCII 図解を出す |
-| オンデマンド | 「地図」「現在地」「進捗」の発話で即時再描画 |
-
-`gh pr list --state all` は開始時1回＋オンデマンド時のみ呼ぶ（API節約）。再描画は状態ファイルのキャッシュを優先。
-
-## 1-bis. skill 非依存の常時発火トリガー（バランス型）
-
-skill 非起動時でも、以下のいずれかに該当したら L1 ASCII 図解を出す（指示なしで出るのが本ルール最大の目的）。
-
-| トリガー | 出す図の例 |
-|---------|-----------|
-| ① 3 つ以上の要素・手順・選択肢の説明 | 箇条マップ / 比較表 / フロー |
-| ② 「今どこ・次どこ」の現在地・進捗 | 5 段階地図 / ミニ地図 |
-| ③ Issue/PR/PRD/仕様書を読んで方針を伝える | 関係図 / 要約マップ / フェーズ図 |
-| ④ バグ修正の「原因 → 対処」説明 | 原因 → 対処フロー |
-| ⑤⑥ 複数ファイル横断の整理・依存関係説明 | 依存ツリー / フロー図 |
-| ⑦ 進捗・週次レビュー・残り作業 | **ゴール地図（§2-bis）**。羅列で終わらせない |
-| ⑧ AI Worker MCP へ複数 provider 委譲/状態確認 | **AI Worker 進捗図**（references）。provider名でなく作業内容・現在地を主役にする |
-
-議論を伴う説明・プランはチャットの L1 要点図解を基本とする。L2 HTMLカードは見た目の比較が必要な時、またはユーザー希望時だけ使う（実装承認プランは plan-approval-gate.md 優先）。③④⑦も専用skill化せず本ルールで発火。
-
-### 出さない場面（うるささ回避）
-
-- 単純な一問一答、1 ステップで完結する短い事実回答、「図はいらない」明示時
-
-図形式は自由。**重い L2/L3 は使わず L1 ASCII をデフォルト**にし、図を要約として使う。
-
-## 2-bis. ゴール地図（骨子）
-
-§1-bis⑦で出す。やったこと羅列で終わらせず、計画全体・残り・次の一手・ゴール妥当性を同時に出す。
-
-必須 7 要素: ①🎯最終ゴール＋達成条件 ②全体スコープ ③✅済 ④⬜未（漏れ） ⑤◀次の一手 ⑥残数 ⑦⚠️ゴール妥当性レビュー。
-
-短絡禁止: 「実装が終わった＝ゴール達成」「施策を打った＝成果(KPI)達成」と書かない（本番運用・撤退基準判定まで未達）。骨子: 📍ゴール／つくる→テスト→🚧本番投入→🏁本番=ゴール／✅済・⬜未・◀次の一手。
-
-全体スコープ・未着手は PRD / Issue / git log を実読して埋める（推測禁止）。フルテンプレは references 参照。
-
-## 3. ミニ地図テンプレート（/brainstorm 用）
-
-/brainstorm の Phase 遷移時に出す最小テンプレート。全文（移設済）: `~/business/AGENT-HUB/skills/visual-companion/references/progress-map-templates.md` 「ミニ地図テンプレート」節参照。
-
-## 4-bis. 視覚化の 3 層（L1/L2/L3）の使い分け
-
-図解は内容に応じ 3 層を使い分ける。実行手段の SSOT は `skills/visual-companion/SKILL.md`。本ルールは L1 ASCII と判定基準のみ持つ。
-
-| 層 | 何を出すか | 手段 | いつ |
-|----|-----------|------|------|
-| **L1 ASCII** | 進捗・現在地マップ | ASCII 地図（ゼロ依存） | **デフォルト・常時** |
-| **L2 ブラウザ HTML** | mockup・レイアウト比較 | `start-server.sh` | 見た目の比較（オプトイン） |
-| **L3 ターミナル画像** | HTML を CLI で目視 | `html-to-terminal.sh` | ブラウザを開かず見たい時 |
-
-判定: 「読むより見た方が理解できるか？」。テキストで足りる選択は L1、見た目の比較は L2/L3。
-
-## 5. 非エンジニア用語ルール
-
-### 原則
-
-- 技術用語は**初回登場時のみ**括弧で平易語を併記、以降はそのまま使う（完全置換はしない）
-- 短い同意（「お願い」「はい」）だけで進めない
-
-代表例（全 12 語は references 参照）: PR=変更提案 / merge=本番に取り込む / migration=DB 構造変更 / staging=テスト環境 / worktree=別フォルダ作業領域。
-
-### 短い同意への応答
-
-「お願い」「はい」「OK」だけ返った時は**次の一手を 1 文で要約してから**再確認する。
-
-### 技術判断を仰ぐ時（平易語 + 選択肢で聞く）
-
-**技術判断は技術用語で聞かない**。①平易語（速さ・安全性・見た目への影響）で説明②2〜3択で提示（可能なら AskUserQuestion）③推奨理由を1文添える。実例は references 参照。
-
-## 6. 状態ファイル schema
-
-`.claude/parallel-run-state/<feature-slug>.json` に保管（kebab-case slug、各PJの `.gitignore` へ追加）。フィールド定義・モード別 schema・`gh pr list` 合成手順の全文は `<AGENT-HUB>/skills/visual-companion/references/state-file-schema.md` を参照。
-
-## 7. 関連ルール
-
-- `.claude/rules/general/response-style.md` / `sub-agent-scope-contract.md` / `branch-rule.md`
-- `skills/brainstorm/SKILL.md` / `skills/parallel-run/SKILL.md` — 各フェーズ・Step 遷移時に参照
-- `commands/brainstorm.md` / `commands/parallel-run.md` — 手動発火ラッパー
-- 全文: `<AGENT-HUB>/skills/visual-companion/references/progress-map-templates.md`, `state-file-schema.md`
-
-`<AGENT-HUB>` は中央ハブrepoのルートを表す（標準配置は `~/business/AGENT-HUB`、別環境では実際の配置先）。
-
-**追記ルール: テンプレ・実例・置換表は references へ書き、本ルールには足さない（再肥大化防止）。**
-
-<!-- 制定経緯（2026-05-15 新規作成 / 2026-07-01 main直接コミット例外全撤回 / 2026-07-16 PR2ダイエット）の
-CaD 全文は `~/business/AGENT-HUB/docs/worktree-operations.md`「決定履歴（CaD 移設）— worktree-rule.md 由来」参照 -->
-
-# Worktree 利用ルール
-
-## いつ worktree を使うか
-
-AI が変更を加える通常作業では、git worktree を作成して別ディレクトリで作業する。
-特に以下のいずれかに該当するときは必須:
-
-- **並列セッション**: Claude Code / Codex CLI / Cursor 等を同時に複数立ち上げて別タスクを進める
-- **複数 PR 同時進行**: 同一リポジトリで 2 本以上の feature branch を行き来する
-- **長期 feature branch**: main から離れて 1 日以上滞在する作業（途中で main を hotfix する可能性がある）
-- **軽量変更を含む AI 作業**: 例外なし。詳細は branch-rule.md 参照
-
-worktree 作成コマンドの例は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
-
-## いつ新規 worktree を作らなくてよいか
-
-以下は新規 worktree なしでよい:
-
-- 読み取りだけでファイル変更・commit・push がない場合
-- 既に feature branch にチェックアウト済みで、別タスクを差し挟まない場合
-- 既にこのタスク専用の worktree / branch にいる場合
-- 人間が明示承認した main 直接反映や初回 repo 作成など、branch-rule.md の注記に該当する例外の場合
-
-## 機密ファイル（MCP / .env）の自動 symlink
-
-worktree 作成時、git 追跡外の機密ファイル（`.mcp.json` / `.env` 系）は main worktree の実体へ**自動 symlink**される（git post-checkout hook 由来）。追加操作は不要。仕組み・手動再設置手順・非破壊の詳細は
-`~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
-
-## Mac mini ContextEngine mirror の自動追従
-
-Mac Studio 側の worktree は Mac mini の ContextEngine mirror が自動追従する（対象: jtt-cms / jtt-apps / jtt-system / AGENT-HUB / hermes）。索引はミラーであり当日の新規変更は未反映のことがある。詳細・stale削除・semantic強化ジョブは
-`~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
-
-## branch contamination が発生した場合の復旧
-
-別セッションのブランチに誤ってコミットした場合は、誤コミット特定 → 正しいブランチへ `cherry-pick` → 復旧用退避作成、の順で対応する。
-**`git reset --hard` と force-push はデフォルト禁止。必ずユーザー承認を得てから実行する。**
-詳細手順は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
-
-## AI セッションから worktree へ commit / push する方法（block-main-commit 対策）
-
-block-main-commit hook は cwd 変更を伴う複合コマンドでの main 直 commit を fail-closed で deny する。AI セッション（cwd=main）から worktree の feature branch へ commit / push する時は:
-
-1. **`isolation: "worktree"` 付きサブエージェントに委譲する**（正攻法）。
-2. isolation 指定ができない場合のみ、GitHub API / connector で remote feature branch commit → PR → CI → merge の fallback を使う（main 直更新は禁止のまま）。
-3. commit/push を含まない操作（`git add` / `git status` / `gh pr create` 等）はメインセッションから直接 `cd <worktree> && ...` してよい。
-4. hook 検査を `bash -c` 等で素通りさせる回避は**禁止**。
-5. **`EnterWorktree`（`path` に対象 worktree）でセッション自体の cwd を worktree へ移してから `git push` する経路も使える**（先に試してよい実用経路。①②を置き換えない）。block-main-commit は cwd 自身のブランチで判定するため、main checkout を cwd にしたまま `git -C <worktree> push` すると main 扱いで拒否される（2026-08-18 実測）。作業後は `ExitWorktree`（`action: "keep"`）で main checkout へ戻す。
-6. **`skills/post-merge/scripts/merge-pr.py` は実行元 HEAD が対象 PR の `headRefOid` と一致することを要求する**（不一致は fail-closed でマージ拒否）。**対象 PR の worktree を cwd にして実行する**こと。main checkout や別 PR の worktree からは実行できない（2026-08-18 実測）。
-
-サブエージェントの worktree が古いベース（origin/main 以前）から切られる問題への対処、外側隔離 worktree の残存・cleanup 手順、Codex fallback・EnterWorktree/ExitWorktree 経路・merge-pr.py headRefOid 要件の実測経緯は
-`~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
-
-## 共有 checkout / main 非占有ルール（全 PJ・全 AI ツール共通）
-
-対象ルート: `~/LLM-Dev/` `~/business/` `~/Herd/` `~/mac-mini-server/` `~/mcp-servers/` `~/jtt-system/`。Claude / Codex / Cursor / Kimi / OpenCode / Antigravity 全て同じ意味で読む。
-
-**AI セッションは、他者や他エージェントが使う可能性のある `main` checkout を掴まない。** 共有 checkout で merge / pull / cleanup を実行すると、並行セッションとブランチ・HEAD を奪い合って競合する。背景・実測実害は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
-
-### 必須：1 タスク = 1 連の完了フロー（PR を出して放置しない）
-
-**専用 worktree 作成 → 編集/commit/push → PR 作成 → マージ → fetch-only / detached 確認 → clean（worktree/branch 削除）まで、必ず一連で最後まで閉じる。** 「PR を出した」「マージした」で止めない。詳細コマンド列は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
-
-### Cursor チャットが紐づく worktree を先に消さない（必須）
-
-クライアント差: Claude Code / Codex は worktree 削除後の主害が **cwd 消滅**（次コマンド失敗・`cd` で復帰しやすい）。
-Cursor は birth path の **project cache**（`~/.cursor/projects/<slug>/`）が残り、Connected でも **0 tools**、
-追加 migrate が消えた path で `git ENOENT` になるのが差。Cursor 専用の削除ガードが必要で、全クライアント一律禁止にはしない。
-
-`move_agent_to_root` が成功しても slug / キャッシュが残ったまま path を消すと上の Cursor 症状が出る。
-
-**禁止:** 今のチャットの cwd（または祖先）になっている worktree、または直近 24h に `agent-transcripts` が更新されている
-worktree を、別フォルダへ移った確証前に削除すること（`mcps/` 残存だけでは拒否しない）。  
-**手順:** ① 生き残るフォルダへ Open / `move_agent_to_root` ② MCP tools>0 を確認 ③  
-`python3 scripts/check-cursor-workspace-before-remove.py <path>` が OK ④ それから削除。  
-`merge-pr` は Cursor 紐づけ検知時に **その worktree の remove だけ遅延**し、remote / local branch と他 worktree
-の掃除は続行する。明示フラグ `--allow-active-cursor-workspace-cleanup` だけが当該 WT 削除の上書き（人間確認後）。
-
-### AI が `main` で「やらないこと / 代わりにやること」
-
-- **やらない**: `git checkout main` / `git switch main` / `git branch -f main` / **共有 checkout へ入って**の `git pull`（`cd <repo> && git pull` のように cwd を main へ移す形）。
-- **やる**: 配布物を実際に届ける早送りは `git -C <対象PJの絶対パス> pull --ff-only` の単発コマンドで **AI が自分で実行する**（下記「catch-up pull」節）。
-- **やる**: `git fetch origin +refs/heads/main:refs/remotes/origin/main` で remote tracking ref を更新する。確認が必要な時は `git worktree add --detach <verify-dir> origin/main` で detached 確認。
-- merge は worktree 内から `gh` / `skills/post-merge/scripts/merge-pr.py --confirm-read` で行う。
-- **cleanup は自分が作った worktree / branch だけ**削除する。`git worktree list --porcelain` で他セッションのものを確認し**温存する**。
-- allowlist 対象の生成 config を main 直コミットする時の stale-main 注意は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
-
-要するに「編集だけ worktree、merge/pull は共有 checkout」をやめる。**着手から cleanup まで一貫して専用 worktree**で閉じる。例外的に人間が明示して main checkout を使う場合は、AI が占有している状態でないことと例外理由を作業ログへ残す。
-
-### catch-up pull は AI が自分で閉じる（全 PJ・全 AI ツール共通・2026-08-16）
-
-配布・修正をマージしても、実際に読まれるのは各 PJ の checkout 上のファイルである。そこへ早送りする
-catch-up pull は人間ゲートにせず、**AI が自分で実行して最後まで閉じる**。人間ゲートは戻せない外向きの操作に絞る。
-
-**形を固定する**: `git -C <対象PJの絶対パス> pull --ff-only` の**単発コマンド**だけを使う。`cd` を伴う複合コマンド・
-`--rebase`・refspec 指定・`--ff-only` を外した pull は使わない（cwd を移さないため共有 checkout の HEAD を掴まない）。
-
-**必須ガード**:
-
-1. 事前に `git -C <path> status --porcelain --untracked-files=no` を確認し、**tracked な未コミット変更があれば pull せず報告する**（他セッションが作業中の可能性）。**untracked ファイルだけなら pull してよい**（`--ff-only` は untracked を壊す取り込みを git 自身が中止するため安全）。`git status --short` で判定すると untracked のゴミ1個で配布が永久に止まる（実測 2026-08-16）。
-2. `git -C <path> branch --show-current` が `main` でない、または detached の場合は **pull しない**。
-3. **届いたことを実測する**。変更した文字列を配布先で `grep` して確認し、pull の成功出力だけを根拠にしない。
-4. 配布したら pull まで閉じる（`branch-rule.md`「配布クローズアウト責任」の完了条件）。「マージした＝届いた」で終えない。
-
-制定経緯・実測は `~/business/AGENT-HUB/docs/worktree-operations.md`「catch-up pull は AI が自分で閉じる — 制定経緯と実測」を参照。
-
-## 既存 worktree の確認
-
-```bash
-git worktree list
-```
-
-新規作成前に既存 worktree の再利用可否を確認すること。既存 worktree の実例（jtt-apps 等）は
-`~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
-
----
-
-**追記ルール: 実測事例・復旧手順・長文詳細は移設先（references / docs）へ書き、本ルールには義務とトリガーだけ足す（再肥大化防止）。**
+> Codex 向け要約: 全文は `CLAUDE.md` を Read。常時義務は下の CARD 地図を正とする。
+
+## 詳細ルール（CARD）
+Codex 等は paths 条件が効かないため、常時ルールは「いつ／何を／できた状態」の CARD だけを載せる。手順の全文は各 CARD 末尾のパスを Read する。編集元は PJ の `CLAUDE.md` + AGENT-HUB manifest v2 が選ぶ canonical rules。条件付き（frontmatter `paths:`）ルールは索引のみ。手動編集ではなく再生成で同期する。
+
+## CARD 地図（常時義務）
+セッション開始時はここを先に見る。詳細手順は下の各 CARD → 元ルールを Read。
+
+1. main 直コミット禁止
+2. 言いなり禁止
+3. 相談時は両G-Brain
+4. 横断指摘は台帳へ
+5. APIキーはHUB SSOT
+6. 人名/用語はmemory先
+7. 中規模はHTML承認
+8. 短く・重複なし
+9. 委譲は3点必須
+10. 現在地を図で
+11. 編集は専用worktree
+
+### CARD: branch-rule — main 直コミット禁止
+- **いつ**: commit / push / PR 作成するとき
+- **何を**: 専用 worktree + feature branch → PR。main へ直接書かない。第三者 upstream へ書かない（origin=自分のforkのみ）
+- **できた状態**: 作業は feature branch 上。upstream は fetch のみ
+- **詳細**: `.claude/rules/general/branch-rule.md`
+- **ledger provenance** (asset_id=`branch-rule` inheritance_id=`f64b20f06e6b71f6`)
+
+### CARD: constructive-dissent — 言いなり禁止
+- **いつ**: 指示が現実・制約・過去の不採用（CaD）と衝突するとき
+- **何を**: ①根拠付きで無理を言う ②代替を2〜3択+推奨 ③保守観点を先出し。最終決定はユーザー
+- **できた状態**: 迎合せず選択肢を出し、ユーザーの選択に従っている
+- **詳細**: `.claude/rules/general/constructive-dissent.md`
+- **ledger provenance** (asset_id=`constructive-dissent` inheritance_id=`4922d83b15c142d6`)
+
+### CARD: gbrain-recall — 相談時は両G-Brain
+- **いつ**: 相談・直し・判断の発話（毎回は探さない）
+- **何を**: `shintaro-gbrain` と `tech-gbrain` の両方を検索。道具が無ければ推測で進めずON待ち
+- **できた状態**: 該当brainを読んでから応答している（またはOFFを一文で伝えて停止）
+- **詳細**: `.claude/rules/general/gbrain-recall.md`
+- **ledger provenance** (asset_id=`gbrain-recall` inheritance_id=`d76b0c994a8ef7f4`)
+
+### CARD: mandate-registry — 横断指摘は台帳へ
+- **いつ**: 「全アプリで必要」「横展開」等の横断指摘があったとき
+- **何を**: 重複確認→`registries/mandate-registry.yaml` に1行登録→報告。黙って追加しない
+- **できた状態**: 台帳に経緯付きで載り、利用者へ報告済み
+- **詳細**: `.claude/rules/general/mandate-registry.md`
+- **ledger provenance** (asset_id=`mandate-registry` inheritance_id=`373f1e4126f00846`)
+
+### CARD: mcp-key-management — APIキーはHUB SSOT
+- **いつ**: MCPキー・`.env`・認証ヘッダを触るとき
+- **何を**: 実値は `~/.config/agent-hub/.env` のみ。PJ `.env` 直書き禁止。gitへ平文キー禁止
+- **できた状態**: SSOT以外にキー実値が無く、ヘッダ方式で同期できる
+- **詳細**: `.claude/rules/general/mcp-key-management.md`
+- **ledger provenance** (asset_id=`mcp-key-management` inheritance_id=`a56034441d19874e`)
+
+### CARD: memory-lookups — 人名/用語はmemory先
+- **いつ**: 人名略称・PJ用語・「あの〜」指示語・過去不採用を覆すとき。**イラストマニュアル**と言われたときも含む
+- **何を**: `~/.claude/projects/*/memory/` を先に検索。正本と矛盾したら正本優先。**イラストマニュアル**は長文手順書ではなく壁掲示イラストセット（正本 `docs/reference/illust-manual-vocabulary.md` → `cafe-image-assistant`）
+- **できた状態**: 推測補完せず、memoryまたは確認に基づいて応答している。イラストマニュアルを長文 Docs に取り違えていない
+- **詳細**: `.claude/rules/general/memory-lookups.md`
+- **ledger provenance** (asset_id=`memory-lookups` inheritance_id=`0d5b4aa7828a34bb`)
+
+### CARD: plan-approval-gate — 中規模はHTML承認
+- **いつ**: 新機能・画面・データ形変更・複数ファイル実装の着手前
+- **何を**: 固定HTMLプランをWriteで作り open。明示承認前に実装しない。承認後は台帳を全件タスク化
+- **できた状態**: 「この実装でいい」相当の承認があり、台帳タスク化済み
+- **詳細**: `.claude/rules/general/plan-approval-gate.md`
+- **ledger provenance** (asset_id=`plan-approval-gate` inheritance_id=`57a7362c64d21737`)
+
+### CARD: response-style — 短く・重複なし
+- **いつ**: ユーザーへ文章で返すとき
+- **何を**: 予告フレーズ避け、bullet優先、同じ情報を2回言わない。確認は選択肢+推奨1行
+- **できた状態**: 結論と次の一手が短く伝わり、冗長な中間報告が無い
+- **詳細**: `.claude/rules/general/response-style.md`
+- **ledger provenance** (asset_id=`response-style` inheritance_id=`5a08beee858fd97d`)
+
+### CARD: sub-agent-scope-contract — 委譲は3点必須
+- **いつ**: Task/Agent に作業を委譲するとき
+- **何を**: allowed_files / forbidden_actions / verify before return を必ず書く。探索ならcontext-engine先、UIならdesign-philosophy先
+- **できた状態**: 委譲先が範囲外編集・stash破壊・捏造検証をしていない
+- **詳細**: `.claude/rules/general/sub-agent-scope-contract.md`
+- **ledger provenance** (asset_id=`sub-agent-scope-contract` inheritance_id=`2df0dc7f3e0e83f2`)
+
+### CARD: visual-progress-map — 現在地を図で
+- **いつ**: 3つ以上の要素説明・進捗・Issue/PR方針・原因→対処など §1-bis 該当時
+- **何を**: skill無しでも L1 ASCII 図解を出す。技術判断は平易語+選択肢
+- **できた状態**: ユーザーが今どこ・次どこを図で把握できる
+- **詳細**: `.claude/rules/general/visual-progress-map.md`
+- **ledger provenance** (asset_id=`visual-progress-map` inheritance_id=`60f192120744a171`)
+
+### CARD: worktree-rule — 編集は専用worktree
+- **いつ**: ファイル変更・commit・push がある AI 作業
+- **何を**: 専用 worktree で着手→cleanupまで閉じる。共有 main を掴まない。stash で他セッションを壊さない
+- **できた状態**: 自分の worktree/branch だけで完了し、不要な共有 checkout 占有が無い
+- **詳細**: `.claude/rules/general/worktree-rule.md`
+- **ledger provenance** (asset_id=`worktree-rule` inheritance_id=`3ac270c246d5b02e`)
 
 ## 条件付きルール索引（on-demand Read）
 以下は Claude Code / Cursor では `paths:` / `globs` で条件付きロードされる。Codex 等の AGENTS.md 注入経路では本文を常時載せないため、該当ファイルを触る作業では一覧のパスを Read してから判断する。
 
-- `.claude/rules/general/ai-model-selection.md` — AI モデル選定指標 (inheritance_id=`9466aa8cd58fb611`)
-- `.claude/rules/general/hooks-structure-rule.md` — hooks構造ルール — チェックリストMDの配置制約とゾンビ復活禁止 (inheritance_id=`47d7849e1bc9d609`)
-- `.claude/rules/general/latest-stack-context7.md` — 最新スタック確認ルール — Next.js/React/serwist等の急速更新ライブラリは実装前にcontext7で最新docsを取得 (inheritance_id=`6cbb121d4707f75f`)
-- `.claude/rules/general/plan-commitment-tracking.md` — 承認済みプラン条項を実装で拾う (inheritance_id=`8f72268d42864cdc`)
-- `.claude/rules/general/reference-over-hardcode.md` — ハードコード排除・参照型設計 (inheritance_id=`c11ada1d33cda872`)
-- `.claude/rules/general/responsive-both-viewports.md` — レスポンシブ画面にUI要素(ボタン/リンク/ナビ)を足す時は必ず全viewport(モバイル/デスクトップ)に足し、各画面幅で表示を確認してから完了にする普遍ルール (inheritance_id=`f1de976176e1cfe6`)
-- `.claude/rules/general/settings-protection-coexistence.md` — settings.json等の保護テスト（直接編集ブロック）と、telemetry配線等の正当な変更を共存させる手順。テスト赤のままマージしない (inheritance_id=`b2c20a61aba97c16`)
-- `.claude/rules/general/ui-stitch-mandatory.md` — UI / デザインは必ず Stitch を通す (inheritance_id=`7c625ee9b414e7b8`)
+- `.claude/rules/general/ai-model-selection.md` — AI モデル選定指標 (asset_id=`ai-model-selection` inheritance_id=`9466aa8cd58fb611`)
+- `.claude/rules/general/hooks-structure-rule.md` — hooks構造ルール — チェックリストMDの配置制約とゾンビ復活禁止 (asset_id=`hooks-structure-rule` inheritance_id=`47d7849e1bc9d609`)
+- `.claude/rules/general/latest-stack-context7.md` — 最新スタック確認ルール — Next.js/React/serwist等の急速更新ライブラリは実装前にcontext7で最新docsを取得 (asset_id=`latest-stack-context7` inheritance_id=`6cbb121d4707f75f`)
+- `.claude/rules/general/plan-commitment-tracking.md` — 承認済みプラン条項を実装で拾う (asset_id=`plan-commitment-tracking` inheritance_id=`8f72268d42864cdc`)
+- `.claude/rules/general/reference-over-hardcode.md` — ハードコード排除・参照型設計 (asset_id=`reference-over-hardcode` inheritance_id=`c11ada1d33cda872`)
+- `.claude/rules/general/responsive-both-viewports.md` — レスポンシブ画面にUI要素(ボタン/リンク/ナビ)を足す時は必ず全viewport(モバイル/デスクトップ)に足し、各画面幅で表示を確認してから完了にする普遍ルール (asset_id=`responsive-both-viewports` inheritance_id=`f1de976176e1cfe6`)
+- `.claude/rules/general/settings-protection-coexistence.md` — settings.json等の保護テスト（直接編集ブロック）と、telemetry配線等の正当な変更を共存させる手順。テスト赤のままマージしない (asset_id=`settings-protection-coexistence` inheritance_id=`b2c20a61aba97c16`)
+- `.claude/rules/general/ui-stitch-mandatory.md` — UI / デザインは必ず Stitch を通す (asset_id=`ui-stitch-mandatory` inheritance_id=`7c625ee9b414e7b8`)

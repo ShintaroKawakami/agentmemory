@@ -1,3 +1,11 @@
+<!-- agents-md-card:start -->
+### CARD: gbrain-recall — 相談時は両G-Brain
+- **いつ**: 相談・直し・判断の発話（毎回は探さない）
+- **何を**: `shintaro-gbrain` と `tech-gbrain` の両方を検索。道具が無ければ推測で進めずON待ち
+- **できた状態**: 該当brainを読んでから応答している（またはOFFを一文で伝えて停止）
+- **詳細**: `.claude/rules/general/gbrain-recall.md`
+<!-- agents-md-card:end -->
+
 # G-Brain リコール層（会話中の「読む側」発火条件）
 
 制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「gbrain-recall.md からの移設」節を参照。

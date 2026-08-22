@@ -1,3 +1,11 @@
+<!-- agents-md-card:start -->
+### CARD: memory-lookups — 人名/用語はmemory先
+- **いつ**: 人名略称・PJ用語・「あの〜」指示語・過去不採用を覆すとき。**イラストマニュアル**と言われたときも含む
+- **何を**: `~/.claude/projects/*/memory/` を先に検索。正本と矛盾したら正本優先。**イラストマニュアル**は長文手順書ではなく壁掲示イラストセット（正本 `docs/reference/illust-manual-vocabulary.md` → `cafe-image-assistant`）
+- **できた状態**: 推測補完せず、memoryまたは確認に基づいて応答している。イラストマニュアルを長文 Docs に取り違えていない
+- **詳細**: `.claude/rules/general/memory-lookups.md`
+<!-- agents-md-card:end -->
+
 # メモリ参照ルール
 
 制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「memory-lookups.md からの移設」節を参照。

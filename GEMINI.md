@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `f0d2f8fc710e927542d6f8152ca690dfe30e02ead905e677d9c91ab0949c24c4`
+- effective hash: `a950f600f79b125d85bd5d330741fcf4b6886809e8c4dfd81ced241a167af51d`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -197,6 +197,14 @@ Hook scripts in `src/hooks/` are standalone Node.js scripts (no iii-sdk import).
 
 ### general/branch-rule.md
 
+<!-- agents-md-card:start -->
+### CARD: branch-rule — main 直コミット禁止
+- **いつ**: commit / push / PR 作成するとき
+- **何を**: 専用 worktree + feature branch → PR。main へ直接書かない。第三者 upstream へ書かない（origin=自分のforkのみ）
+- **できた状態**: 作業は feature branch 上。upstream は fetch のみ
+- **詳細**: `.claude/rules/general/branch-rule.md`
+<!-- agents-md-card:end -->
+
 # ブランチ運用ルール
 
 制定経緯（CaD）: `~/business/AGENT-HUB/docs/worktree-operations.md`「決定履歴（CaD 移設）— branch-rule.md 由来」節を参照。
@@ -291,6 +299,14 @@ AGENT-HUB から各 PJ へ配布した tracked 差分も「配布クローズア
 
 ### general/constructive-dissent.md
 
+<!-- agents-md-card:start -->
+### CARD: constructive-dissent — 言いなり禁止
+- **いつ**: 指示が現実・制約・過去の不採用（CaD）と衝突するとき
+- **何を**: ①根拠付きで無理を言う ②代替を2〜3択+推奨 ③保守観点を先出し。最終決定はユーザー
+- **できた状態**: 迎合せず選択肢を出し、ユーザーの選択に従っている
+- **詳細**: `.claude/rules/general/constructive-dissent.md`
+<!-- agents-md-card:end -->
+
 <!-- [2026-07-04][feat] 制定経緯（背景・他案不採用理由）は verbatim で移設済み。
 全文: ~/business/AGENT-HUB/skills/adversarial-review/SKILL.md「constructive-dissent.md からの移設」節 -->
 
@@ -349,6 +365,14 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 
 ### general/gbrain-recall.md
 
+<!-- agents-md-card:start -->
+### CARD: gbrain-recall — 相談時は両G-Brain
+- **いつ**: 相談・直し・判断の発話（毎回は探さない）
+- **何を**: `shintaro-gbrain` と `tech-gbrain` の両方を検索。道具が無ければ推測で進めずON待ち
+- **できた状態**: 該当brainを読んでから応答している（またはOFFを一文で伝えて停止）
+- **詳細**: `.claude/rules/general/gbrain-recall.md`
+<!-- agents-md-card:end -->
+
 # G-Brain リコール層（会話中の「読む側」発火条件）
 
 制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「gbrain-recall.md からの移設」節を参照。
@@ -401,6 +425,14 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 **追記ルール: 実測事例・長文詳細・制定経緯は `docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
 
 ### general/mandate-registry.md
+
+<!-- agents-md-card:start -->
+### CARD: mandate-registry — 横断指摘は台帳へ
+- **いつ**: 「全アプリで必要」「横展開」等の横断指摘があったとき
+- **何を**: 重複確認→`registries/mandate-registry.yaml` に1行登録→報告。黙って追加しない
+- **できた状態**: 台帳に経緯付きで載り、利用者へ報告済み
+- **詳細**: `.claude/rules/general/mandate-registry.md`
+<!-- agents-md-card:end -->
 
 # 横断チェック台帳（mandate-registry）への登録ルール
 
@@ -459,6 +491,14 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 **追記ルール: 実測事例・長文手順・制定経緯は台帳ヘッダ／`docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
 
 ### general/mcp-key-management.md
+
+<!-- agents-md-card:start -->
+### CARD: mcp-key-management — APIキーはHUB SSOT
+- **いつ**: MCPキー・`.env`・認証ヘッダを触るとき
+- **何を**: 実値は `~/.config/agent-hub/.env` のみ。PJ `.env` 直書き禁止。gitへ平文キー禁止
+- **できた状態**: SSOT以外にキー実値が無く、ヘッダ方式で同期できる
+- **詳細**: `.claude/rules/general/mcp-key-management.md`
+<!-- agents-md-card:end -->
 
 # MCP API キー管理規範（AGENT-HUB SSOT）
 
@@ -556,6 +596,14 @@ User scope MCP (`~/.<tool>/...`) の SSOT 一元管理は **user-mcp スキル**
 
 ### general/memory-lookups.md
 
+<!-- agents-md-card:start -->
+### CARD: memory-lookups — 人名/用語はmemory先
+- **いつ**: 人名略称・PJ用語・「あの〜」指示語・過去不採用を覆すとき。**イラストマニュアル**と言われたときも含む
+- **何を**: `~/.claude/projects/*/memory/` を先に検索。正本と矛盾したら正本優先。**イラストマニュアル**は長文手順書ではなく壁掲示イラストセット（正本 `docs/reference/illust-manual-vocabulary.md` → `cafe-image-assistant`）
+- **できた状態**: 推測補完せず、memoryまたは確認に基づいて応答している。イラストマニュアルを長文 Docs に取り違えていない
+- **詳細**: `.claude/rules/general/memory-lookups.md`
+<!-- agents-md-card:end -->
+
 # メモリ参照ルール
 
 制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「memory-lookups.md からの移設」節を参照。
@@ -625,6 +673,14 @@ memory と正本が矛盾する場合は、正本を優先する。G-Brain は�
 
 ### general/plan-approval-gate.md
 
+<!-- agents-md-card:start -->
+### CARD: plan-approval-gate — 中規模はHTML承認
+- **いつ**: 新機能・画面・データ形変更・複数ファイル実装の着手前
+- **何を**: 固定HTMLプランをWriteで作り open。明示承認前に実装しない。承認後は台帳を全件タスク化
+- **できた状態**: 「この実装でいい」相当の承認があり、台帳タスク化済み
+- **詳細**: `.claude/rules/general/plan-approval-gate.md`
+<!-- agents-md-card:end -->
+
 # 実装前に HTML プランで承認を仰ぐルール（強制）
 
 ## 原則
@@ -670,6 +726,14 @@ memory と正本が矛盾する場合は、正本を優先する。G-Brain は�
 **追記ルール: 実測事例・復旧手順・長文詳細は移設先（references / docs）へ書き、本ルールには義務とトリガーだけ足す（再肥大化防止）。**
 
 ### general/response-style.md
+
+<!-- agents-md-card:start -->
+### CARD: response-style — 短く・重複なし
+- **いつ**: ユーザーへ文章で返すとき
+- **何を**: 予告フレーズ避け、bullet優先、同じ情報を2回言わない。確認は選択肢+推奨1行
+- **できた状態**: 結論と次の一手が短く伝わり、冗長な中間報告が無い
+- **詳細**: `.claude/rules/general/response-style.md`
+<!-- agents-md-card:end -->
 
 # 出力簡潔性ルール
 
@@ -719,6 +783,14 @@ AI が URL やファイルパスを出力するとき、**URL の直後に全角
 **追記ルール: 実測事例・長文詳細・制定経緯は `docs/architecture/rules-general-cad-archive.md` へ書き、本ルールには義務・トリガー・禁止事項だけ足す（再肥大化防止）。**
 
 ### general/sub-agent-scope-contract.md
+
+<!-- agents-md-card:start -->
+### CARD: sub-agent-scope-contract — 委譲は3点必須
+- **いつ**: Task/Agent に作業を委譲するとき
+- **何を**: allowed_files / forbidden_actions / verify before return を必ず書く。探索ならcontext-engine先、UIならdesign-philosophy先
+- **できた状態**: 委譲先が範囲外編集・stash破壊・捏造検証をしていない
+- **詳細**: `.claude/rules/general/sub-agent-scope-contract.md`
+<!-- agents-md-card:end -->
 
 # サブエージェント Scope Contract
 
@@ -790,6 +862,14 @@ revert し、delegate にやり直しを指示する。
 **追記ルール: 制定経緯・テンプレート全文の詳細は `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` へ書き、本ルールには義務・トリガーだけ足す（再肥大化防止）。**
 
 ### general/visual-progress-map.md
+
+<!-- agents-md-card:start -->
+### CARD: visual-progress-map — 現在地を図で
+- **いつ**: 3つ以上の要素説明・進捗・Issue/PR方針・原因→対処など §1-bis 該当時
+- **何を**: skill無しでも L1 ASCII 図解を出す。技術判断は平易語+選択肢
+- **できた状態**: ユーザーが今どこ・次どこを図で把握できる
+- **詳細**: `.claude/rules/general/visual-progress-map.md`
+<!-- agents-md-card:end -->
 
 <!-- CaD 全文移設（2026-08-08 ctx-slim）: ~/business/AGENT-HUB/skills/visual-companion/references/progress-map-templates.md 「visual-progress-map.md からの移設」節参照 -->
 
@@ -904,6 +984,14 @@ skill 非起動時でも、以下のいずれかに該当したら L1 ASCII 図�
 **追記ルール: テンプレ・実例・置換表は references へ書き、本ルールには足さない（再肥大化防止）。**
 
 ### general/worktree-rule.md
+
+<!-- agents-md-card:start -->
+### CARD: worktree-rule — 編集は専用worktree
+- **いつ**: ファイル変更・commit・push がある AI 作業
+- **何を**: 専用 worktree で着手→cleanupまで閉じる。共有 main を掴まない。stash で他セッションを壊さない
+- **できた状態**: 自分の worktree/branch だけで完了し、不要な共有 checkout 占有が無い
+- **詳細**: `.claude/rules/general/worktree-rule.md`
+<!-- agents-md-card:end -->
 
 <!-- 制定経緯（2026-05-15 新規作成 / 2026-07-01 main直接コミット例外全撤回 / 2026-07-16 PR2ダイエット）の
 CaD 全文は `~/business/AGENT-HUB/docs/worktree-operations.md`「決定履歴（CaD 移設）— worktree-rule.md 由来」参照 -->
