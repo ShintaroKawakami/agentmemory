@@ -1,3 +1,11 @@
+<!-- agents-md-card:start -->
+### CARD: mcp-key-management — APIキーはHUB SSOT
+- **いつ**: MCPキー・`.env`・認証ヘッダを触るとき
+- **何を**: 実値は `~/.config/agent-hub/.env` のみ。PJ `.env` 直書き禁止。gitへ平文キー禁止
+- **できた状態**: SSOT以外にキー実値が無く、ヘッダ方式で同期できる
+- **詳細**: `.claude/rules/general/mcp-key-management.md`
+<!-- agents-md-card:end -->
+
 # MCP API キー管理規範（AGENT-HUB SSOT）
 
 制定経緯（CaD）: `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md`「決定履歴（CaD 移設）— mcp-key-management.md 由来」節（#12 圧縮経緯・#13/#14 条件付きロード降格の試行と撤回経緯）を参照。本ルールはセキュリティ規範（API キー管理）のため常時ロードを維持する（constructive-dissent.md「個人開発スケールと例外」例外(a)）。

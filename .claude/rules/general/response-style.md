@@ -1,3 +1,11 @@
+<!-- agents-md-card:start -->
+### CARD: response-style — 短く・重複なし
+- **いつ**: ユーザーへ文章で返すとき
+- **何を**: 予告フレーズ避け、bullet優先、同じ情報を2回言わない。確認は選択肢+推奨1行
+- **できた状態**: 結論と次の一手が短く伝わり、冗長な中間報告が無い
+- **詳細**: `.claude/rules/general/response-style.md`
+<!-- agents-md-card:end -->
+
 # 出力簡潔性ルール
 
 制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「response-style.md からの移設」節を参照。

@@ -1,3 +1,11 @@
+<!-- agents-md-card:start -->
+### CARD: mandate-registry — 横断指摘は台帳へ
+- **いつ**: 「全アプリで必要」「横展開」等の横断指摘があったとき
+- **何を**: 重複確認→`registries/mandate-registry.yaml` に1行登録→報告。黙って追加しない
+- **できた状態**: 台帳に経緯付きで載り、利用者へ報告済み
+- **詳細**: `.claude/rules/general/mandate-registry.md`
+<!-- agents-md-card:end -->
+
 # 横断チェック台帳（mandate-registry）への登録ルール
 
 制定経緯（CaD）: `~/business/AGENT-HUB/docs/architecture/rules-general-cad-archive.md`「mandate-registry.md からの移設」節を参照。
