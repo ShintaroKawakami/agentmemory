@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `67a5878a0f84aa60aaeac952a31a39757a35bdbf5bf686fbf81a4e7a73bdd228`
+- effective hash: `f0d2f8fc710e927542d6f8152ca690dfe30e02ead905e677d9c91ab0949c24c4`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -571,6 +571,15 @@ memory は、前回までの作業状態・人物名・用語・過去の判断�
 - **PJ 固有用語・コードネーム**に遭遇したとき
 - **過去の不採用判断**を覆そうとしているとき
 - ユーザーが「あの〜」「以前話した〜」等の指示語で参照しているとき
+
+## 固定用語（ハーネス語彙・memory より先にこれを使う）
+
+| 用語 | 意味（要約） | 正本 |
+|------|--------------|------|
+| **イラストマニュアル** | 従業員が絵を見て数秒で直感理解するための**掲示セット**。A4 は紙の単位（場面 N → だいたい N 枚）。長文手順書・Google Doc ではない | `docs/reference/illust-manual-vocabulary.md` |
+
+「イラストマニュアル」と言われたら長文 Docs を書かず、上記正本 → `cafe-image-assistant` / `chatgpt-image-creator` 経路へ進む。
+bare「マニュアル」だけなら「長文手順書か、イラスト掲示か」を確認する。
 
 ## 検索手順
 
