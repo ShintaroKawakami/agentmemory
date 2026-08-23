@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `a950f600f79b125d85bd5d330741fcf4b6886809e8c4dfd81ced241a167af51d`
+- effective hash: `f40446fca30bf2ceac6433c2849a4e02f90b8bc6c16618bb1526768c5f141261`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -866,8 +866,8 @@ revert し、delegate にやり直しを指示する。
 <!-- agents-md-card:start -->
 ### CARD: visual-progress-map — 現在地を図で
 - **いつ**: 3つ以上の要素説明・進捗・Issue/PR方針・原因→対処など §1-bis 該当時
-- **何を**: skill無しでも L1 ASCII 図解を出す。技術判断は平易語+選択肢
-- **できた状態**: ユーザーが今どこ・次どこを図で把握できる
+- **何を**: L1 ASCII既定。**説明HTMLは薄いストーリー＋左ナビ。細部詰め込み禁止。MermaidはPC横/スマホ縦。共有は0.0.0.0+Tailscale URL。Stitch不要**（本番UIだけStitch）。手順: `skills/visual-companion/references/explain-html-codex.md`
+- **できた状態**: 今どこ・次どこが図で分かる（情報過多で迷わせない）
 - **詳細**: `.claude/rules/general/visual-progress-map.md`
 <!-- agents-md-card:end -->
 
@@ -950,6 +950,45 @@ skill 非起動時でも、以下のいずれかに該当したら L1 ASCII 図�
 | **L3 ターミナル画像** | HTML を CLI で目視 | `html-to-terminal.sh` | ブラウザを開かず見たい時 |
 
 判定: 「読むより見た方が理解できるか？」。テキストで足りる選択は L1、見た目の比較は L2/L3。
+
+### 境界（Stitch との切り分け・常時）
+
+- **L2 の説明用 HTML**（Before/After・計画承認・改善フロー図・「HTMLで見せて」）は **Stitch 不要**。MCP が無くても拒否しない。
+- **本番アプリの画面デザイン確定**だけ `ui-stitch-mandatory`（Stitch）へ。無いときは **実装だけ STOP**し、説明 HTML は作ってよい。
+
+### 説明 HTML の密度（Codex Terra 対策・禁止）
+
+<!-- [2026-08-23][fix]
+背景:
+  - ユーザー依頼意図: Codex が Before/After HTML に画面細部・全フィールド・3端末分を詰めすぎて分かりにくくなる。薄いストーリー型の方が伝わる。縦長は左ナビ。MermaidはPC横/スマホ縦。Tailscale共有も必要。
+  - 守るべき業務ルール: 説明HTMLの既定は「一言の変化→Before/After対比→役割は最大3段」。細密詰め込みは禁止。画面モックは明示依頼時のみ。手順は visual-companion references。
+  - 他案不採用理由: 毎回ユーザーが「薄くして」と言う運用は再発するため不採用。憲法に禁止を書く。
+対応: 既定＝薄いストーリー型、禁止＝細部詰め込み、オプトイン＝画面/Mermaid、ナビ・向き・配信は手順正本へ。
+-->
+
+**手順・テンプレ正本（ライブ読み）**: `skills/visual-companion/references/explain-html-codex.md`  
+**骨格テンプレ**: `skills/visual-companion/references/explain-html-shell.html`
+
+**既定（これで出す）**: 薄いストーリー型（PART A）。
+
+- 1行の変化 → Before/After 要点（各 3〜5 行）→ 役割最大 3 段
+- お手本粒度: `kaizen-unified` の PART A / `kaizen-cold-storage-story` 級
+- セクション 3 つ以上 → **左 sticky 目次**（スマホは横スクロール目次）
+- Mermaid を出すとき → **PC=LR・スマホ=TD** の2本＋CSS切替（手順正本参照）
+- 他端末・Tailscale 共有時 → `0.0.0.0` 配信し localhost と Tailscale URL の両方を出す
+
+**禁止（頼まれなくてもやらない）**:
+
+- 全フィールド・全ボタン・全チップ・全タイムスタンプを画面に埋め込む
+- スマホモックを横に 3 枚並べて細部まで再現する（情報過多）
+- iframe サンドボックス包みや英語タイトルだけの「見た目リッチ・中身読めない」HTML
+- 「詳しいほど親切」として説明 HTML を仕様書化する
+- Stitch 未接続を理由に説明 HTML を拒否する
+
+**オプトイン（利用者が明示したときだけ）**:
+
+- 「画面で見せて」「Asana の画面」「PWA の画面」「Mermaid」など → PART B（画面モック / フロー図）
+- それでも **1画面あたりの意味合いを主役**にし、UI 細部の再現は最小にする
 
 ## 5. 非エンジニア用語ルール
 
@@ -1126,4 +1165,4 @@ Claude Code / Cursor では `paths:` / `globs` で条件付きロード。 GEMIN
 - `.claude/rules/general/reference-over-hardcode.md` — ハードコード排除・参照型設計 (inheritance_id=`c11ada1d33cda872`)
 - `.claude/rules/general/responsive-both-viewports.md` — レスポンシブ画面にUI要素(ボタン/リンク/ナビ)を足す時は必ず全viewport(モバイル/デスクトップ)に足し、各画面幅で表示を確認してから完了にする普遍ルール (inheritance_id=`f1de976176e1cfe6`)
 - `.claude/rules/general/settings-protection-coexistence.md` — settings.json等の保護テスト（直接編集ブロック）と、telemetry配線等の正当な変更を共存させる手順。テスト赤のままマージしない (inheritance_id=`b2c20a61aba97c16`)
-- `.claude/rules/general/ui-stitch-mandatory.md` — UI / デザインは必ず Stitch を通す (inheritance_id=`7c625ee9b414e7b8`)
+- `.claude/rules/general/ui-stitch-mandatory.md` — UI / デザインは必ず Stitch（説明用 Before/After・計画 HTML は例外・拒否しない） (inheritance_id=`7c625ee9b414e7b8`)
