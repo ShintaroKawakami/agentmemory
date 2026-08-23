@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `a950f600f79b125d85bd5d330741fcf4b6886809e8c4dfd81ced241a167af51d`
+- effective hash: `f40446fca30bf2ceac6433c2849a4e02f90b8bc6c16618bb1526768c5f141261`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -125,8 +125,8 @@ Codex 等は paths 条件が効かないため、常時ルールは「いつ／�
 
 ### CARD: visual-progress-map — 現在地を図で
 - **いつ**: 3つ以上の要素説明・進捗・Issue/PR方針・原因→対処など §1-bis 該当時
-- **何を**: skill無しでも L1 ASCII 図解を出す。技術判断は平易語+選択肢
-- **できた状態**: ユーザーが今どこ・次どこを図で把握できる
+- **何を**: L1 ASCII既定。**説明HTMLは薄いストーリー＋左ナビ。細部詰め込み禁止。MermaidはPC横/スマホ縦。共有は0.0.0.0+Tailscale URL。Stitch不要**（本番UIだけStitch）。手順: `skills/visual-companion/references/explain-html-codex.md`
+- **できた状態**: 今どこ・次どこが図で分かる（情報過多で迷わせない）
 - **詳細**: `.claude/rules/general/visual-progress-map.md`
 - **ledger provenance** (asset_id=`visual-progress-map` inheritance_id=`60f192120744a171`)
 
@@ -147,4 +147,4 @@ Codex 等は paths 条件が効かないため、常時ルールは「いつ／�
 - `.claude/rules/general/reference-over-hardcode.md` — ハードコード排除・参照型設計 (asset_id=`reference-over-hardcode` inheritance_id=`c11ada1d33cda872`)
 - `.claude/rules/general/responsive-both-viewports.md` — レスポンシブ画面にUI要素(ボタン/リンク/ナビ)を足す時は必ず全viewport(モバイル/デスクトップ)に足し、各画面幅で表示を確認してから完了にする普遍ルール (asset_id=`responsive-both-viewports` inheritance_id=`f1de976176e1cfe6`)
 - `.claude/rules/general/settings-protection-coexistence.md` — settings.json等の保護テスト（直接編集ブロック）と、telemetry配線等の正当な変更を共存させる手順。テスト赤のままマージしない (asset_id=`settings-protection-coexistence` inheritance_id=`b2c20a61aba97c16`)
-- `.claude/rules/general/ui-stitch-mandatory.md` — UI / デザインは必ず Stitch を通す (asset_id=`ui-stitch-mandatory` inheritance_id=`7c625ee9b414e7b8`)
+- `.claude/rules/general/ui-stitch-mandatory.md` — UI / デザインは必ず Stitch（説明用 Before/After・計画 HTML は例外・拒否しない） (asset_id=`ui-stitch-mandatory` inheritance_id=`7c625ee9b414e7b8`)

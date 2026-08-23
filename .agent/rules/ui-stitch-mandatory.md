@@ -39,6 +39,12 @@ Stitch 由来のファイルを散らかさないため、保存先を固定す�
 - UI に変化を伴わない純粋なロジック修正。
 - **写真・イラスト・商品画像・掲示物の図解**（画面レイアウトではなく「絵そのもの」を作る作業）。
   → Stitch ではなく下記「画像生成」の導線を使う。
+- **説明・認識合わせ用 HTML**（Before/After 比較、plan-approval の承認 HTML、visual-companion L2、
+  業務改善・戦略の図解モック、「HTMLで見せて」系の説明資料）。
+  → **本番アプリに載せる画面デザインの確定ではない**。Stitch MCP が無い・runtime 不可視でも
+  **拒否せず作成する**（`skills/brainstorm` の Before/After モックと同型）。
+  → 保存先は gitignored の temp / `.superpowers/` / `.codex-visualizations/` 等。リポジトリルート直下は禁止。
+  → 説明 HTML を作ったあと、同じ内容を**実装する本番 UI**へ進む段階では本ルール本体（Stitch）に戻る。
 
 ## 画像生成（写真・イラスト・図解）は手順を読んでから着手する（強制）
 
