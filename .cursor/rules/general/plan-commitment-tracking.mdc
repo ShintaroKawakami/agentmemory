@@ -28,6 +28,7 @@ globs:
 
 ## 必須手順
 
+0. **「台帳化／全部タスク化」指示は plan-commitment 系だけ（2026-08-24）**: 利用者が「台帳化」「全部タスク化」「台帳をタスクに」等と言ったら、**TodoWrite / TaskCreate / CreateGoal だけを台帳代わりにしない**。必ず (1) `skills/plan-approval/plan-commitment-registry.yaml`（`common`＋`per_project`）→ (2) `python3 skills/plan-approval/scripts/render-commitment-ledger.py --project <pj>` で**要約せず全件**展開 → (3) HTML 台帳へ載せ **1行=1タスク** → (4) **進捗正本は HTML の ☐/☑**。全行が ☑ または明示保留／「該当なし（理由）」になるまで完了宣言禁止。**代替禁止（別用途）**: `loop-registry` / `mandate-registry` / `parallel-run-state` / Cursor Goal。手順詳細は `skills/plan-approval/SKILL.md` の発火トリガー表。
 1. **承認直後に台帳化**: プラン本文の commitment / 条項（「〜不具合時」「〜したら」「最後に〜」「後で」「別プラン」「TODO」「フォローアップ」「要〜判断」の類）を全て抽出し、着手前に **TaskCreate で 1 項目 = 1 タスク**化する。**📋 コミットメント台帳セクションが空でないのに、未タスク化のまま実装へ進まない**。
    - **AI worker を 1 度でも使う計画なら、「AI worker 摩擦時は該当正本を worktree→PR→merge→fetch-only / detached 確認→cleanup で修正」の条項を台帳に必ず入れる**（テンプレ既定行・消さない）。無ければ台帳は未完成。
 2. **節目ごとに突き合わせ**: 各 PR / フェーズ完了時に standing 条項を読み返し、観測した live な失敗・回避策を突き合わせる。
