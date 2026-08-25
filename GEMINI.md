@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `1846b7cd0d39c53e81d83482232c1adebf2afd05be4367c464d46891d9bf33b0`
+- effective hash: `93ecbaafea57e007f2ce58c4b4201c64355c7ed13fbff39006344864bf72b444`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -586,7 +586,7 @@ User scope MCP (`~/.<tool>/...`) の SSOT 一元管理は **user-mcp スキル**
 - `scripts/lib/user_mcp_sync_lib.py` — 5 sync 共通 lib (env / registry / MANAGED block / 検証)
 - `scripts/sync-claude-project-mcp.py` — Project scope 同期
 - `scripts/codex-mcp-remote-with-env.sh` — Codex 用 SSE → stdio bridge
-- `~/business/AGENT-HUB/docs/codex-mcp-registry.yaml` `~/business/AGENT-HUB/docs/codex-mcp-definitions.yaml` — 台帳
+- `~/business/AGENT-HUB/docs/codex-mcp-registry.yaml` `~/business/AGENT-HUB/docs/codex-mcp-definitions.yaml` — 台帳（definitions=接続定義のみ現役。registry の enabled_mcp は選択に不使用）
 - `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` — 障害復旧ランブック
 - `docs/reference/project-roots.md` — プロジェクトルート規約
 
