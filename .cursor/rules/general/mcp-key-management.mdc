@@ -99,7 +99,7 @@ User scope MCP (`~/.<tool>/...`) の SSOT 一元管理は **user-mcp スキル**
 - `scripts/lib/user_mcp_sync_lib.py` — 5 sync 共通 lib (env / registry / MANAGED block / 検証)
 - `scripts/sync-claude-project-mcp.py` — Project scope 同期
 - `scripts/codex-mcp-remote-with-env.sh` — Codex 用 SSE → stdio bridge
-- `~/business/AGENT-HUB/docs/codex-mcp-registry.yaml` `~/business/AGENT-HUB/docs/codex-mcp-definitions.yaml` — 台帳
+- `~/business/AGENT-HUB/docs/codex-mcp-registry.yaml` `~/business/AGENT-HUB/docs/codex-mcp-definitions.yaml` — 台帳（definitions=接続定義のみ現役。registry の enabled_mcp は選択に不使用）
 - `~/business/AGENT-HUB/docs/runbooks/mcp-auth-recovery.md` — 障害復旧ランブック
 - `docs/reference/project-roots.md` — プロジェクトルート規約
 
