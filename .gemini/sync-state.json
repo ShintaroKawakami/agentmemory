@@ -1,7 +1,7 @@
 {
   "tool": "antigravity-sync",
-  "generated_at": "2026-08-13T09:43:01.500467+00:00",
-  "source_commit": "1406911",
+  "generated_at": "2026-08-27T14:20:12.076733+00:00",
+  "source_commit": "b2ca4a4",
   "project_root": ".",
   "generated_gemini_md": true,
   "copied_agents": [
@@ -37,6 +37,10 @@
     "scripts/block-skill-reverse-edit.test.sh",
     "scripts/block-unauthorized-docs-file.sh",
     "scripts/block-unauthorized-docs-file.test.sh",
+    "scripts/credit-baton-preflight.sh",
+    "scripts/credit-baton-preflight.test.sh",
+    "scripts/credit-usage-cache.sh",
+    "scripts/credit-usage-cache.test.sh",
     "scripts/delegation-routing-backstop.sh",
     "scripts/delegation-routing-backstop.test.sh",
     "scripts/delegation-routing-reminder.sh",
@@ -120,13 +124,13 @@
     "PreToolUse matcher=Write|Edit|MultiEdit は Gemini の run_shell_command へ未変換のためスキップ",
     "PreToolUse matcher=Bash|Edit|MultiEdit|Shell|StrReplaceFile|Write|WriteFile は Gemini の run_shell_command へ未変換のためスキップ",
     "PreToolUse matcher=Skill|Task|Agent は Gemini の run_shell_command へ未変換のためスキップ",
+    "SessionStart→SessionStart は現状の runtime bridge 未対応のためスキップ",
     "PostToolUse matcher=Edit|Write|MultiEdit は Gemini の write_file|replace へ未変換のためスキップ",
     "PostToolUse matcher=Edit|Write|MultiEdit は Gemini の write_file|replace へ未変換のためスキップ",
     "PostToolUse matcher=Skill|Task|Agent は Gemini の write_file|replace へ未変換のためスキップ",
     "UserPromptSubmit command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/delegation-routing-reminder.sh\"",
     "UserPromptSubmit command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/gbrain-recall-preflight.sh\"",
     "UserPromptSubmit command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/handover-preflight.sh\"",
-    "SessionStart→SessionStart は現状の runtime bridge 未対応のためスキップ",
     "SubagentStop→AfterAgent は現状の runtime bridge 未対応のためスキップ",
     "Stop→AfterAgent は現状の runtime bridge 未対応のためスキップ"
   ]

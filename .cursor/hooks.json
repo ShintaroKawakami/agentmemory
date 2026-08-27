@@ -42,6 +42,23 @@
         "matcher": "Edit|MultiEdit|Write"
       }
     ],
+    "sessionStart": [
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/credit-baton-preflight.sh\"'",
+        "timeout": 5
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/freshness-gate.sh\"'",
+        "timeout": 10
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/telemetry-log.sh\"'",
+        "timeout": 5
+      }
+    ],
     "afterFileEdit": [
       {
         "type": "command",
@@ -73,18 +90,6 @@
       {
         "type": "command",
         "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/pre-implementation-check.sh\"'",
-        "timeout": 5
-      }
-    ],
-    "sessionStart": [
-      {
-        "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/freshness-gate.sh\"'",
-        "timeout": 10
-      },
-      {
-        "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/telemetry-log.sh\"'",
         "timeout": 5
       }
     ],

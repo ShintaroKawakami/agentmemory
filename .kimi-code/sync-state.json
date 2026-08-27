@@ -1,8 +1,8 @@
 {
   "tool": "kimi-sync",
   "target": "kimi-code-cli",
-  "generated_at": "2026-08-19T13:46:04.179314+00:00",
-  "source_commit": "4c998d9",
+  "generated_at": "2026-08-27T14:20:14.941114+00:00",
+  "source_commit": "b2ca4a4",
   "project_root": ".",
   "project_agents_md": ".kimi-code/AGENTS.md",
   "skills_link": "managed by sync-runtime-skills.py (manifest v2)",
@@ -22,6 +22,10 @@
     "scripts/block-skill-reverse-edit.test.sh",
     "scripts/block-unauthorized-docs-file.sh",
     "scripts/block-unauthorized-docs-file.test.sh",
+    "scripts/credit-baton-preflight.sh",
+    "scripts/credit-baton-preflight.test.sh",
+    "scripts/credit-usage-cache.sh",
+    "scripts/credit-usage-cache.test.sh",
     "scripts/delegation-routing-backstop.sh",
     "scripts/delegation-routing-backstop.test.sh",
     "scripts/delegation-routing-reminder.sh",
@@ -54,8 +58,8 @@
   "machine_scope": "not-run",
   "legacy_kimi_dir_cleanup": "separate-proof-gated-migration-only",
   "warnings": [
-    "PostToolUse は観測系 event のため Kimi では重い hook を生成しません: delegation-routing-backstop.sh, fable-implementation-guard.sh, telemetry-log.sh",
     "SessionStart は観測系 event のため Kimi では重い hook を生成しません",
+    "PostToolUse は観測系 event のため Kimi では重い hook を生成しません: delegation-routing-backstop.sh, fable-implementation-guard.sh, telemetry-log.sh",
     "SubagentStop は観測系 event のため Kimi では重い hook を生成しません"
   ]
 }
