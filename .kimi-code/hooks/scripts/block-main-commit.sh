@@ -1077,8 +1077,25 @@ push_is_safe_remote_branch_deletion() {
   [ -n "$segs" ] || return 1
   while IFS= read -r seg; do
     [ -z "$seg" ] && continue
+    # [2026-08-27][fix] `git push --delete <remote> main`（--delete の直後が remote 名になる語順）
+    # 背景:
+    #   - ユーザー依頼意図: read-only 診断ドライバで `git push --delete origin main` /
+    #     `git push -C <feature WT> --delete origin main` が誤って ALLOW（リモート main 削除）に
+    #     なっていることが実測された。旧パターンは「--delete の直後トークンが main か」しか見ておらず、
+    #     `--delete <remote> main` のように remote 名が間に挟まる語順を見逃していた。
+    #   - 守るべき業務ルール: リモート main 削除（`--delete main` / `--delete <remote> main` いずれの
+    #     語順でも）は引き続き deny。merge cleanup（`--delete <remote> <feature>`）は従来どおり許可し続ける。
+    #   - 他案不採用理由:
+    #     (a) `-d`（--delete の短縮形）を本 allowlist 側へ足す案 → 現状 `-d` はこの関数で
+    #         「安全な枝削除」と認識されず後段の fail-closed で deny されている（意図せず安全側）。
+    #         ここに `-d` を足すと `push -d origin feature/x` が新たに ALLOW になり、許可が広がるため不採用。
+    #     (b) `--delete` の allowlist 自体を撤廃する案 → merge 後のリモート枝掃除（本来の用途）が
+    #         止まるため不採用。
+    #   対応: 「--delete の直後が main か」ではなく「セグメント中に main がトークンとして現れるか」で
+    #   判定する。PUSH_SEGMENTS ブロック（本ファイル下部）の main 検知パターンと同一の正規表現を
+    #   再利用し、新しい正規表現を発明しない（`main-old` / `feature/main` 等は従来どおり誤検知しない）。
     if echo "$seg" | grep -qE '(^|[[:space:]])--delete([[:space:]]|$)'; then
-      echo "$seg" | grep -qE '(^|[[:space:]])--delete([[:space:]]+)(\+)?(refs/heads/)?main([[:space:]]|$)' && return 1
+      echo "$seg" | grep -qE '(^|[[:space:]])\+?(refs/heads/)?main([[:space:]]|$)' && return 1
       continue
     fi
     if echo "$seg" | grep -qE '(^|[[:space:]]+)([^[:space:]]+[[:space:]]+)?:[^[:space:]]+'; then

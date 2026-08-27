@@ -698,6 +698,17 @@ expect_allow \
   "$main_repo" \
   "git push origin --delete branch1 branch2 branch3"
 
+# [2026-08-27][test] issue: push-delete-main-order
+# 背景:
+#   - ユーザー依頼意図: `--delete <remote> <branch>` の語順（--delete の直後が remote 名）でも
+#     merge cleanup（feature 枝削除）は従来どおり許可され続けることを固定する。
+#   - 守るべき業務ルール: 語順違いで許可が狭まってはいけない（本来の用途を壊さない）。
+#   - 他案不採用理由: なし（既存「push --delete 単独を許可」の語順違いバリアントとして必要）。
+expect_allow \
+  "push --delete 語順違い(--delete <remote> <branch>)でも許可" \
+  "$main_repo" \
+  "git push --delete origin feature/old-branch"
+
 # [2026-08-13][test]
 # 背景:
 #   - ユーザー依頼意図: 全PJでthird-party upstream writeを禁止し、fork内writeだけを許可する。
@@ -991,10 +1002,40 @@ expect_allow \
   "$feature_repo" \
   "gh api --method=PATCH repos/TestOwner/feature/issues/1 -f state=closed"
 
-expect_block \
-  "push --delete main は拒否" \
+# [2026-08-27][test] issue: push-delete-main-order
+# 背景:
+#   - ユーザー依頼意図: read-only 診断ドライバで実測した「remote main 削除の穴」を回帰固定する。
+#     `--delete main`（直後が main）と `--delete <remote> main`（間に remote 名を挟む語順）の
+#     両方を、cwd=main と `-C <feature worktree>` 経由の両方で deny させる。`-d`（短縮形）は
+#     従来どおり deny のまま（許可を広げていないことの固定）。
+#   - 守るべき業務ルール: リモート main 削除はどの語順・どの -C 経由でも deny。
+#   - 他案不採用理由: `-d` を allowlist へ足す案・allowlist 自体を撤廃する案は
+#     hook-library/scripts/block-main-commit.sh の push_is_safe_remote_branch_deletion 直上の
+#     CaD コメントに記載（不採用理由の重複記載を避けるため、ここでは要点のみ）。
+expect_main_branch_deny \
+  "push --delete main は拒否（--delete の直後が main）" \
   "$main_repo" \
   "git push origin --delete main"
+
+expect_main_branch_deny \
+  "push --delete 語順違い(--delete <remote> main)は拒否 ← 今回の本命" \
+  "$main_repo" \
+  "git push --delete origin main"
+
+expect_main_branch_deny \
+  "-C <feature WT> 経由 push origin --delete main は拒否" \
+  "$main_repo" \
+  "git -C $feature_repo push origin --delete main"
+
+expect_main_branch_deny \
+  "-C <feature WT> 経由 push --delete origin main は拒否 ← 今回の本命" \
+  "$main_repo" \
+  "git -C $feature_repo push --delete origin main"
+
+expect_main_branch_deny \
+  "-C <feature WT> 経由 push -d origin main は拒否（-d の挙動は変えていない固定）" \
+  "$main_repo" \
+  "git -C $feature_repo push -d origin main"
 
 expect_block \
   "push --delete と commit 同梱は拒否" \
