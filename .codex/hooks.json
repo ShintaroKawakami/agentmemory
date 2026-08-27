@@ -47,6 +47,26 @@
         ]
       }
     ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; bash \"$PROJECT_DIR/.codex/hooks/scripts/credit-baton-preflight.sh\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; bash \"$PROJECT_DIR/.codex/hooks/scripts/freshness-gate.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
@@ -72,17 +92,6 @@
             "type": "command",
             "command": "PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; bash \"$PROJECT_DIR/.codex/hooks/scripts/handover-preflight.sh\"",
             "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; bash \"$PROJECT_DIR/.codex/hooks/scripts/freshness-gate.sh\"",
-            "timeout": 10
           }
         ]
       }
