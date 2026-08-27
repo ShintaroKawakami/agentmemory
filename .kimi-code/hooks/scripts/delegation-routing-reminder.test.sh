@@ -35,6 +35,15 @@ set -euo pipefail
 #     対象窓とする単位である（delegation-routing-reminder.sh 本体のコメントと同一定義）。
 # 対応: make_transcript ヘルパーで tool_use ブロックを N 件持つ transcript fixture を生成し、
 #   DELEGATION_REMINDER_READ_GREP_THRESHOLD 等の閾値環境変数はデフォルトのまま検証する。
+#
+# [2026-08-27][test] クレジット残量条件の相乗りテスト追加。
+# 背景:
+#   - 依頼意図: クレジット残量キャッシュの有無・破損・閾値帯・スロットル・24時間経過・
+#     codexbar 非実行を機械的に固定する。
+#   - 守るべき業務ルール: テスト内で mktemp へ差し替え、実リポの agents.yaml や
+#     ~/.cache/agent-hub/ を汚さない。偽 codexbar を PATH に置き、実行されないことを確認。
+# 対応: キャッシュ無し・壊れJSON・warn未満・warn以上・strong以上・同日日付スロットル・
+#   帯上昇・24時間以上古い・codexbar非実行の9ケースを追加。
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOK="$SCRIPT_DIR/delegation-routing-reminder.sh"
@@ -53,6 +62,12 @@ fail() {
 run_hook() {
   local payload="$1"
   printf '%s' "$payload" | CLAUDE_PROJECT_DIR="$TMP_PROJECT" bash "$HOOK"
+}
+
+run_hook_env() {
+  local payload="$1"
+  shift
+  printf '%s' "$payload" | CLAUDE_PROJECT_DIR="$TMP_PROJECT" "$@" bash "$HOOK"
 }
 
 payload() {
@@ -198,5 +213,198 @@ huge_output="$(
     CLAUDE_PROJECT_DIR="$TMP_PROJECT" DELEGATION_REMINDER_MAX_BYTES="$small_max_bytes" bash "$HOOK"
 )"
 echo "$huge_output" | grep -q "大量読み" || fail "サイズ上限超過時に末尾から検知できない: $huge_output"
+
+# ===== [2026-08-27] クレジット残量条件テスト =====
+
+# ヘルパー: agents.yaml と credit-usage.json を一時ディレクトリに作る
+# [2026-08-27][fix] ケース間でマーカーが持ち越されないようにする
+# 背景:
+#   - 事象: 残量文言のスロットルは「日付 + 閾値帯」単位のため、マーカーがテストケース間で
+#     共有されると、先行ケースが同じ帯で 1 度発火しただけで後続ケースが常に無音になり
+#     「1回目で発火しない」と誤検知する（実際に検知した）。
+#   - 守るべき業務ルール: 各ケースは独立した初期状態から始める。セッション単位マーカーと
+#     日付+帯マーカーの両方をクリアする。
+#   - 他案不採用理由: ケースごとに日付を変える案は、hook 側が UTC 日付を自前で取るため
+#     テストから制御できず不採用。
+setup_credit_test() {
+  local tmp_dir="$1"
+  mkdir -p "$tmp_dir"
+  # 残量スロットルのマーカーを消す（実リポではなくテスト専用 CACHE_DIR のみ）
+  find "$CACHE_DIR" -maxdepth 1 -type f -name '*-tier-*' -delete 2>/dev/null || true
+}
+
+make_agents_yaml() {
+  local path="$1"
+  local warn="${2:-55}"
+  local strong="${3:-75}"
+  cat > "$path" <<EOF
+worker_delegation:
+  credit_preflight:
+    cache_path: "~/.cache/agent-hub/credit-usage.json"
+    cache_ttl_seconds: 900
+    claude_weekly_warn_percent: $warn
+    claude_weekly_strong_percent: $strong
+EOF
+}
+
+make_credit_cache() {
+  local path="$1"
+  local weekly="${2:-62}"
+  local updated_at="${3:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+  cat > "$path" <<EOF
+{
+  "updatedAt": "$updated_at",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": $weekly, "session": 16, "weekly": $weekly, "willLastToReset": false},
+    "glm": {"usedPercent": 2},
+    "antigravity": {"usedPercent": 0},
+    "kimi": {"usedPercent": 21},
+    "codex": {"usedPercent": 70},
+    "cursor": {"usedPercent": 79},
+    "ocg": {"usedPercent": 0}
+  }
+}
+EOF
+}
+
+CREDIT_TMP="$(mktemp -d)"
+# テスト終了時にクリーンアップ（trap は既にあるので手動で追加）
+# shellcheck disable=SC2064
+trap "rm -rf '$CREDIT_TMP'; $(trap -p EXIT | sed "s/trap -- '\(.*\)' EXIT/\1/")" EXIT
+
+# 14) キャッシュが無いとき、従来どおりの文言が出て exit 0
+setup_credit_test "$CREDIT_TMP/no-cache"
+make_agents_yaml "$CREDIT_TMP/no-cache/agents.yaml" 55 75
+no_cache_output="$(
+  printf '%s' "$(payload "このバグを修正して" "sess-no-cache")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/no-cache/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/no-cache/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$no_cache_output" | grep -q "三役体制" || fail "キャッシュ無しで従来文言が出ない: $no_cache_output"
+echo "$no_cache_output" | grep -q "Claude 週次" && fail "キャッシュ無しで残量文言が出てしまう: $no_cache_output" || true
+
+# 15) キャッシュが壊れた JSON のとき、従来どおりの文言が出て exit 0
+setup_credit_test "$CREDIT_TMP/bad-cache"
+make_agents_yaml "$CREDIT_TMP/bad-cache/agents.yaml" 55 75
+printf 'not-json{{{' > "$CREDIT_TMP/bad-cache/credit-usage.json"
+bad_cache_output="$(
+  printf '%s' "$(payload "このバグを修正して" "sess-bad-cache")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/bad-cache/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/bad-cache/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$bad_cache_output" | grep -q "三役体制" || fail "壊れJSONで従来文言が出ない: $bad_cache_output"
+echo "$bad_cache_output" | grep -q "Claude 週次" && fail "壊れJSONで残量文言が出てしまう: $bad_cache_output" || true
+
+# 16) routes.claude.weekly が warn 未満のとき、残量文言が出ない
+setup_credit_test "$CREDIT_TMP/below-warn"
+make_agents_yaml "$CREDIT_TMP/below-warn/agents.yaml" 55 75
+make_credit_cache "$CREDIT_TMP/below-warn/credit-usage.json" 30
+below_warn_output="$(
+  printf '%s' "$(payload "このバグを修正して" "sess-below-warn")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/below-warn/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/below-warn/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$below_warn_output" | grep -q "三役体制" || fail "warn未満で従来文言が出ない: $below_warn_output"
+echo "$below_warn_output" | grep -q "Claude 週次" && fail "warn未満で残量文言が出てしまう: $below_warn_output" || true
+
+# 17) warn 以上のとき、残量文言と空き worker 名が出る
+setup_credit_test "$CREDIT_TMP/warn"
+make_agents_yaml "$CREDIT_TMP/warn/agents.yaml" 55 75
+make_credit_cache "$CREDIT_TMP/warn/credit-usage.json" 62
+warn_output="$(
+  printf '%s' "$(payload "このバグを修正して" "sess-warn")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/warn/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/warn/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$warn_output" | grep -q "三役体制" || fail "warn以上で従来文言が出ない: $warn_output"
+echo "$warn_output" | grep -q "Claude 週次 62%" || fail "warn以上で残量文言が出ない: $warn_output"
+echo "$warn_output" | grep -q "glm" || fail "warn以上で空きworker名が出ない: $warn_output"
+
+# 18) strong 以上のとき、強い表現になる
+setup_credit_test "$CREDIT_TMP/strong"
+make_agents_yaml "$CREDIT_TMP/strong/agents.yaml" 55 75
+make_credit_cache "$CREDIT_TMP/strong/credit-usage.json" 80
+strong_output="$(
+  printf '%s' "$(payload "このバグを修正して" "sess-strong")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/strong/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/strong/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$strong_output" | grep -q "三役体制" || fail "strong以上で従来文言が出ない: $strong_output"
+echo "$strong_output" | grep -q "⛔" || fail "strong以上で強い表現が出ない: $strong_output"
+
+# 19) 実装キーワードが無い会話では、warn でも strong でも残量文言を出さない
+# 残量の状況把握は SessionStart パネル（credit-baton-preflight.sh）が担うため、
+# UserPromptSubmit 側は「実装へ着手しようとした瞬間」だけに絞る（重複とノイズの回避）。
+setup_credit_test "$CREDIT_TMP/tier-throttle"
+make_agents_yaml "$CREDIT_TMP/tier-throttle/agents.yaml" 55 75
+make_credit_cache "$CREDIT_TMP/tier-throttle/credit-usage.json" 62
+# warn 帯・実装キーワード無し → 無音
+tier_output1="$(
+  printf '%s' "$(payload "今日は天気だけ確認" "sess-tier-1")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/tier-throttle/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/tier-throttle/credit-usage.json" bash "$HOOK" 2>&1
+)"
+[ -z "$tier_output1" ] || fail "実装キーワード無し・warn 帯では無音であるべき: $tier_output1"
+# strong 帯へ上げても、実装キーワードが無ければ無音のまま
+make_credit_cache "$CREDIT_TMP/tier-throttle/credit-usage.json" 80
+tier_output3="$(
+  printf '%s' "$(payload "今日は天気だけ確認" "sess-tier-3")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/tier-throttle/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/tier-throttle/credit-usage.json" bash "$HOOK" 2>&1
+)"
+[ -z "$tier_output3" ] || fail "実装キーワード無し・strong 帯でも無音であるべき: $tier_output3"
+
+# 20) HIT ありの場合、帯が warn → strong に上がったら再度出る
+setup_credit_test "$CREDIT_TMP/tier-throttle"
+make_agents_yaml "$CREDIT_TMP/tier-throttle/agents.yaml" 55 75
+make_credit_cache "$CREDIT_TMP/tier-throttle/credit-usage.json" 62
+# 1回目: warn 帯で発火
+tier_output1="$(
+  printf '%s' "$(payload "このバグを修正して" "sess-tier-1")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/tier-throttle/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/tier-throttle/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$tier_output1" | grep -q "Claude 週次" || fail "tierスロットル1回目で発火しない: $tier_output1"
+# 同じ warn 帯の 2回目: スロットルされ無音（HITは別セッションなので三役体制は出るが残量は出ない）
+tier_output2="$(
+  printf '%s' "$(payload "このバグを修正して" "sess-tier-2")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/tier-throttle/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/tier-throttle/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$tier_output2" | grep -q "三役体制" || fail "tierスロットル2回目で従来文言が出ない: $tier_output2"
+# 残量文言が出ていないことを確認（CREDIT_LINE は出力されないはず）
+# ただし HIT=1 なので三役体制メッセージは出る。CREDIT_LINE の有無を確認。
+echo "$tier_output2" | grep -q "Claude 週次" && fail "同じ帯の2回目で残量文言が出てしまう: $tier_output2" || true
+# 帯を strong に上げて再度実行
+make_credit_cache "$CREDIT_TMP/tier-throttle/credit-usage.json" 80
+tier_output3="$(
+  printf '%s' "$(payload "このバグを修正して" "sess-tier-3")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/tier-throttle/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/tier-throttle/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$tier_output3" | grep -q "⛔" || fail "帯がstrongに上がったら再通知されるべき: $tier_output3"
+
+# 21) キャッシュが 24 時間以上古いとき、残量文言が出ない
+setup_credit_test "$CREDIT_TMP/old-cache"
+make_agents_yaml "$CREDIT_TMP/old-cache/agents.yaml" 55 75
+# 25時間前のタイムスタンプ
+old_time="$(date -u -d '25 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-25H +%Y-%m-%dT%H:%M:%SZ)"
+make_credit_cache "$CREDIT_TMP/old-cache/credit-usage.json" 80 "$old_time"
+old_cache_output="$(
+  printf '%s' "$(payload "このバグを修正して" "sess-old-cache")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/old-cache/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/old-cache/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$old_cache_output" | grep -q "三役体制" || fail "古いキャッシュで従来文言が出ない: $old_cache_output"
+echo "$old_cache_output" | grep -q "Claude 週次" && fail "24時間以上古いキャッシュで残量文言が出てしまう: $old_cache_output" || true
+
+# 22) codexbar を実行しないこと（偽 codexbar を PATH に置く）
+FAKE_BIN="$CREDIT_TMP/fake-bin"
+mkdir -p "$FAKE_BIN"
+cat > "$FAKE_BIN/codexbar" <<'EOF'
+#!/bin/bash
+echo "FAKE_CODEXBAR_CALLED=1"
+exit 1
+EOF
+chmod +x "$FAKE_BIN/codexbar"
+setup_credit_test "$CREDIT_TMP/no-exec"
+make_agents_yaml "$CREDIT_TMP/no-exec/agents.yaml" 55 75
+make_credit_cache "$CREDIT_TMP/no-exec/credit-usage.json" 62
+no_exec_output="$(
+  printf '%s' "$(payload "このバグを修正して" "sess-no-exec")" |
+    PATH="$FAKE_BIN:$PATH" CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/no-exec/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/no-exec/credit-usage.json" bash "$HOOK" 2>&1
+)"
+[ -z "$(echo "$no_exec_output" | grep "FAKE_CODEXBAR_CALLED")" ] || fail "codexbar が呼ばれている: $no_exec_output"
+echo "$no_exec_output" | grep -q "Claude 週次" || fail "codexbar非実行テストで残量文言が出ない: $no_exec_output"
 
 echo "PASS: delegation-routing-reminder"
