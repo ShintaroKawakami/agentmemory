@@ -271,11 +271,44 @@ def contains_repository_write(command: str) -> bool:
     )
 
 
+# [2026-08-27][fix] ハイフン語内部の git / push をコマンドトークンと誤判定しない
+# 背景:
+#   - 依頼意図: 正規化で `-` が許可文字として残るため、`\bgit\b` `\bpush\b` の単語境界が
+#     ハイフン区切りのディレクトリ名・ブランチ名（例: ai-worker-git-push-text-pattern）の
+#     内部にも成立し、git を一切含まない `cd <dir> && python3 <script>` が
+#     「cannot prove repository target through opaque runtime payload」で誤拒否されていた
+#     （同種の `git` と `push` を `.*` で繋ぐ誤検知はこれで 4 例目）。
+#   - 守るべき業務ルール: 実際に git 書き込みへ言及する不透明ペイロード
+#     （独立トークンの git/push、gh の書込み系グループ、github.com URL）は
+#     従来どおり fail-closed で止める。止まらなくなる形を 1 つも作らない。
+#   - 他案不採用理由:
+#     1) 正規化の許可文字集合から `-` を外して空白に潰す案 → `feature/x-y` のような正当な
+#        refspec が `feature/x` と `y` に分断され、ブランチ名の断片が独立トークン化して
+#        別の誤判定を生むおそれがあるため不採用。
+#     2) この判定自体を撤廃する案 → python/node/env -S 等の不透明ペイロード経由の
+#        書き込みを素通しするため不採用。
+# 対応: 正規化後を空白で split し、`\b` に頼らずトークン一致で判定する。
+#   先頭語（git / gh）は basename 一致（`/usr/bin/git` 形の言及を従来どおり拾うため）、
+#   後続語（push / gh グループ）はトークン完全一致。github.com 判定は従来どおり正規表現のまま。
 def opaque_payload_mentions_repository_write(payload: str) -> bool:
     normalized = re.sub(r"[^A-Za-z0-9_./:-]+", " ", payload)
+    tokens = normalized.split()
+
+    def has_ordered_tokens(lead: str, followers: frozenset[str]) -> bool:
+        lead_index = next(
+            (index for index, token in enumerate(tokens) if token.rsplit("/", 1)[-1].lower() == lead),
+            None,
+        )
+        if lead_index is None:
+            return False
+        return any(token.lower() in followers for token in tokens[lead_index + 1 :])
+
     return bool(
-        re.search(r"\bgit\b.*\bpush\b", normalized, re.IGNORECASE)
-        or re.search(r"\bgh\b.*\b(?:api|pr|issue|release|repo|workflow|run|secret|variable)\b", normalized, re.IGNORECASE)
+        has_ordered_tokens("git", frozenset({"push"}))
+        or has_ordered_tokens(
+            "gh",
+            frozenset({"api", "pr", "issue", "release", "repo", "workflow", "run", "secret", "variable"}),
+        )
         or re.search(r"github\.com", normalized, re.IGNORECASE)
     )
 

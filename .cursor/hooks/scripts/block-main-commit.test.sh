@@ -1103,6 +1103,48 @@ expect_unclassified_deny \
   'python3 -c "import os; os.system(\"git push origin feature/test\")"' \
   "through opaque"
 
+# [2026-08-27][test] issue: hyphen-token-word-boundary
+# 背景:
+#   - ユーザー依頼意図: hook-library/lib/upstream-write-guard.py の
+#     opaque_payload_mentions_repository_write() が `\b` 単語境界で判定していたため、
+#     ハイフン区切りのブランチ名・ディレクトリ名（ai-worker-git-push-text-pattern 等）の
+#     内部にある git / push を独立コマンドトークンと誤判定し、git を一切含まない
+#     `cd <dir> && python3 <script>` が「書込先を証明できない」で拒否されていた。
+#     トークン一致化した修正を回帰固定する。
+#   - 守るべき業務ルール: ハイフン語内部の git / push は誤検知しない一方、実際に git 書き込みへ
+#     言及する不透明ペイロードと github.com URL は従来どおり fail-closed で拒否する
+#     （許可回帰と deny 回帰を対で置く）。
+#   - 他案不採用理由: 許可側だけのテストでは、将来トークン判定を緩めたときに
+#     実書き込みペイロードの deny が消えても検知できないため不採用。
+hyphen_repo="$tmp/ai-worker-git-push-text-pattern"
+mkdir -p "$hyphen_repo"
+expect_allow \
+  "ハイフン語ディレクトリへの cd + python3 実行は許可" \
+  "$feature_repo" \
+  "cd $hyphen_repo && python3 /abs/script.py"
+
+expect_allow \
+  "ファイル名にハイフンで git-push を含む python3 実行は許可" \
+  "$feature_repo" \
+  "python3 /abs/path/to/my-git-push-helper.py"
+
+expect_allow \
+  "ハイフン語の refspec 風パスへの cd + python3 実行は許可" \
+  "$feature_repo" \
+  "cd $tmp/feature/git-push-fix && python3 /abs/script.py"
+
+expect_unclassified_deny \
+  "opaque python payload 引数内の git push は分類不能メッセージで拒否" \
+  "$feature_repo" \
+  "python3 /abs/script.py git -C /repo push origin main" \
+  "through opaque"
+
+expect_unclassified_deny \
+  "opaque node payload 内の github.com URL は分類不能メッセージで拒否" \
+  "$feature_repo" \
+  "node -e \"fetch('https://github.com/ThirdParty/feature')\"" \
+  "through opaque"
+
 expect_unclassified_deny \
   "piped cd 付き push は分類不能メッセージで拒否" \
   "$feature_repo" \
