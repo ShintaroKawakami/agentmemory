@@ -104,6 +104,40 @@ expect_block_with_script() {
   fi
 }
 
+# [2026-08-13][test] issue #1746 由来。own-repo 証明不能（HEREDOC/複合cd/パイプ）は upstream 文言と混ぜない。
+# [2026-08-27][test] block-main-commit-deny-message 対応で、②(パイプ付き -C push)の検査にも
+#   このヘルパーを使うため、定義位置を最初の利用箇所(旧 issue #1746 セクション)から
+#   共通ヘルパー群の直後へ移動した（bash は呼び出し時点で定義済みである必要があるため）。
+#   中身は変更していない。旧位置には移動した旨のコメントだけ残す。
+# [2026-08-27][fix] 実装監査指摘: expect_main_branch_deny は「書込先を安全に証明できない」文言の
+#   非存在まで見ているのに、本ヘルパーは third-party upstream 文言の非存在しか見ておらず、
+#   main の DENY_MSG（「mainブランチへの直接コミット/プッシュはブロックされました」）混入を
+#   見ていなかった。対称に main 文言の非存在検査も追加する。
+#   自己反証（監査役の補足）: emit_deny()（hook-library/lib/hook-io.sh:106）は JSON を印字した
+#   直後に exit 0 するため、現状は 1 回の deny で 2 つの文言が同時に出ることは構造的に起きない。
+#   この検査は「将来 _emit_deny_with_telemetry の後方 exit を外すリファクタが入ったとき、
+#   分類不能文言のはずが main 文言も混入する」という潜在的な検査漏れへの予防であり、
+#   現時点で実際に混入が起きているわけではない。
+expect_unclassified_deny() {
+  local name="$1"
+  local cwd="$2"
+  local command="$3"
+  local reason_fragment="$4"
+  local out
+  out="$(run_hook "$cwd" "$command" 2>&1 || true)"
+  if printf '%s' "$out" | grep -q 'permissionDecision.*deny' \
+    && printf '%s' "$out" | grep -q '書込先を安全に証明できない' \
+    && printf '%s' "$out" | grep -q "$reason_fragment" \
+    && ! printf '%s' "$out" | grep -q 'third-party upstream への書込みは禁止' \
+    && ! printf '%s' "$out" | grep -q 'mainブランチへの直接コミット/プッシュはブロックされました'; then
+    printf '[PASS] %s\n' "$name"
+    PASS=$((PASS + 1))
+  else
+    printf '[FAIL] %s: %s\n' "$name" "$out"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 export HOME="$tmp/home"
@@ -543,6 +577,96 @@ expect_block \
   "$main_repo" \
   "git -C $feature_repo status && git commit --allow-empty -m unsafe"
 
+# [2026-08-27][fix] issue: block-main-commit-deny-message
+# 背景:
+#   - 依頼意図: `git -C <feature-worktree> push -u origin feature/x 2>&1 | tail -6` が
+#     main 文言(DENY_MSG=「mainブランチへの直接コミット/プッシュはブロックされました」)で
+#     拒否され、既に feature branch で作業している AI が「main を直接触った」と誤解して
+#     人間へブランチ作成を依頼する誤誘導が実際に発生した。
+#     真の拒否理由は main 保護ではなく、パイプ(`| tail`)付き複合コマンドでは
+#     `-C` の書込先(worktree)を安全に証明できないため（single_git_c_target_dir の
+#     has_unquoted_shell_control が `|` を shell 制御とみなし解決不能=空を返す）。
+#   - 守るべき業務ルール: 止める条件・許可条件は 1 文字も変えない（新たに通るコマンドを作らない）。
+#     変えるのは「止めた理由の説明文」だけ。
+#   - 他案不採用理由: パイプ検知自体を緩める案は shell control 検知全般を弱め fail-open を招くため不採用。
+#     既存 expect_block（deny か否かのみ判定）で押さえる案は、文言が入れ替わっても緑になり
+#     今回の誤誘導を再発検知できないため不採用。
+# 対応: DENY_MSG(main文言)と UNCLASSIFIED_GIT_GUARD_MSG(分類不能文言)を区別して検査する
+#   expect_main_branch_deny を追加し、①〜⑥の実測挙動を固定する。
+#   ②は本体修正前の現状(DENY_MSG)を固定し、Step 3 で expect_unclassified_deny へ切り替える。
+expect_main_branch_deny() {
+  local name="$1"
+  local cwd="$2"
+  local command="$3"
+  local out
+  out="$(run_hook "$cwd" "$command" 2>&1 || true)"
+  if printf '%s' "$out" | grep -q 'permissionDecision.*deny' \
+    && printf '%s' "$out" | grep -q 'mainブランチへの直接コミット/プッシュはブロックされました' \
+    && ! printf '%s' "$out" | grep -q '書込先を安全に証明できない' \
+    && ! printf '%s' "$out" | grep -q 'third-party upstream への書込みは禁止'; then
+    printf '[PASS] %s\n' "$name"
+    PASS=$((PASS + 1))
+  else
+    printf '[FAIL] %s: %s\n' "$name" "$out"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+expect_allow \
+  "① -C 経由 push（パイプなし）は許可" \
+  "$main_repo" \
+  "git -C $feature_repo push -u origin feature/x"
+
+expect_unclassified_deny \
+  "② -C 経由 push をパイプ(| tail)に繋ぐと分類不能メッセージで拒否（main 文言と誤誘導しない）" \
+  "$main_repo" \
+  "git -C $feature_repo push -u origin feature/x 2>&1 | tail -6" \
+  "piped or compound command"
+
+expect_allow \
+  "③ -C 経由 push + リダイレクトのみ(2>&1)は許可" \
+  "$main_repo" \
+  "git -C $feature_repo push -u origin feature/x 2>&1"
+
+# [2026-08-27][fix] 実装監査指摘: ④の名前が実体とずれていた（push先は main ではなく feature/x）。
+# このケースが検証しているのは「refspec に `:` を含むため has_unsafe_push が unsafe 判定し、
+# 書込先(-C先)自体は解決できている（＝分類不能ではない）ので main 文言のまま止まる」こと。
+# アサーション・コマンドは変更せず、名前だけ実体に合わせて修正した。
+expect_main_branch_deny \
+  "④ -C 経由 push の : 付き refspec は unsafe 判定で main 文言のまま拒否" \
+  "$main_repo" \
+  "git -C $feature_repo push origin HEAD:refs/heads/feature/x"
+
+# [2026-08-27][test] ④に対応する「本当に main 宛ての colon refspec」ケースを追加。
+# 背景: 上の④は push 先が feature/x（main ではない）で、colon 付き refspec というだけで
+#   unsafe 判定される経路を検証していた。「main 宛て refspec」を実際に main 名で確認する
+#   ケースがまだ無かった（"-C 経由でも main 宛て push は拒否" は colon なしの ref=main の別経路）。
+#   本ケースは colon 付きで dst が refs/heads/main のケースを固定する。
+expect_main_branch_deny \
+  "④' -C 経由 push の main 宛て(colon refspec)は main 文言のまま拒否" \
+  "$main_repo" \
+  "git -C $feature_repo push origin HEAD:refs/heads/main"
+
+msg_file="$tmp/pipe-fix-msg.txt"
+echo "chore: message file commit" > "$msg_file"
+expect_allow \
+  "⑤ -C 経由 commit -F <file> は許可" \
+  "$main_repo" \
+  "git -C $feature_repo commit -F $msg_file"
+
+echo pipe-fix >> "$main_repo/README.md"
+git -C "$main_repo" add README.md
+expect_main_branch_deny \
+  "⑥ cwd(main) への直接 commit は main 文言のまま拒否" \
+  "$main_repo" \
+  "git commit -m docs"
+git -C "$main_repo" reset -q
+
+expect_main_branch_deny \
+  "⑥ cwd(main) からの直接 push は main 文言のまま拒否" \
+  "$main_repo" \
+  "git push origin main"
+
 expect_block \
   "先頭 cd でも対象が main なら commit 拒否" \
   "$main_repo" \
@@ -921,25 +1045,8 @@ fi
 #   - ユーザー依頼意図: shell substitution / opaque payload / piped cd の deny が fork 誘導しないこと。
 #   - 守るべき業務ルール: deny 自体は維持。本物の third-party write は従来の upstream 文言のまま。
 #   - 他案不採用理由: HEREDOC commit の静的許可は fail-open リスクがあるため今回やらない。
-expect_unclassified_deny() {
-  local name="$1"
-  local cwd="$2"
-  local command="$3"
-  local reason_fragment="$4"
-  local out
-  out="$(run_hook "$cwd" "$command" 2>&1 || true)"
-  if printf '%s' "$out" | grep -q 'permissionDecision.*deny' \
-    && printf '%s' "$out" | grep -q '書込先を安全に証明できない' \
-    && printf '%s' "$out" | grep -q "$reason_fragment" \
-    && ! printf '%s' "$out" | grep -q 'third-party upstream への書込みは禁止'; then
-    printf '[PASS] %s\n' "$name"
-    PASS=$((PASS + 1))
-  else
-    printf '[FAIL] %s: %s\n' "$name" "$out"
-    FAIL=$((FAIL + 1))
-  fi
-}
-
+# 注: expect_unclassified_deny 関数の定義は 2026-08-27 に共通ヘルパー群（run_hook 等の直後）へ移動済み。
+#   ②(-C push + パイプ)の検査でも同ヘルパーを使うため、bash の「呼び出し前に定義済み」制約に合わせた。
 expect_unclassified_deny \
   "shell substitution 付き commit は分類不能メッセージで拒否" \
   "$feature_repo" \

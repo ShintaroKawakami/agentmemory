@@ -1237,27 +1237,55 @@ if [ "$BRANCH" = "main" ]; then
   #        先頭の単一 cd のみ解決し（-C は git 1 回しか効かないため不採用＝deny）、env トリック/複数 cd/
   #        サブシェル/eval/-c シェルは effective_target_branch が空を返す=従来 deny。
   #     注: 本フックは「権限ルールの実体(SSOT)」そのもの。別途の権限ドキュメント同期は不要（ここが正本）。
+  # [2026-08-27][fix] issue: block-main-commit-deny-message
+  # 背景:
+  #   依頼意図: `git -C <feature-worktree> push -u origin feature/x 2>&1 | tail -6` のように
+  #     パイプ付き複合コマンドで -C の書込先を安全に証明できず deny になったケースが、
+  #     下の最終 deny で main 保護と同じ DENY_MSG（「main ブランチへの直接コミット/プッシュは
+  #     ブロックされました。git checkout -b feature/xxx でブランチを作成…」）を返していた。
+  #     既に feature branch で作業している AI がこの文面を読んで「main を直接触った」と
+  #     誤解し、人間へブランチ作成を手作業で依頼する誤誘導が実際に発生した。
+  #   守るべき業務ルール: 止める条件・許可条件は 1 文字も変えない（既存 exit 0 の位置・条件は不変）。
+  #     変えるのは「止めた理由の説明文」だけ。3 つの解決関数（effective_target_dir /
+  #     single_git_c_target_dir / consistent_git_c_target_dir）が全て空を返した（＝真に書込先を
+  #     証明できなかった）場合だけ UNCLASSIFIED_GIT_GUARD_MSG（分類不能文言）を使う。
+  #     いずれか 1 つでも解決できていた（例: refspec に `:` を含み has_unsafe_push が unsafe 判定した
+  #     ケース＝ eff_dir 自体は解決済み）場合は、従来どおり main 保護の DENY_MSG のまま。
+  #   他案不採用理由:
+  #     1) 3 関数とも同じ変数 `eff_dir` へ代入したまま「最後の eff_dir が空か」だけで判定する案:
+  #        1 つの戻り値しか見ていない実装でもテストが偶然緑になり、正しさの証明にならないため不採用。
+  #        3 つを別変数（eff_dir_a/b/c）へ保持し、明示的 OR で「3 つとも空」を判定する。
+  #     2) `command_targets_other_dir` ブロックの内側だけで判定変数を宣言する案: `set -euo pipefail`
+  #        (190行目) 下で -C を含まない main 直 commit（ブロック非到達）のとき unbound variable で
+  #        クラッシュし deny の JSON すら返せなくなる（＝保護が消える）ため、ブロック手前で
+  #        必ず初期化してから判定する。
+  # 対応: `unresolved_git_target` をブロック手前で 0 初期化し、3 つの解決結果が全て空のときだけ 1 を立てる。
+  #   最終 deny はこのフラグだけで DENY_MSG / UNCLASSIFIED_GIT_GUARD_MSG を振り分ける。
+  unresolved_git_target=0
   if command_targets_other_dir; then
-    eff_dir="$(effective_target_dir)"
-    if [ -n "$eff_dir" ]; then
-      eff_branch="$(git -C "$eff_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-      if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir"; then
+    eff_dir_a="$(effective_target_dir)"
+    if [ -n "$eff_dir_a" ]; then
+      eff_branch="$(git -C "$eff_dir_a" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+      if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir_a"; then
         exit 0  # 別 worktree/別リポの feature への commit / 安全な非 main push（refspec 省略含む）→ 許可
       fi
     fi
-    eff_dir="$(single_git_c_target_dir)"
-    if [ -n "$eff_dir" ]; then
-      eff_branch="$(git -C "$eff_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-      if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir"; then
+    eff_dir_b="$(single_git_c_target_dir)"
+    if [ -n "$eff_dir_b" ]; then
+      eff_branch="$(git -C "$eff_dir_b" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+      if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir_b"; then
         exit 0  # 単発 `git -C <feature> commit/push` は -C が対象 git へだけ効くため許可
       fi
     fi
-    eff_dir="$(consistent_git_c_target_dir)"
-    if [ -n "$eff_dir" ]; then
-      eff_branch="$(git -C "$eff_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-      if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir"; then
+    eff_dir_c="$(consistent_git_c_target_dir)"
+    if [ -n "$eff_dir_c" ]; then
+      eff_branch="$(git -C "$eff_dir_c" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+      if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir_c"; then
         exit 0  # 同一 -C 先への add && commit 等の複合（issue #1672）
       fi
+    fi
+    if [ -z "$eff_dir_a" ] && [ -z "$eff_dir_b" ] && [ -z "$eff_dir_c" ]; then
+      unresolved_git_target=1  # 3関数とも解決不能＝真に書込先を証明できなかった（パイプ等）
     fi
   fi
 
@@ -1268,6 +1296,12 @@ if [ "$BRANCH" = "main" ]; then
   #   `git -C /other push origin feature` (CWD=main) など希少な workflow を deny する副作用は
   #   メイン保護のため許容（自然なワークフローは /other へ cd して実行）。
   if echo "$COMMAND_FOR_GIT_MATCH" | grep -qE "${GIT_CMD}[[:space:]]+(commit|push)"; then
+    # [2026-08-27][fix] unresolved_git_target=1（3関数とも解決不能）のときだけ分類不能文言。
+    #   それ以外（cwd=main の直接操作、-C 先は解決できたが main 向け/曖昧refspecだった等）は
+    #   従来どおり main 保護の DENY_MSG。
+    if [ "$unresolved_git_target" = "1" ]; then
+      _emit_deny_with_telemetry "$UNCLASSIFIED_GIT_GUARD_MSG\n\n検出理由: cannot prove -C/cd write target through piped or compound command"
+    fi
     _emit_deny_with_telemetry "$DENY_MSG"
   fi
 fi
