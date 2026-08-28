@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `85166d70f8e7c77a6825a5ce245b938fbe70db66a5eb7781b3caac22c5d00432`
+- effective hash: `4ab0acdbd3ff9192dd3cbf1d304d821603d562f37b81d3c49829a45d7da012f4`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -48,17 +48,25 @@ Codex 等は paths 条件が効かないため、常時ルールは「いつ／�
 ## CARD 地図（常時義務）
 セッション開始時はここを先に見る。詳細手順は下の各 CARD → 元ルールを Read。
 
-1. main 直コミット禁止
-2. 言いなり禁止
-3. 相談時は両G-Brain
-4. 横断指摘は台帳へ
-5. APIキーはHUB SSOT
-6. 人名/用語はmemory先
-7. 中規模はHTML承認
-8. 短く・重複なし
-9. 委譲は3点必須
-10. 現在地を図で
-11. 編集は専用worktree
+1. 委譲後は見張りを立てる
+2. main 直コミット禁止
+3. 言いなり禁止
+4. 相談時は両G-Brain
+5. 横断指摘は台帳へ
+6. APIキーはHUB SSOT
+7. 人名/用語はmemory先
+8. 中規模はHTML承認
+9. 短く・重複なし
+10. 委譲は3点必須
+11. 現在地を図で
+12. 編集は専用worktree
+
+### CARD: ai-worker-watch — 委譲後は見張りを立てる
+- **いつ**: `delegate_impl` で AI worker へ委譲したとき／PR を作って CI を待つとき
+- **何を**: 委譲・PR 作成の直後に見張りを background で1本立てる。ポーリングだけで待たない
+- **できた状態**: 終了・期限切れのどちらでも AI が自分で起きている（無言で待ち続けていない）
+- **詳細**: `.claude/rules/general/ai-worker-watch.md`
+- **ledger provenance** (asset_id=`ai-worker-watch` inheritance_id=`d0f860f95e9dce9c`)
 
 ### CARD: branch-rule — main 直コミット禁止
 - **いつ**: commit / push / PR 作成するとき
