@@ -26,6 +26,16 @@ dist/
 #     （sync-agents.py --project-root <clean linked worktree>）の単一 writer 契約を壊すため不採用。
 !.claude/hooks/
 
+# [2026-08-28][fix] Claude hook の配線ファイルを追跡対象へ戻す。
+# 背景:
+#   - 実測: 上の `.claude/*` により `.claude/settings.json` が配布 PR に載らず、
+#     AGENT-HUB の hook-registry.yaml が宣言する Claude hook 7 本が一度も発火していなかった
+#     （AGENT-HUB Issue #2180）。スクリプト実体は追跡済みのため「あるのに呼ばれない」状態だった。
+#   - 他 25 プロジェクトは `.claude/settings.json` を追跡しており、本リポジトリだけが例外だった。
+#   - 他案不採用理由: 無視されたまま primary checkout へ直接コピーする案は、配布の単一 writer 契約
+#     （sync-agents.py）を壊すため不採用。
+!.claude/settings.json
+
 # MCP接続設定は各マシンのローカル設定（sync-agents が生成）
 .mcp.json
 
