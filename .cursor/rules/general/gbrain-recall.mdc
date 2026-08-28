@@ -8,8 +8,8 @@ alwaysApply: true
 <!-- agents-md-card:start -->
 ### CARD: gbrain-recall — 相談時は両G-Brain
 - **いつ**: 相談・直し・判断の発話（毎回は探さない）
-- **何を**: `shintaro-gbrain` と `tech-gbrain` の両方を検索。道具が無ければ推測で進めずON待ち
-- **できた状態**: 該当brainを読んでから応答している（またはOFFを一文で伝えて停止）
+- **何を**: `shintaro-gbrain` と `tech-gbrain` の両方を検索。可用性の status と証拠は共通 rule に従う
+- **できた状態**: `AVAILABLE` を確認した該当 brain を読んでから応答している（未確認・runtime unavailable は停止案内）
 - **詳細**: `.claude/rules/general/gbrain-recall.md`
 <!-- agents-md-card:end -->
 
@@ -44,9 +44,23 @@ alwaysApply: true
 
 判断に迷う場合は検索する側に倒す（誤爆コストは低く、未検索コストは高い）。
 
-## 1-bis. 道具が無いときは止まって待つ
+## 1-bis. tool availability の解決と必須 G-Brain の境界
 
-§1 の検索先 MCP（`shintaro-gbrain` / `tech-gbrain`）のツールがこのセッションの道具一覧に無いときは、推測で読んだつもりにせず作業を進めない。利用者へ一文だけ伝える: 「G-Brain の2つ（shintaro-gbrain / tech-gbrain）がOFFです。MCPパネルでONにしてから続けます」。ONになるまで待つ。配線は harness type 依存であり、Claude Code / Codex でも片方または両方が無いことがある。道具一覧を見て判断し、「通常あるはず」で進めない。
+§1 の検索先 MCP（`shintaro-gbrain` / `tech-gbrain`）も、共通ルール
+`.claude/rules/general/tool-availability-resolution.md` の証拠順序と status を使う。初期 tool
+一覧に無いだけでは `OFF` と判定しない。catalog の欠落だけなら `UNPROVEN` とし、登録・選択・
+runtime の証拠を確認するまで、検索済みだと主張しない。
+
+必須 G-Brain は次の境界で扱う。
+
+- `AVAILABLE`: 該当 brain を検索してから応答する。
+- `RUNTIME_UNAVAILABLE`: 推測で進めず停止する。利用者へ「G-Brain の runtime が利用できないため、
+  検索せずに推測で進めません。runtime を復旧してから続けます」と案内する。
+- `NOT_SELECTED` / `UNPROVEN`: 選択・runtime の証拠が不足しているため検索済みと扱わず、確認できるまで
+  判断を要する作業を進めない。
+
+配線は harness type 依存であり、Claude Code / Codex でも片方または両方の status が異なることがある。
+status を初期一覧の欠落から推測せず、確認できた根拠を明示する。
 
 ## 2. 検索実行の判断はモデル側に残す
 

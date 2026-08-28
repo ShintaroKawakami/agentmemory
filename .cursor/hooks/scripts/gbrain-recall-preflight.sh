@@ -3,6 +3,8 @@
 # Quiet by default: only prints when the prompt contains a known keyword group
 # (bug/investigation or management-consultation/strategy), or when
 # GBRAIN_RECALL_PREFLIGHT_FORCE=1 is set.
+# Availability is a model/user check. This hook only prints a reminder; it does
+# not inspect a catalog or call an MCP tool.
 #
 # [2026-08-04][feat] G-Brain ハーネス Phase 1（gbrain-recall rule と対の hook）
 # 背景:
@@ -13,6 +15,7 @@
 #     UserPromptSubmit hook 実装様式に倣う（quiet-by-default・JSON stdin パース・FORCE env）。
 #   - 他案不採用理由: hook 側で自動的に search ツールを呼ぶ案は、誤爆時にノイズ・不要な MCP 呼び出しが
 #     発生するため不採用（rule §2 のとおりリマインドに留める）。
+#   - tool availability は初期 tool 一覧の欠落を OFF と見なさず、共通 rule の証拠順序を案内する。
 # 対応: 新規 hook を追加。settings/gbrain-recall-preflight.json（Claude）と
 #   settings-codex/gbrain-recall-preflight.json（Codex）を同一 PR で追加する。
 
@@ -87,5 +90,10 @@ elif tech_hit:
     print("- tech-gbrain を検索してから着手（バグ修正・障害調査・回帰）")
 elif business_hit:
     print("- shintaro-gbrain を検索してから着手（経営相談・戦略・クレーム対応）")
+print("- tool availability: 初期 tool 一覧の欠落だけでは可否を決めない")
+print("- status の証拠順序: セッション catalog → 遅延 catalog → 選択状態 → runtime 実測 → 結論")
+print("- status: AVAILABLE / NOT_SELECTED / RUNTIME_UNAVAILABLE / UNPROVEN")
+print("- hook は案内のみ。catalog 探索・MCP tool 呼出しは自動実行しない")
 print("- 詳細: .claude/rules/general/gbrain-recall.md")
+print("- 共通ルール: .claude/rules/general/tool-availability-resolution.md")
 PY
