@@ -43,4 +43,13 @@ force_output="$(printf '{"user_prompt": "ただの雑談"}' | GBRAIN_RECALL_PREF
 echo "$force_output" | grep -q "gbrain-recall preflight:" || fail "FORCE時の preflight が出ない: $force_output"
 echo "$force_output" | grep -q "該当キーワードなし" || fail "FORCE時に無該当メッセージが出ない: $force_output"
 
+for status in AVAILABLE NOT_SELECTED RUNTIME_UNAVAILABLE UNPROVEN; do
+  echo "$fix_both_output" | grep -q "$status" \
+    || fail "availability status $status の案内が出ない: $fix_both_output"
+done
+echo "$fix_both_output" | grep -q "catalog 探索・MCP tool 呼出しは自動実行しない" \
+  || fail "hookが自動探索・自動呼出しをしない案内を出さない: $fix_both_output"
+echo "$fix_both_output" | grep -q "tool-availability-resolution.md" \
+  || fail "共通availability ruleへの参照が出ない: $fix_both_output"
+
 echo "PASS: gbrain-recall-preflight"

@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `4ab0acdbd3ff9192dd3cbf1d304d821603d562f37b81d3c49829a45d7da012f4`
+- effective hash: `c7d136d5e4ed72ca28757d302eb615db06c86a0e819f3384ad8c179938a5de9e`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -58,8 +58,9 @@ Codex 等は paths 条件が効かないため、常時ルールは「いつ／�
 8. 中規模はHTML承認
 9. 短く・重複なし
 10. 委譲は3点必須
-11. 現在地を図で
-12. 編集は専用worktree
+11. Tool availability 解決ルール（共通）
+12. 現在地を図で
+13. 編集は専用worktree
 
 ### CARD: ai-worker-watch — 委譲後は見張りを立てる
 - **いつ**: `delegate_impl` で AI worker へ委譲したとき／PR を作って CI を待つとき
@@ -84,8 +85,8 @@ Codex 等は paths 条件が効かないため、常時ルールは「いつ／�
 
 ### CARD: gbrain-recall — 相談時は両G-Brain
 - **いつ**: 相談・直し・判断の発話（毎回は探さない）
-- **何を**: `shintaro-gbrain` と `tech-gbrain` の両方を検索。道具が無ければ推測で進めずON待ち
-- **できた状態**: 該当brainを読んでから応答している（またはOFFを一文で伝えて停止）
+- **何を**: `shintaro-gbrain` と `tech-gbrain` の両方を検索。可用性の status と証拠は共通 rule に従う
+- **できた状態**: `AVAILABLE` を確認した該当 brain を読んでから応答している（未確認・runtime unavailable は停止案内）
 - **詳細**: `.claude/rules/general/gbrain-recall.md`
 - **ledger provenance** (asset_id=`gbrain-recall` inheritance_id=`d76b0c994a8ef7f4`)
 
@@ -130,6 +131,13 @@ Codex 等は paths 条件が効かないため、常時ルールは「いつ／�
 - **できた状態**: 委譲先が範囲外編集・stash破壊・捏造検証をしていない
 - **詳細**: `.claude/rules/general/sub-agent-scope-contract.md`
 - **ledger provenance** (asset_id=`sub-agent-scope-contract` inheritance_id=`2df0dc7f3e0e83f2`)
+
+### CARD: tool-availability-resolution — Tool availability 解決ルール（共通）
+- **いつ**: tool の可用性を判断するとき、または利用できない理由を説明するとき
+- **何を**: 初期 catalog → 遅延 catalog → 選択状態 → runtime 実測の順で証拠を確認し、4状態へ分類する
+- **できた状態**: `AVAILABLE` / `NOT_SELECTED` / `RUNTIME_UNAVAILABLE` / `UNPROVEN` と根拠が明示され、初期一覧の欠落だけで `OFF` と断定していない
+- **詳細**: `.claude/rules/general/tool-availability-resolution.md`
+- **ledger provenance** (asset_id=`tool-availability-resolution` inheritance_id=`24858e26fca6d353`)
 
 ### CARD: visual-progress-map — 現在地を図で
 - **いつ**: 3つ以上の要素説明・進捗・Issue/PR方針・原因→対処など §1-bis 該当時
