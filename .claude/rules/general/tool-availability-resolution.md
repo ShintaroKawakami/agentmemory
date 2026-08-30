@@ -50,3 +50,7 @@ tool の可用性は、現在のセッションで確認できた証拠だけで
 相談・直し・判断では、`shintaro-gbrain` と `tech-gbrain` を必須確認対象とし、それぞれの status と根拠を確認する。両方が `AVAILABLE` のときだけ、該当する brain を検索してから応答する。
 
 どちらか一方でも `RUNTIME_UNAVAILABLE`・`NOT_SELECTED`・`UNPROVEN` なら、推測で進めず停止・待機する。runtime が `RUNTIME_UNAVAILABLE` のときは復旧を案内し、`NOT_SELECTED` / `UNPROVEN` のときは選択・追加証拠の確認を案内する。いずれも未確認を成功扱いせず、検索済みとも記録しない。
+
+`jtt-gbrain`（会社そのものの脳）は 2026-08-30 に追加した3つ目だが、**必須には含めない**。`AVAILABLE` なら追加で検索し、そうでなければその1つを飛ばして先へ進んでよい（必須2つの検索まで止めないこと）。飛ばした場合はその旨を一言添える。
+
+理由: 3つとも必須にすると、jtt-gbrain がまだ繋がっていない環境で既存2つの検索まで止まる。配線されているかの強制は `registries/mcp-registry.yaml` の `shintaro-gbrain.requires_assets` が担い、resolver が fail-close で検査するため、本ルールで二重に止める必要がない。

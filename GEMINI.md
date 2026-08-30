@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `42a9debc95d2939b678da5c4fd35b3eb03def10734b8c81c98c2a2d64f697d86`
+- effective hash: `e65c312796e3ccdc7f0bad02a5fc46c5009f7dbce226047619f458da5fccf01b`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -454,7 +454,7 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 <!-- agents-md-card:start -->
 ### CARD: gbrain-recall — 相談時は両G-Brain
 - **いつ**: 相談・直し・判断の発話（毎回は探さない）
-- **何を**: `shintaro-gbrain` と `tech-gbrain` の両方を検索。可用性の status と証拠は共通 rule に従う
+- **何を**: `shintaro-gbrain` と `tech-gbrain` の両方を検索（必須）。`jtt-gbrain` は `AVAILABLE` なら追加で見る（無くても止めない）。可用性の status と証拠は共通 rule に従う
 - **できた状態**: `AVAILABLE` を確認した該当 brain を読んでから応答している（未確認・runtime unavailable は停止案内）
 - **詳細**: `.claude/rules/general/gbrain-recall.md`
 <!-- agents-md-card:end -->
@@ -483,21 +483,28 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 
 | 発話・作業の性質 | 検索する先 | 例 |
 |---|---|---|
-| 相談・直し・判断（意見・修正方針） | **`shintaro-gbrain` と `tech-gbrain` の両方** | 「どう思う？」「直して」「修正して」「どうすれば」「どういう風に」 |
+| 相談・直し・判断（意見・修正方針） | **`shintaro-gbrain` と `tech-gbrain` の両方**（必須）＋ `jtt-gbrain` が `AVAILABLE` なら追加で | 「どう思う？」「直して」「修正して」「どうすれば」「どういう風に」 |
 | バグ修正・障害調査・回帰の原因特定（上記に当たらない純粋な調査） | `tech-gbrain`（`mcp__tech-gbrain__search` / `recall`） | 「〇〇が直らない」「なぜこのエラーが出るか」「前も似た不具合あったはず」 |
-| 経営相談・戦略・クレーム対応・売上・オペレーション改善（上記に当たらない） | `shintaro-gbrain`（`mcp__shintaro-gbrain__search` / `recall`） | 「この施策の戦略は」「クレームにどう対応すべきか」「売上を改善したい」 |
+| 経営相談・戦略・クレーム対応・売上・オペレーション改善（上記に当たらない） | `shintaro-gbrain`（判断軸）＋ `jtt-gbrain`（会社の事実）が `AVAILABLE` なら両方 | 「この施策の戦略は」「クレームにどう対応すべきか」「売上を改善したい」 |
+| 会社そのものの事実（誰が・どの取引先・何が動いているか） | `jtt-gbrain`（`mcp__jtt-gbrain__search` / `recall`） | 「この件は誰の担当だっけ」「あの取引先との経緯は」「今どのPJが動いてる」 |
 | 作業再開・引き継ぎ・「あの続き」 | `agentmemory`（continuation） | 「〇〇の続き」「前回どこまでやったか」 |
+
+3つの脳の切り分けは「その記述は誰／何がいなくなったら成立しなくなるか」で決める。
+
+- `shintaro-gbrain` — 伸太郎さんが**別の会社を経営していても**まだ正しい（判断軸・好み）
+- `jtt-gbrain` — **株式会社ジェイティティが無くなったら**意味を失う（人・取引先・PJ・会社としての戦略）
+- `tech-gbrain` — **JTT と無関係のどのプロジェクトでも**使える（技術の知見）
 
 判断に迷う場合は検索する側に倒す（誤爆コストは低く、未検索コストは高い）。
 
 ## 1-bis. tool availability の解決と必須 G-Brain の境界
 
-§1 の検索先 MCP（`shintaro-gbrain` / `tech-gbrain`）も、共通ルール
+§1 の検索先 MCP（`shintaro-gbrain` / `tech-gbrain` / `jtt-gbrain`）も、共通ルール
 `.claude/rules/general/tool-availability-resolution.md` の証拠順序と status を使う。初期 tool
 一覧に無いだけでは `OFF` と判定しない。catalog の欠落だけなら `UNPROVEN` とし、登録・選択・
 runtime の証拠を確認するまで、検索済みだと主張しない。
 
-必須 G-Brain は次の境界で扱う。
+**必須は `shintaro-gbrain` と `tech-gbrain` の2つ**。この2つは次の境界で扱う。
 
 - `AVAILABLE`: 該当 brain を検索してから応答する。
 - `RUNTIME_UNAVAILABLE`: 推測で進めず停止する。利用者へ「G-Brain の runtime が利用できないため、
@@ -505,7 +512,15 @@ runtime の証拠を確認するまで、検索済みだと主張しない。
 - `NOT_SELECTED` / `UNPROVEN`: 選択・runtime の証拠が不足しているため検索済みと扱わず、確認できるまで
   判断を要する作業を進めない。
 
-配線は harness type 依存であり、Claude Code / Codex でも片方または両方の status が異なることがある。
+**`jtt-gbrain` は「あるなら追加で見る」**（2026-08-30 決定）。`AVAILABLE` なら検索し、
+`NOT_SELECTED` / `UNPROVEN` / `RUNTIME_UNAVAILABLE` なら**その1つを飛ばして先へ進んでよい**（必須2つの
+検索まで止めない）。飛ばした場合は、その旨を一言添える。
+
+理由: 3つとも必須にすると、jtt-gbrain がまだ繋がっていない環境で既存2つの検索まで止まる。
+配線の強制は別の層（`registries/mcp-registry.yaml` の `shintaro-gbrain.requires_assets` →
+resolver の fail-close）が担っており、本ルールで二重に止める必要がない。
+
+配線は harness type 依存であり、Claude Code / Codex でも status が異なることがある。
 status を初期一覧の欠落から推測せず、確認できた根拠を明示する。
 
 ## 2. 検索実行の判断はモデル側に残す
@@ -1018,6 +1033,10 @@ tool の可用性は、現在のセッションで確認できた証拠だけで
 
 どちらか一方でも `RUNTIME_UNAVAILABLE`・`NOT_SELECTED`・`UNPROVEN` なら、推測で進めず停止・待機する。runtime が `RUNTIME_UNAVAILABLE` のときは復旧を案内し、`NOT_SELECTED` / `UNPROVEN` のときは選択・追加証拠の確認を案内する。いずれも未確認を成功扱いせず、検索済みとも記録しない。
 
+`jtt-gbrain`（会社そのものの脳）は 2026-08-30 に追加した3つ目だが、**必須には含めない**。`AVAILABLE` なら追加で検索し、そうでなければその1つを飛ばして先へ進んでよい（必須2つの検索まで止めないこと）。飛ばした場合はその旨を一言添える。
+
+理由: 3つとも必須にすると、jtt-gbrain がまだ繋がっていない環境で既存2つの検索まで止まる。配線されているかの強制は `registries/mcp-registry.yaml` の `shintaro-gbrain.requires_assets` が担い、resolver が fail-close で検査するため、本ルールで二重に止める必要がない。
+
 ### general/visual-progress-map.md
 
 <!-- agents-md-card:start -->
@@ -1241,6 +1260,25 @@ block-main-commit hook は cwd 変更を伴う複合コマンドでの main 直 
 4. hook 検査を `bash -c` 等で素通りさせる回避は**禁止**。
 5. **`EnterWorktree`（`path` に対象 worktree）でセッション自体の cwd を worktree へ移してから `git push` する経路も使える**（先に試してよい実用経路。①②を置き換えない）。block-main-commit は cwd 自身のブランチで判定するため、main checkout を cwd にしたまま `git -C <worktree> push` すると main 扱いで拒否される（2026-08-18 実測）。作業後は `ExitWorktree`（`action: "keep"`）で main checkout へ戻す。
 6. **`skills/post-merge/scripts/merge-pr.py` は実行元 HEAD が対象 PR の `headRefOid` と一致することを要求する**（不一致は fail-closed でマージ拒否）。**対象 PR の worktree を cwd にして実行する**こと。main checkout や別 PR の worktree からは実行できない（2026-08-18 実測）。
+
+<!-- [2026-08-30][fix]
+背景:
+  - ユーザー依頼意図: Claude auto mode が EnterWorktree / ExitWorktree を任意の経路として案内するだけでなく、自分の feature worktree で自律実行してほしい。
+  - 守るべき業務ルール: worktree-bound な書込みから検証までを main や他セッションの worktree に触れず、安全に閉じる。
+  - 他案不採用理由: 全AIクライアントの既存経路を一律変更する案は、Claude auto mode 固有の session 操作を他クライアントへ誤適用するため不採用。
+対応: Claude auto mode 専用の必須 lifecycle と、残留 session の一回限り復旧を明文化。
+-->
+
+### Claude Code auto mode：EnterWorktree / ExitWorktree は必須
+
+Claude Code の **auto mode** は、現在のタスク自身が作成または選択した non-main の feature worktree に対して、次を**自律的に必ず**行う。利用者への都度確認や「使ってよい経路」としての任意扱いにしない。
+
+1. worktree-bound なファイル書込み、commit、push、PR merge、または対象 worktree を cwd にする検証の前に、対象の安全なパスを確認して `EnterWorktree` を実行する。
+2. 同じ worktree-bound phase 内の操作はその session cwd で実行する。共有 main checkout、他セッションの worktree、削除済みまたは所有を確認できないパスには入らない。
+3. phase が終わったら `ExitWorktree` を `action: "keep"` で実行する。`remove` / 削除系 action、main への書込み、他セッションの worktree 操作は自動化しない。
+4. `EnterWorktree` が `Already in a worktree session` で拒否された場合だけ、`ExitWorktree` を `action: "keep"` で**一回**実行してから同じ対象へ再試行する。再試行も失敗した場合は main から続行せず、既存の安全な fallback を使える条件かを確認して安全に停止・報告する。
+
+この節は Claude Code auto mode 専用である。Codex、Cursor、その他クライアントの既存の安全ルールや実行経路は変更しない。
 
 サブエージェントの worktree が古いベース（origin/main 以前）から切られる問題への対処、外側隔離 worktree の残存・cleanup 手順、Codex fallback・EnterWorktree/ExitWorktree 経路・merge-pr.py headRefOid 要件の実測経緯は
 `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。

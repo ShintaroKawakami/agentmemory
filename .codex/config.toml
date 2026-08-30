@@ -27,6 +27,11 @@ command = "/bin/bash"
 args = ["/Users/shintaro/business/AGENT-HUB/scripts/codex-mcp-remote-with-env.sh", "http://shintaros-mac-mini:8847/mcp", "CODEBASE_CONTEXT_ENGINE_MCP_API_KEY"]
 enabled = true
 
+[mcp_servers.status-mcp]
+command = "/bin/bash"
+args = ["/Users/shintaro/business/AGENT-HUB/scripts/codex-mcp-remote-with-env.sh", "http://shintaros-mac-mini:8839/mcp", "STATUS_MCP_BEARER_CLAUDE"]
+enabled = true
+
 [mcp_servers.stitch]
 url = "https://stitch.googleapis.com/mcp"
 enabled = true
