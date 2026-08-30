@@ -85,11 +85,15 @@ print("gbrain-recall preflight:")
 if not any_hit:
     print("- 該当キーワードなし（FORCE 表示）")
 if consult_both_hit:
+    # [2026-08-30] jtt-gbrain（3つ目・会社そのもの）は「あるなら追加で見る」。必須2つの検索は止めない。
+    # 既存テストが下記の固定文言を grep するため、文言は変えず後ろの行として足すこと。
     print("- shintaro-gbrain と tech-gbrain の両方を検索してから着手（相談・直し・判断）")
+    print("- jtt-gbrain（会社そのもの: 人・取引先・PJ）は AVAILABLE なら追加で見る。無ければ飛ばして進む")
 elif tech_hit:
     print("- tech-gbrain を検索してから着手（バグ修正・障害調査・回帰）")
 elif business_hit:
     print("- shintaro-gbrain を検索してから着手（経営相談・戦略・クレーム対応）")
+    print("- jtt-gbrain（会社そのもの: 人・取引先・PJ）は AVAILABLE なら追加で見る")
 print("- tool availability: 初期 tool 一覧の欠落だけでは可否を決めない")
 print("- status の証拠順序: セッション catalog → 遅延 catalog → 選択状態 → runtime 実測 → 結論")
 print("- status: AVAILABLE / NOT_SELECTED / RUNTIME_UNAVAILABLE / UNPROVEN")

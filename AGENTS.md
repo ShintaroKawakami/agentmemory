@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `4eab652bf65e7e0592d4ecabbe37a39d8536dff2a046c3ecbad8252026e56bdc`
+- effective hash: `e5843c03d47a5cb58577bf210e3b23560a0b1a2a5504132015fdf289af030e73`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -85,7 +85,7 @@ Codex 等は paths 条件が効かないため、常時ルールは「いつ／�
 
 ### CARD: gbrain-recall — 相談時は両G-Brain
 - **いつ**: 相談・直し・判断の発話（毎回は探さない）
-- **何を**: `shintaro-gbrain` と `tech-gbrain` の両方を検索。可用性の status と証拠は共通 rule に従う
+- **何を**: `shintaro-gbrain` と `tech-gbrain` の両方を検索（必須）。`jtt-gbrain` は `AVAILABLE` なら追加で見る（無くても止めない）。可用性の status と証拠は共通 rule に従う
 - **できた状態**: `AVAILABLE` を確認した該当 brain を読んでから応答している（未確認・runtime unavailable は停止案内）
 - **詳細**: `.claude/rules/general/gbrain-recall.md`
 - **ledger provenance** (asset_id=`gbrain-recall` inheritance_id=`d76b0c994a8ef7f4`)

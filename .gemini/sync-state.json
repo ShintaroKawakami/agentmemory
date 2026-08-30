@@ -1,7 +1,7 @@
 {
   "tool": "antigravity-sync",
-  "generated_at": "2026-08-28T07:13:28.736326+00:00",
-  "source_commit": "29985da",
+  "generated_at": "2026-08-30T10:20:05.028260+00:00",
+  "source_commit": "53aa65a",
   "project_root": ".",
   "generated_gemini_md": true,
   "copied_agents": [
@@ -92,7 +92,7 @@
     "BeforeAgent",
     "BeforeTool"
   ],
-  "mcp_server_count": 7,
+  "mcp_server_count": 8,
   "warnings": [
     "backend-developer.md: agent frontmatter `model: claude-sonnet-5` は Claude 固有のため除去（Gemini 側 inherit 相当）",
     "backend-developer.md: agent frontmatter field `memory` は Gemini 互換でないため除去",
