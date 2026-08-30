@@ -59,6 +59,14 @@
         "GBRAIN_MCP_CLIENT_SECRET_SHINTARO"
       ]
     },
+    "status-mcp": {
+      "type": "remote",
+      "enabled": true,
+      "url": "http://shintaros-mac-mini:8839/mcp",
+      "headers": {
+        "Authorization": "{env:STATUS_MCP_BEARER_CLAUDE}"
+      }
+    },
     "stitch": {
       "type": "remote",
       "enabled": true,
