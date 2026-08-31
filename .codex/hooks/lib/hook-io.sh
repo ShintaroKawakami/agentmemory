@@ -22,6 +22,16 @@ read_stdin() {
 # --- JSON フィールド抽出 (PreToolUse用) ---
 # tool_input内の文字列フィールドを抽出する。Node.js優先、sed fallback。
 # 使用例: COMMAND=$(extract_field command)
+# [2026-08-30][fix]
+# 背景:
+#   - ユーザー依頼意図: Codex bridge が apply_patch 本文を top-level arguments に
+#     渡す時も、既存ファイルの正当な更新を誤って拒否しないようにする。
+#   - 守るべき業務ルール: patch の全経路を同じ docs path gate で検査し、
+#     未承認 SSOT や docs/.ssot-allowlist の編集は引き続き fail-closed にする。
+#   - 他案不採用理由: arguments 全体を無条件に許可する案は、入力形式の違いで
+#     docs 承認制を迂回できるため不採用。
+# 対応: tool_input/toolInput に加えて、同じ field 名の arguments object と
+# apply_patch 専用の raw arguments string を抽出対象にする。
 extract_field() {
   local field="$1"
   if command -v node >/dev/null 2>&1; then
@@ -40,6 +50,19 @@ extract_field() {
             : parsed;
         if (source && typeof source[field] === "string") {
           value = source[field];
+        } else if (
+          parsed &&
+          typeof parsed.arguments === "object" &&
+          parsed.arguments !== null &&
+          typeof parsed.arguments[field] === "string"
+        ) {
+          value = parsed.arguments[field];
+        } else if (
+          parsed &&
+          typeof parsed.arguments === "string" &&
+          (field === "patch" || field === "input")
+        ) {
+          value = parsed.arguments;
         }
       } catch {}
       process.stdout.write(value);
@@ -64,7 +87,13 @@ try:
         if isinstance(parsed, dict)
         else {}
     )
-    candidate = source.get(field, "") if isinstance(source, dict) else ""
+    candidate = source.get(field) if isinstance(source, dict) else None
+    if not isinstance(candidate, str) and isinstance(parsed, dict):
+        arguments = parsed.get("arguments")
+        if isinstance(arguments, dict):
+            candidate = arguments.get(field, "")
+        elif isinstance(arguments, str) and field in {"patch", "input"}:
+            candidate = arguments
     if isinstance(candidate, str):
         value = candidate
 except Exception:
