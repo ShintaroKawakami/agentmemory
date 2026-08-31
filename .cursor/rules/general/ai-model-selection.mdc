@@ -18,7 +18,7 @@ globs:
 対応: 判断理由だけを CaD に残し、詳細な実測ログは agent-dispatch references を正本とする。
 -->
 
-# AI モデル選定指標（GLM 5.3 / Kimi K2.7・K3）
+# AI モデル選定指標（Codex 5.6 / GLM 5.3 / Kimi K2.7・K3）
 
 全 PJ 共通。コード実装をAIエージェントに任せる際の初期ヒューリスティック。
 
@@ -29,12 +29,14 @@ globs:
 ## 0-bis. Codex 指名時の固定ルール
 
 - **`codexで実装` / `Codexで実装` / `codex実装` / `Codex実装`** と言われた時だけ、Codex 実装として扱う。
-- Codex 実装の正式設定名は **model = `gpt-5.3-codex-spark`**, **model_reasoning_effort = `xhigh`**（2026-08-15 レーン方針。職人メイン。medium / high は明示時）。
-- 起動例は `codex exec -m gpt-5.3-codex-spark -c model_reasoning_effort=xhigh`。
-- **`xhigh` が Spark 実装の既定**。軽微タスクは `medium` を明示指定する。
+- 実装モデルは固定IDではなく、`agents.yaml#worker_delegation.codex_model_routing` の役割キーから解決する。通常は **routine=Luna（medium、Terraへfallback）**、**standard=Terra（high、Lunaへfallback）** を使う。
+- **Sol（xhigh）は難所だけ**に限定する。`high_risk` と `broad_mutation` の組み合わせ、同じ要件の失敗2回以上、または理由付きの `deep_reason` が必要である。
+- **Spark（xhigh）は標準枠を守るための overflow**。標準枠が日次ペース上限に達した時だけ自動選択し、通常の第一候補にはしない。
+- Codex の Fast は **明示指定時だけ**許可する。自動選択では標準速度を使う。
+- 週次枠は10%を予備として残し、自動選択は経過日数に応じた90%上限でペース配分する。95%以上、残量不明、古い計測値は標準ルートを自動停止する。
+- モデルを更新するときは `agents.yaml` の catalog entry と役割参照だけを変更する。コードやこのルールへ runtime ID を追加しない。
 - **「実装」だけでは Codex 固定にしない**。Cursor / Kimi / GLM / Claude / Codex のどれで進めるかを文脈で判断し、不明なら確認する。
-- **Spark は職人メインの1本**（GLM 5.3 / Gemini 3.7 Flash / Spark）。原因不明バグ・設計判断・DB移行・大規模リファクタ・コンテキストが大きい仕事は Spark に固執せず、GLM / Gemini へ回避する。
-- **「レビュー」または「codexでレビュー」** は既存の `codex-review` 導線を使う。実装専用の `gpt-5.3-codex-spark` 固定には巻き込まない。
+- **「レビュー」または「codexでレビュー」** は既存の `codex-review` 導線を使う。実装の役割選択へ巻き込まない。
 
 ---
 
@@ -59,7 +61,7 @@ globs:
 
 **境界（2026-08-08）**: 見積り10分未満の小実装とガバナンス領域（`.claude/` `hook` 等の worker 編集不可領域）は Claude サブエージェント内製、大タスク・並列・大量読みは worker（判定手順は `skills/agent-dispatch` が正本）。
 
-**三役の呼称（2026-08-15）**: 監督=Claude / Codex 5.6 Sol or Terra / Cursor（PM クライアント）／参謀=Kimi K3／職人メイン=GLM 5.3 max・Gemini 3.7 Flash Medium+High・Codex Spark xhigh。OpenCode Go は予備。正本: `agents.yaml` の `role_titles` と `worker_delegation.lane_policy`。
+**三役の呼称（2026-08-31）**: 監督=Claude / Codex 5.6 / Cursor（PM クライアント）／参謀=Kimi K3／職人メイン=GLM 5.3 max・Gemini 3.7 Flash Medium+High・Codex 5.6 Luna/Terra。Codex Sol は難所限定、Spark は overflow。OpenCode Go は予備。正本: `agents.yaml` の `role_titles` と `worker_delegation.lane_policy`。
 
 **Fable 使用条件（2026-08-11・ctx-save）**: Fable は難所（設計・承認判断／原因不明バグの診断／ガバナンス領域編集）限定。調査・大量読み・軽作業は使わない。重い調査が主目的のセッションは、セッションモデル自体を Sonnet 既定で開始する（第二弾 2026-08-11）。正本・境界の全文は `agents.yaml` の `task_routing.fable_usage_policy`（`session_model_default` 含む）を参照（複製しない）。
 
@@ -69,7 +71,8 @@ globs:
 |-----------|---------|------|
 | 仕様が明確・クリーンさ重視・UI/結線・お手本コード | **GLM 5.3 max** | 職人メイン。範囲内に収まりやすい |
 | 通常の実装 / DB・認証・本番・横断 | **Gemini 3.7 Flash Medium / High** | 職人メイン。難所は High |
-| 小〜中の明確な実装 | **Codex Spark xhigh** | 職人メイン。128k超過は他へ |
+| 小〜中の明確な実装 | **Codex 5.6 Luna / Terra** | 役割キーで解決。通常は Luna、標準は Terra |
+| 難所・広域変更 | **Codex 5.6 Sol xhigh** | 構造化された難所条件を満たす時だけ |
 | 複雑バックエンド・メイン枯渇時 | **Kimi K2.7 Code**（予備） | メイン3本が足りない時、または堅牢性確認 |
 | 巨大 context の読み込み・リポ横断調査 | **Kimi K3**（参謀） | 実装メインではない |
 
