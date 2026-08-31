@@ -54,6 +54,7 @@ describe("JTT scoped gateway over Streamable HTTP", () => {
       upstreamUrl: `http://127.0.0.1:${portOf(upstream)}`,
       upstreamSecret: "upstream-test-secret",
       allowedProjects: new Set(["agent-hub", "global/reference"]),
+      tokenProjects: new Map(),
       requestTimeoutMs: 1_000,
     };
     const gateway = startScopedGateway(config);
@@ -94,6 +95,7 @@ describe("JTT scoped gateway over Streamable HTTP", () => {
       gatewaySecret: "http-test-secret",
       upstreamUrl: "http://127.0.0.1:9",
       allowedProjects: new Set(["agent-hub"]),
+      tokenProjects: new Map(),
       requestTimeoutMs: 50,
     };
     const gateway = startScopedGateway(config);

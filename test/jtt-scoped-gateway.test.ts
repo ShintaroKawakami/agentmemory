@@ -5,6 +5,7 @@ import {
   GatewayError,
   ScopedMemoryService,
   createScopedMcpServer,
+  loadGatewayConfig,
   resolveRequestScope,
   type AgentMemoryBackend,
   type GatewayConfig,
@@ -32,8 +33,29 @@ const config: GatewayConfig = {
   gatewaySecret: "test-secret",
   upstreamUrl: "http://127.0.0.1:3111",
   allowedProjects: new Set(["agent-hub", "jtt-cms", "global/reference"]),
+  tokenProjects: new Map(),
   requestTimeoutMs: 100,
 };
+
+const tokenMapConfig: GatewayConfig = {
+  ...config,
+  tokenProjects: new Map([["tok-agent-hub", "agent-hub"], ["tok-jtt-cms", "jtt-cms"]]),
+};
+
+const tokenMapEnv: NodeJS.ProcessEnv = {
+  AGENTMEMORY_GATEWAY_SECRET: "shared-secret",
+  AGENTMEMORY_ALLOWED_PROJECTS: "agent-hub, jtt-cms",
+};
+
+function scopeError(fn: () => unknown): GatewayError {
+  try {
+    fn();
+  } catch (error) {
+    if (error instanceof GatewayError) return error;
+    throw error;
+  }
+  throw new Error("expected resolveRequestScope to throw a GatewayError");
+}
 
 function headers(project: string, agent = "hermes"): Headers {
   return new Headers({
@@ -71,6 +93,100 @@ describe("resolveRequestScope", () => {
       GatewayError,
     );
     expect(() => resolveRequestScope(headers("other-project"), config)).toThrow(/not enabled/);
+  });
+
+  it("resolves the project from a mapped bearer token without the project header", () => {
+    expect(resolveRequestScope(new Headers({ authorization: "Bearer tok-agent-hub" }), tokenMapConfig)).toEqual({
+      project: "agent-hub",
+      agent: "claude-ai",
+    });
+  });
+
+  it("rejects a project header that disagrees with the mapped token project", () => {
+    const error = scopeError(() =>
+      resolveRequestScope(
+        new Headers({ authorization: "Bearer tok-agent-hub", "x-agentmemory-project": "jtt-cms" }),
+        tokenMapConfig,
+      ),
+    );
+    expect(error.statusCode).toBe(403);
+    expect(error.code).toBe("project_not_allowed");
+  });
+
+  it("accepts a project header that matches the mapped token project", () => {
+    expect(
+      resolveRequestScope(
+        new Headers({ authorization: "Bearer tok-jtt-cms", "x-agentmemory-project": "JTT-CMS" }),
+        tokenMapConfig,
+      ),
+    ).toEqual({ project: "jtt-cms", agent: "claude-ai" });
+  });
+
+  it("rejects an unknown bearer token with 401", () => {
+    const error = scopeError(() =>
+      resolveRequestScope(
+        new Headers({ authorization: "Bearer unknown-token", "x-agentmemory-project": "agent-hub" }),
+        tokenMapConfig,
+      ),
+    );
+    expect(error.statusCode).toBe(401);
+    expect(error.code).toBe("unauthorized");
+  });
+
+  it("keeps the shared secret + header route unchanged", () => {
+    expect(resolveRequestScope(headers("AGENT-HUB", "Claude-Code"), tokenMapConfig)).toEqual({
+      project: "agent-hub",
+      agent: "claude-code",
+    });
+    expect(scopeError(() => resolveRequestScope(new Headers({ authorization: "Bearer test-secret" }), tokenMapConfig)))
+      .toMatchObject({ statusCode: 400, code: "project_required" });
+  });
+});
+
+describe("loadGatewayConfig token project map", () => {
+  it("parses token:project pairs into the token project map", () => {
+    const parsed = loadGatewayConfig({
+      ...tokenMapEnv,
+      AGENTMEMORY_TOKEN_PROJECT_MAP: "tok-agent-hub:agent-hub, tok-jtt-cms:jtt-cms",
+    });
+    expect(parsed.tokenProjects).toEqual(
+      new Map([
+        ["tok-agent-hub", "agent-hub"],
+        ["tok-jtt-cms", "jtt-cms"],
+      ]),
+    );
+  });
+
+  it("defaults to an empty map when the env is absent or blank", () => {
+    expect(loadGatewayConfig(tokenMapEnv).tokenProjects.size).toBe(0);
+    expect(loadGatewayConfig({ ...tokenMapEnv, AGENTMEMORY_TOKEN_PROJECT_MAP: "  " }).tokenProjects.size).toBe(0);
+  });
+
+  it("throws on an invalid project in the map", () => {
+    expect(() =>
+      loadGatewayConfig({ ...tokenMapEnv, AGENTMEMORY_TOKEN_PROJECT_MAP: "tok-agent-hub:Not A Project" }),
+    ).toThrow(GatewayError);
+  });
+
+  it("throws on a project outside AGENTMEMORY_ALLOWED_PROJECTS", () => {
+    expect(() =>
+      loadGatewayConfig({ ...tokenMapEnv, AGENTMEMORY_TOKEN_PROJECT_MAP: "tok-agent-hub:global/reference" }),
+    ).toThrow(/not in AGENTMEMORY_ALLOWED_PROJECTS/);
+  });
+
+  it("throws on duplicate tokens", () => {
+    expect(() =>
+      loadGatewayConfig({
+        ...tokenMapEnv,
+        AGENTMEMORY_TOKEN_PROJECT_MAP: "tok-agent-hub:agent-hub,tok-agent-hub:jtt-cms",
+      }),
+    ).toThrow(/duplicate token/);
+  });
+
+  it("throws on an empty token entry", () => {
+    expect(() => loadGatewayConfig({ ...tokenMapEnv, AGENTMEMORY_TOKEN_PROJECT_MAP: ":agent-hub" })).toThrow(
+      /token:project/,
+    );
   });
 });
 
