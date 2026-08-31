@@ -67,6 +67,67 @@ PY
   printf '%s' "$payload" | CLAUDE_PROJECT_DIR="$TMP_PROJECT" bash "$HOOK_PATH"
 }
 
+run_apply_patch_arguments_hook() {
+  local patch_text="$1"
+  local payload
+  payload=$(python3 - "$patch_text" <<'PY'
+import json
+import sys
+print(json.dumps({"tool_name": "apply_patch", "arguments": sys.argv[1]}), end="")
+PY
+)
+  printf '%s' "$payload" | CLAUDE_PROJECT_DIR="$TMP_PROJECT" bash "$HOOK_PATH"
+}
+
+run_apply_patch_arguments_object_hook() {
+  local patch_text="$1"
+  local payload
+  payload=$(python3 - "$patch_text" <<'PY'
+import json
+import sys
+print(json.dumps({"tool_name": "apply_patch", "arguments": {"patch": sys.argv[1]}}), end="")
+PY
+)
+  printf '%s' "$payload" | CLAUDE_PROJECT_DIR="$TMP_PROJECT" bash "$HOOK_PATH"
+}
+
+PYTHON_ONLY_BIN="$TMP_PROJECT/.python-only-bin"
+mkdir -p "$PYTHON_ONLY_BIN"
+for utility in python3 dirname cat; do
+  utility_path="$(command -v "$utility")"
+  ln -s "$utility_path" "$PYTHON_ONLY_BIN/$utility"
+done
+
+run_python_fallback_hook() {
+  local payload="$1"
+  printf '%s' "$payload" |
+    PATH="$PYTHON_ONLY_BIN" CLAUDE_PROJECT_DIR="$TMP_PROJECT" /bin/bash "$HOOK_PATH"
+}
+
+run_apply_patch_arguments_python_hook() {
+  local patch_text="$1"
+  local payload
+  payload=$(python3 - "$patch_text" <<'PY'
+import json
+import sys
+print(json.dumps({"tool_name": "apply_patch", "arguments": sys.argv[1]}), end="")
+PY
+)
+  run_python_fallback_hook "$payload"
+}
+
+run_apply_patch_arguments_object_python_hook() {
+  local patch_text="$1"
+  local payload
+  payload=$(python3 - "$patch_text" <<'PY'
+import json
+import sys
+print(json.dumps({"tool_name": "apply_patch", "arguments": {"patch": sys.argv[1]}}), end="")
+PY
+)
+  run_python_fallback_hook "$payload"
+}
+
 assert_denied() {
   local output="$1"
   local label="$2"
@@ -300,8 +361,23 @@ assert_allowed "$(run_apply_patch_hook $'*** Begin Patch\n*** Update File: docs/
 echo "CX-4/5 Codex apply_patch で src 新規 -> allow"
 assert_allowed "$(run_apply_patch_hook $'*** Begin Patch\n*** Add File: src/codex.ts\n+export {};\n*** End Patch')" "Codex apply_patch non-docs"
 
+echo "CX-7/7 Codex bridge の arguments object でも未承認 docs は deny"
+assert_denied "$(run_apply_patch_arguments_object_hook $'*** Begin Patch\n*** Add File: docs/prd/codex-object.md\n+new\n*** End Patch')" "Codex apply_patch arguments object gate"
+
+echo "CX-8/8 Codex bridge の arguments object で既存 docs 更新は allow"
+assert_allowed "$(run_apply_patch_arguments_object_hook $'*** Begin Patch\n*** Update File: docs/prd/prd-active.md\n@@\n+updated\n*** End Patch')" "Codex apply_patch arguments object existing docs"
+
 echo "CX-5/5 Codex apply_patch の対象欠損 -> deny"
 assert_denied "$(run_hook_raw '{"tool_name":"apply_patch","tool_input":{}}')" "Codex apply_patch missing target"
+
+echo "CX-6/6 Codex bridge の top-level arguments patch は既存 docs 更新を許可"
+assert_allowed "$(run_apply_patch_arguments_hook $'*** Begin Patch\n*** Update File: docs/prd/prd-active.md\n@@\n+updated\n*** End Patch')" "Codex apply_patch arguments envelope"
+
+echo "CX-PY-1 Python fallback でも top-level arguments patch を抽出"
+assert_allowed "$(run_apply_patch_arguments_python_hook $'*** Begin Patch\n*** Update File: docs/prd/prd-active.md\n@@\n+updated\n*** End Patch')" "Python fallback arguments envelope"
+
+echo "CX-PY-2 Python fallback でも arguments object patch を抽出"
+assert_allowed "$(run_apply_patch_arguments_object_python_hook $'*** Begin Patch\n*** Update File: docs/prd/prd-active.md\n@@\n+updated\n*** End Patch')" "Python fallback arguments object"
 
 CODEX_HOOKS_JSON="$(cd "$SCRIPT_DIR/../.." && pwd)/hooks.json"
 if [ -f "$CODEX_HOOKS_JSON" ]; then
