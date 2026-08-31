@@ -23,6 +23,7 @@ export interface GatewayConfig {
   upstreamUrl: string;
   upstreamSecret?: string;
   allowedProjects: ReadonlySet<string>;
+  tokenProjects: Map<string, string>;
   requestTimeoutMs: number;
 }
 
@@ -99,6 +100,39 @@ function canonicalProject(value: string): string {
   return project;
 }
 
+// [2026-08-31][feat] Claude.ai コネクタ向け token→project マップ経路
+// 背景:
+//   - ユーザー依頼意図: Claude.ai カスタムコネクタは authorization ヘッダしか送れない
+//     （未承認カスタムヘッダ名 x-agentmemory-project は登録時に拒否・2026-08-31 実測）ため、
+//     専用 Bearer トークン自体に project を紐づけて X-AgentMemory-Project 無しでも scope を解決する。
+//   - 守るべき業務ルール: 既存の共有 secret + ヘッダ経路は無変更で残す。トークン実値を
+//     例外メッセージ・ログへ出さない。project は AGENTMEMORY_ALLOWED_PROJECTS の範囲内に限る。
+//   - 他案不採用理由: クエリ鍵→Bearer 変換プロキシの新設は Claude.ai がヘッダ入力欄を持つため不要。
+//     MCP ツール引数で project を渡す案は書込み先スコープを呼び出し側が自由化できてしまうため不採用。
+function parseTokenProjectMap(value: string | undefined, allowedProjects: ReadonlySet<string>): Map<string, string> {
+  const tokenProjects = new Map<string, string>();
+  const raw = value?.trim();
+  if (!raw) return tokenProjects;
+  for (const entry of raw.split(",")) {
+    const item = entry.trim();
+    const separator = item.indexOf(":");
+    const token = (separator >= 0 ? item.slice(0, separator) : item).trim();
+    if (!token) {
+      throw new Error("AGENTMEMORY_TOKEN_PROJECT_MAP entries must be formatted as token:project");
+    }
+    const project = canonicalProject(separator >= 0 ? item.slice(separator + 1) : "");
+    if (!allowedProjects.has(project)) {
+      throw new Error(`AGENTMEMORY_TOKEN_PROJECT_MAP project ${project} is not in AGENTMEMORY_ALLOWED_PROJECTS`);
+    }
+    if (tokenProjects.has(token)) {
+      // トークン実値をメッセージへ含めない（起動時エラーがログへ出ても Bearer が漏れないように）。
+      throw new Error("AGENTMEMORY_TOKEN_PROJECT_MAP contains a duplicate token");
+    }
+    tokenProjects.set(token, project);
+  }
+  return tokenProjects;
+}
+
 export function loadGatewayConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig {
   const gatewaySecret = env["AGENTMEMORY_GATEWAY_SECRET"]?.trim();
   if (!gatewaySecret) {
@@ -122,6 +156,7 @@ export function loadGatewayConfig(env: NodeJS.ProcessEnv = process.env): Gateway
     upstreamUrl: (env["AGENTMEMORY_UPSTREAM_URL"]?.trim() || "http://127.0.0.1:3111").replace(/\/+$/, ""),
     upstreamSecret: env["AGENTMEMORY_SECRET"]?.trim() || undefined,
     allowedProjects,
+    tokenProjects: parseTokenProjectMap(env["AGENTMEMORY_TOKEN_PROJECT_MAP"], allowedProjects),
     requestTimeoutMs: positiveInt(env["AGENTMEMORY_GATEWAY_TIMEOUT_MS"], DEFAULT_TIMEOUT_MS),
   };
 }
@@ -132,25 +167,44 @@ function sameSecret(actual: string, expected: string): boolean {
   return timingSafeEqual(actualDigest, expectedDigest);
 }
 
-export function resolveRequestScope(headers: Headers, config: GatewayConfig): RequestScope {
-  const authorization = headers.get("authorization") ?? "";
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-  if (!token || !sameSecret(token, config.gatewaySecret)) {
-    throw new GatewayError("Unauthorized", 401, "unauthorized");
-  }
-  const rawProject = headers.get("x-agentmemory-project");
-  if (!rawProject) {
-    throw new GatewayError("X-AgentMemory-Project is required", 400, "project_required");
-  }
-  const project = canonicalProject(rawProject);
-  if (!config.allowedProjects.has(project)) {
-    throw new GatewayError("Project is not enabled for this gateway", 403, "project_not_allowed");
-  }
-  const rawAgent = (headers.get("x-agentmemory-agent") || "unknown-agent").trim().toLowerCase();
+function resolveAgent(headers: Headers, fallback: string): string {
+  const rawAgent = (headers.get("x-agentmemory-agent") || fallback).trim().toLowerCase();
   if (!AGENT_PATTERN.test(rawAgent)) {
     throw new GatewayError("Invalid agent identifier", 400, "invalid_agent");
   }
-  return { project, agent: rawAgent };
+  return rawAgent;
+}
+
+export function resolveRequestScope(headers: Headers, config: GatewayConfig): RequestScope {
+  const authorization = headers.get("authorization") ?? "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  const sharedSecretMatch = sameSecret(token, config.gatewaySecret);
+  let mappedProject: string | undefined;
+  if (!sharedSecretMatch) {
+    // Compare every entry so token length or entry count never leaks through timing.
+    for (const [candidate, project] of config.tokenProjects) {
+      if (sameSecret(token, candidate)) mappedProject = project;
+    }
+  }
+  if (sharedSecretMatch) {
+    const rawProject = headers.get("x-agentmemory-project");
+    if (!rawProject) {
+      throw new GatewayError("X-AgentMemory-Project is required", 400, "project_required");
+    }
+    const project = canonicalProject(rawProject);
+    if (!config.allowedProjects.has(project)) {
+      throw new GatewayError("Project is not enabled for this gateway", 403, "project_not_allowed");
+    }
+    return { project, agent: resolveAgent(headers, "unknown-agent") };
+  }
+  if (!mappedProject) {
+    throw new GatewayError("Unauthorized", 401, "unauthorized");
+  }
+  const rawProject = headers.get("x-agentmemory-project");
+  if (rawProject && canonicalProject(rawProject) !== mappedProject) {
+    throw new GatewayError("Project is not enabled for this gateway", 403, "project_not_allowed");
+  }
+  return { project: mappedProject, agent: resolveAgent(headers, "claude-ai") };
 }
 
 export class RestAgentMemoryBackend implements AgentMemoryBackend {
