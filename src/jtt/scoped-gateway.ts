@@ -100,6 +100,15 @@ function canonicalProject(value: string): string {
   return project;
 }
 
+// [2026-08-31][feat] Claude.ai コネクタ向け token→project マップ経路
+// 背景:
+//   - ユーザー依頼意図: Claude.ai カスタムコネクタは authorization ヘッダしか送れない
+//     （未承認カスタムヘッダ名 x-agentmemory-project は登録時に拒否・2026-08-31 実測）ため、
+//     専用 Bearer トークン自体に project を紐づけて X-AgentMemory-Project 無しでも scope を解決する。
+//   - 守るべき業務ルール: 既存の共有 secret + ヘッダ経路は無変更で残す。トークン実値を
+//     例外メッセージ・ログへ出さない。project は AGENTMEMORY_ALLOWED_PROJECTS の範囲内に限る。
+//   - 他案不採用理由: クエリ鍵→Bearer 変換プロキシの新設は Claude.ai がヘッダ入力欄を持つため不要。
+//     MCP ツール引数で project を渡す案は書込み先スコープを呼び出し側が自由化できてしまうため不採用。
 function parseTokenProjectMap(value: string | undefined, allowedProjects: ReadonlySet<string>): Map<string, string> {
   const tokenProjects = new Map<string, string>();
   const raw = value?.trim();
@@ -116,7 +125,8 @@ function parseTokenProjectMap(value: string | undefined, allowedProjects: Readon
       throw new Error(`AGENTMEMORY_TOKEN_PROJECT_MAP project ${project} is not in AGENTMEMORY_ALLOWED_PROJECTS`);
     }
     if (tokenProjects.has(token)) {
-      throw new Error(`AGENTMEMORY_TOKEN_PROJECT_MAP contains duplicate token ${token}`);
+      // トークン実値をメッセージへ含めない（起動時エラーがログへ出ても Bearer が漏れないように）。
+      throw new Error("AGENTMEMORY_TOKEN_PROJECT_MAP contains a duplicate token");
     }
     tokenProjects.set(token, project);
   }

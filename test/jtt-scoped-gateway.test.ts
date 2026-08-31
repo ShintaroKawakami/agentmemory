@@ -174,13 +174,18 @@ describe("loadGatewayConfig token project map", () => {
     ).toThrow(/not in AGENTMEMORY_ALLOWED_PROJECTS/);
   });
 
-  it("throws on duplicate tokens", () => {
-    expect(() =>
+  it("throws on duplicate tokens without leaking the token value", () => {
+    let thrown: Error | undefined;
+    try {
       loadGatewayConfig({
         ...tokenMapEnv,
         AGENTMEMORY_TOKEN_PROJECT_MAP: "tok-agent-hub:agent-hub,tok-agent-hub:jtt-cms",
-      }),
-    ).toThrow(/duplicate token/);
+      });
+    } catch (error) {
+      thrown = error as Error;
+    }
+    expect(thrown?.message).toMatch(/duplicate token/);
+    expect(thrown?.message).not.toContain("tok-agent-hub");
   });
 
   it("throws on an empty token entry", () => {
