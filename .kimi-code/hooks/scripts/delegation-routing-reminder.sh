@@ -114,6 +114,9 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null |
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)/delegation-reminder-cache.sh"
 CACHE_DIR="$(resolve_delegation_reminder_cache_dir "$PROJECT_DIR")"
 mkdir -p "$CACHE_DIR" 2>/dev/null || true
+# [2026-08-31][feat] 日次基準点ファイルを python から読み書きできるように export する
+# （CACHE_DIR はローカル変数のため、明示 export しない限り python サブプロセスから見えない）。
+export CACHE_DIR
 
 # 古いマーカーの軽量清掃（7日超を削除。context-size-cache 系と同様ローカル状態のみ）。
 if [ -d "$CACHE_DIR" ]; then
@@ -423,9 +426,151 @@ def load_credit_thresholds(agents_yaml_path: str) -> tuple[int, int] | None:
     return warn_int, strong_int
 
 
-def load_credit_usage(cache_path: str) -> tuple[int, list[str]] | None:
-    """credit-usage.json から routes.claude.weekly と空き worker 名リストを読む。
-    24時間以上古い場合は None。読めなければ None。"""
+def load_daily_credit_thresholds(agents_yaml_path: str) -> tuple[int, int] | None:
+    """agents.yaml から claude_daily_warn_percent / claude_daily_strong_percent を読む。
+    読めなければ None（日次残量機能を無効化。fail-open）。"""
+    try:
+        with open(agents_yaml_path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except Exception:
+        return None
+    warn = _read_yaml_value(text, "worker_delegation", "credit_preflight", "claude_daily_warn_percent")
+    strong = _read_yaml_value(text, "worker_delegation", "credit_preflight", "claude_daily_strong_percent")
+    if warn is None or strong is None:
+        return None
+    try:
+        warn_int = int(warn)
+        strong_int = int(strong)
+    except Exception:
+        return None
+    return warn_int, strong_int
+
+
+def daily_baseline_path(cache_dir: str) -> str:
+    """[2026-08-31][feat] 日次基準点ファイルのパス。UTC日付単位（既存 date_hash() と同じ
+    UTC 基準を使う。ファイル名は日付そのもの＝session_id のような未検証の外部入力ではない
+    ため、既存の session marker（sha256 ハッシュ化）と違いハッシュ化の必要が無い）。"""
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return os.path.join(cache_dir, f"daily-baseline-{today}.txt")
+
+
+def load_or_init_daily_baseline(
+    cache_dir: str, weekly: int, resets_at: str | None
+) -> tuple[int, int | None, bool]:
+    """当日 UTC で最初に観測した routes.claude.weekly 値を基準点として保存し、以後は
+    `weekly - baseline` の増分で『本日の使用量』を計算する材料を返す。
+
+    [2026-09-01][fix] Codexレビュー指摘（credit-baton-preflight.sh:300 /
+    delegation-routing-reminder.sh:635・🟡・妥当と判断し承認）:
+    基準点と同じ UTC 日の途中で weekly の集計対象ウィンドウ（resetsAt）を跨ぐと、
+    weekly が大きく下がり `max(0, weekly - baseline)` が 0 に潰れて実際の使用分を
+    見逃す（例: リセット前の基準点80% → リセット後に15%使用 → max(0, 15-80)=0 と誤判定。
+    resetsAt = 2026-09-06T09:00:00Z のように UTC 日の途中でリセットが起きる日には
+    週1回必ず発生する）。resetsAt をキャッシュへ追加したのに日次計算では使っていなかった。
+    背景:
+      - 守るべき業務ルール: resets_at（現在キャッシュの世代識別子）を基準点ファイルへ
+        一緒に保存し、読み込み時に保存済み resets_at と現在の resets_at を比較する。
+        異なれば世代が変わったとみなし、新世代の最初の観測値を新しい基準点として
+        取り直す。resets_at が None（他 provider や古いキャッシュで resetsAt が
+        取れない）場合は世代判定できないため、既存 baseline をそのまま使う
+        （fail-open。判定不能を理由に発火を止めない）。
+      - 世代切替の瞬間の扱い（重要・過去の誤り訂正）: 「新世代の最初の観測値を
+        新baselineにする」だけだと、切替を検知したその回の daily_used が
+        max(0, weekly-新baseline)=0 になり、切替直後の１回だけ今回の指摘の症状が
+        別の場所で再発する（新世代の baseline を weekly 自身にしてしまうと同じ日に
+        差分が消える）。新世代は「0%から始まった」ことが確定しているため、切替を
+        検知したその回に限り、観測された weekly の値そのものを『本日の使用量』
+        として扱う（daily_used_override）。ただし、リセット前（旧世代）に今日
+        すでに使っていた分はこの値に含まれない＝復元できないため、呼び出し側は
+        この回だけ『本日分は一部のみ』の注記を出す（過少評価であることを明示。
+        推測で埋めない）。切替を検知した回以降は、新しい baseline（=切替検知時の
+        weekly 値）からの通常の増分計算に戻る。
+      - 他案不採用理由:
+        1) 「基準点ファイルの mtime が当日中なら世代switchを無視する」案は、
+           resetsAt を無視したままの再発（今回の指摘そのもの）になるため不採用。
+        2) 「世代switch時にリセット前の消費分を按分で埋める」案は、埋めた値の
+           根拠が無く捏造になるため不採用。
+        3) 「初回観測（baseline未存在）も同様に daily_used=weekly として扱う」案は、
+           初回観測は『ウィンドウがいつから続いているか不明』な状態であり、世代
+           切替のように『0%から始まった』ことが確定していないため不採用
+           （初回観測は従来どおり保守的に daily_used=0 起点を維持する）。
+    戻り値: (baseline, daily_used_override, generation_switched)。
+      - daily_used_override: None なら呼び出し側が通常どおり max(0, weekly-baseline)
+        を計算する。世代切替を検知した回だけ int（=weekly 自身）を返し、呼び出し側は
+        それをそのまま『本日の使用量』として使う。
+      - generation_switched: 「本日分は一部のみ」の注記を出すかどうかの判定に使う。
+    書き込みに失敗しても基準点=現在値として fail-open する（真の日次カウンタが
+    無い環境でも hook は必ず非ブロックのまま動く）。
+    """
+    if not cache_dir:
+        return weekly, None, False
+    path = daily_baseline_path(cache_dir)
+    stored_baseline = None
+    stored_resets_at = None
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            raw = fh.read().strip()
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            parsed = None
+        if isinstance(parsed, dict):
+            stored_baseline = parsed.get("baseline")
+            stored_resets_at = parsed.get("resetsAt")
+        elif isinstance(parsed, (int, float)):
+            # legacy format（本修正前は生の数値だけを書いていた）。resetsAt情報が
+            # 無いため世代不明として扱う（stored_resets_at=None のまま）。
+            stored_baseline = parsed
+            stored_resets_at = None
+    except Exception:
+        stored_baseline = None
+
+    generation_switched = (
+        stored_baseline is not None
+        and resets_at is not None
+        and resets_at != stored_resets_at
+    )
+
+    if stored_baseline is None:
+        # 初回観測（世代不明・ウィンドウの継続期間が分からない）。保守的に「今から数える」。
+        new_baseline = weekly
+        try:
+            os.makedirs(cache_dir, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(json.dumps({"baseline": new_baseline, "resetsAt": resets_at}))
+        except Exception:
+            pass
+        return new_baseline, None, False
+
+    if generation_switched:
+        # 新世代は0%から始まったことが確定しているため、観測値そのものが『本日の使用量』
+        # （新世代分だけ・旧世代の消費分は含まない＝過少評価）。
+        new_baseline = weekly
+        try:
+            os.makedirs(cache_dir, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(json.dumps({"baseline": new_baseline, "resetsAt": resets_at}))
+        except Exception:
+            pass
+        return new_baseline, weekly, True
+
+    try:
+        return int(round(float(stored_baseline))), None, False
+    except Exception:
+        return weekly, None, False
+
+
+def load_credit_usage(cache_path: str) -> tuple[int, list[str], dict, float | None] | None:
+    """credit-usage.json から routes.claude.weekly・空き worker 名リスト・claude route の
+    生 dict（pace フィールド参照用）・鮮度（経過秒数）を読む。24時間以上古い場合は None。
+    読めなければ None。
+
+    [2026-09-01][feat] pace フィールド参照のため claude_info（生 dict）と経過秒数を追加で返す。
+    背景: `pace.secondary.{expectedUsedPercent,deltaPercent,stage,willLastToReset,summary,
+    etaSeconds}` を credit-usage-cache.sh 側で routes.claude へ転記済みのため、ここでもそのまま
+    読む（自前でペースを再計算しない）。経過秒数は「表示側で鮮度を必ず出す」ための材料。
+    """
     try:
         with open(cache_path, "r", encoding="utf-8") as fh:
             data = json.load(fh)
@@ -434,12 +579,14 @@ def load_credit_usage(cache_path: str) -> tuple[int, list[str]] | None:
     if not isinstance(data, dict):
         return None
     updated_at_str = data.get("updatedAt")
+    elapsed_sec = None
     if updated_at_str:
         try:
             from datetime import datetime, timezone
             updated_at = datetime.fromisoformat(updated_at_str.replace("Z", "+00:00"))
             now = datetime.now(timezone.utc)
-            if (now - updated_at).total_seconds() >= 86400:
+            elapsed_sec = (now - updated_at).total_seconds()
+            if elapsed_sec >= 86400:
                 return None
         except Exception:
             return None
@@ -470,7 +617,30 @@ def load_credit_usage(cache_path: str) -> tuple[int, list[str]] | None:
                     pass
     candidates.sort(key=lambda x: x[0])
     free_workers = [name for _, name in candidates[:3]]
-    return weekly_int, free_workers
+    return weekly_int, free_workers, claude_info, elapsed_sec
+
+
+def load_pace_thresholds(agents_yaml_path: str) -> tuple[int, int, bool] | None:
+    """agents.yaml から claude_pace_delta_warn_points / claude_pace_delta_strong_points /
+    claude_pace_exhaustion_is_strong を読む。読めなければ None（pace 機能を無効化。fail-open）。
+    [2026-09-01][feat] pace（codexbar 計算済みペース）ベースの節約モード条件。"""
+    try:
+        with open(agents_yaml_path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except Exception:
+        return None
+    warn = _read_yaml_value(text, "worker_delegation", "credit_preflight", "claude_pace_delta_warn_points")
+    strong = _read_yaml_value(text, "worker_delegation", "credit_preflight", "claude_pace_delta_strong_points")
+    exhaustion = _read_yaml_value(text, "worker_delegation", "credit_preflight", "claude_pace_exhaustion_is_strong")
+    if warn is None or strong is None:
+        return None
+    try:
+        warn_int = int(warn)
+        strong_int = int(strong)
+    except Exception:
+        return None
+    exhaustion_bool = exhaustion if isinstance(exhaustion, bool) else str(exhaustion).strip().lower() in ("true", "1", "yes")
+    return warn_int, strong_int, exhaustion_bool
 
 
 def credit_tier(weekly: int, warn: int, strong: int) -> str:
@@ -479,6 +649,13 @@ def credit_tier(weekly: int, warn: int, strong: int) -> str:
     if weekly >= warn:
         return "warn"
     return "none"
+
+
+_TIER_RANK = {"none": 0, "warn": 1, "strong": 2}
+
+
+def stronger_tier(a: str, b: str) -> str:
+    return a if _TIER_RANK.get(a, 0) >= _TIER_RANK.get(b, 0) else b
 
 
 def date_hash() -> str:
@@ -506,17 +683,25 @@ def main() -> None:
     hit = bool(impl_re.search(prompt))
     heavy_hit = evaluate_heavy_read(transcript_path)
 
-    # [2026-08-27][feat] クレジット残量読み取り
+    # [2026-08-27][feat] クレジット残量読み取り（週次）
     agents_yaml_path = os.environ.get("AGENTS_YAML_PATH", "")
     credit_cache_path = os.environ.get("CREDIT_CACHE_PATH", "")
     credit_line = ""
     tier = "none"
+    # [2026-08-31][feat] 日次節約モード読み取り（週次と独立。週次ロジックは変更しない）
+    # [2026-09-01][fix] 「ローリングウィンドウの減衰で過小評価」は誤りだったため訂正
+    # （agents.yaml credit_preflight の同日付コメント参照。weekly は resetsAt 固定の
+    # 7日ウィンドウであり、基準点からの増分は近似ではなく正確な値）。
+    # [2026-09-01][feat] pace（deltaPercent/willLastToReset）も daily-pct とは独立の
+    # OR 条件として組み込み、tier は両方のうち厳しい方（stronger_tier）を採用する。
+    daily_line = ""
+    daily_tier = "none"
     if agents_yaml_path and credit_cache_path:
         thresholds = load_credit_thresholds(agents_yaml_path)
         usage = load_credit_usage(credit_cache_path)
         if thresholds is not None and usage is not None:
             warn_p, strong_p = thresholds
-            weekly, free_workers = usage
+            weekly, free_workers, claude_info, elapsed_sec = usage
             tier = credit_tier(weekly, warn_p, strong_p)
             if tier == "strong":
                 workers_str = ", ".join(free_workers) if free_workers else "AI worker"
@@ -525,12 +710,77 @@ def main() -> None:
                 workers_str = ", ".join(free_workers) if free_workers else "AI worker"
                 credit_line = f"Claude 週次 {weekly}% 使用。実装は {workers_str} へ委譲してください。"
 
+            daily_thresholds = load_daily_credit_thresholds(agents_yaml_path)
+            cache_dir = os.environ.get("CACHE_DIR", "")
+            daily_pct_tier = "none"
+            daily_used = None
+            daily_generation_switched = False
+            if daily_thresholds is not None and cache_dir:
+                daily_warn_p, daily_strong_p = daily_thresholds
+                current_resets_at = claude_info.get("resetsAt")
+                baseline, daily_used_override, daily_generation_switched = load_or_init_daily_baseline(
+                    cache_dir, weekly, current_resets_at
+                )
+                daily_used = daily_used_override if daily_used_override is not None else max(0, weekly - baseline)
+                daily_pct_tier = credit_tier(daily_used, daily_warn_p, daily_strong_p)
+
+            pace_tier = "none"
+            delta_pts = claude_info.get("deltaPercent")
+            expected_pct = claude_info.get("expectedUsedPercent")
+            will_last = claude_info.get("willLastToReset")
+            eta_seconds = claude_info.get("etaSeconds")
+            pace_thresholds = load_pace_thresholds(agents_yaml_path)
+            if pace_thresholds is not None:
+                pace_warn_pts, pace_strong_pts, exhaustion_is_strong = pace_thresholds
+                if isinstance(delta_pts, (int, float)):
+                    pace_tier = credit_tier(delta_pts, pace_warn_pts, pace_strong_pts)
+                if will_last is False and exhaustion_is_strong:
+                    pace_tier = "strong"
+
+            daily_tier = stronger_tier(daily_pct_tier, pace_tier)
+
+            if daily_tier in ("warn", "strong"):
+                detail_parts = []
+                if daily_used is not None:
+                    detail_parts.append(f"本日約{daily_used}%")
+                if isinstance(expected_pct, (int, float)) and isinstance(delta_pts, (int, float)):
+                    sign = "+" if delta_pts >= 0 else ""
+                    detail_parts.append(f"期待{int(round(expected_pct))}%・{sign}{int(round(delta_pts))}%超過")
+                if will_last is False and isinstance(eta_seconds, (int, float)) and eta_seconds > 0:
+                    days = int(eta_seconds // 86400)
+                    hours_left = int((eta_seconds % 86400) // 3600)
+                    if days > 0:
+                        detail_parts.append(f"あと{days}日{hours_left}時間で枯渇見込み")
+                    else:
+                        detail_parts.append(f"あと{hours_left}時間で枯渇見込み")
+                # [2026-09-01][feat] 表示側で鮮度を必ず出す（古い値を新しい値のように見せない）。
+                if elapsed_sec is not None and elapsed_sec > 3600:
+                    hours_stale = int(elapsed_sec // 3600)
+                    detail_parts.append(f"⚠{hours_stale}時間前の値")
+                # [2026-09-01][fix] 世代切替（resetsAt変更）直後は、リセット前の消費分を
+                # 復元できないため「本日分は一部のみ」と明記する（推測で埋めない代わりに
+                # 過少である可能性を利用者へ伝える。過度に冗長にしないため短い注記に留める）。
+                if daily_generation_switched:
+                    detail_parts.append("週次カウンタ変更直後のため本日分は一部のみ")
+                detail = "（" + "・".join(detail_parts) + "）" if detail_parts else ""
+                workers_str = ", ".join(free_workers) if free_workers else "AI worker"
+                icon = "⛔" if daily_tier == "strong" else ""
+                prefix = f"{icon}【節約モード】" if icon else "【節約モード】"
+                daily_line = (
+                    f"{prefix}週次 {weekly}%{detail}。実装={workers_str}へ委譲、"
+                    "探索・大量読みはサブエージェントへ委譲し、Claudeは指示・検証・判断に専念してください"
+                    "（ブラウザ操作は例外でPM直可）。"
+                )
+
     print("HIT=1" if hit else "HIT=0")
     print(f"SESSION={session_hash}")
     print("HEAVYHIT=1" if heavy_hit else "HEAVYHIT=0")
     print(f"CREDIT_TIER={tier}")
     if credit_line:
         print(f"CREDIT_LINE={credit_line}")
+    print(f"DAILY_TIER={daily_tier}")
+    if daily_line:
+        print(f"DAILY_LINE={daily_line}")
 
 
 try:
@@ -541,6 +791,7 @@ except Exception:
     print("SESSION=")
     print("HEAVYHIT=0")
     print("CREDIT_TIER=none")
+    print("DAILY_TIER=none")
 PY
 }
 
@@ -556,11 +807,23 @@ SESSION_HASH="$(printf '%s\n' "$RESULT" | sed -n 's/^SESSION=//p')"
 HEAVY_HIT="$(printf '%s\n' "$RESULT" | sed -n 's/^HEAVYHIT=//p')"
 CREDIT_TIER="$(printf '%s\n' "$RESULT" | sed -n 's/^CREDIT_TIER=//p')"
 CREDIT_LINE="$(printf '%s\n' "$RESULT" | sed -n 's/^CREDIT_LINE=//p')"
+DAILY_TIER="$(printf '%s\n' "$RESULT" | sed -n 's/^DAILY_TIER=//p')"
+DAILY_LINE="$(printf '%s\n' "$RESULT" | sed -n 's/^DAILY_LINE=//p')"
 
 # [2026-08-27][feat] クレジット残量マーカー（日付+閾値帯単位）。
 # 既存のセッション1回マーカーとは別ファイル名で混ざらないようにする。
+# [2026-08-31][fix] DATE_HASH の計算を CREDIT_TIER 専用条件の外へ出す
+# 背景:
+#   - 事象: DATE_HASH は元々 CREDIT_TIER（週次）が none でない時だけ計算していたため、
+#     週次が none でも日次（DAILY_TIER）が warn/strong になるケース（週次はまだ低いが
+#     今日だけ急に使った場合）でマーカーを決められなかった。
+#   - 守るべき業務ルール: 週次ロジックの挙動（マーカー名・スロットル単位）は変更しない。
+#     日次マーカーも同じ「日付+閾値帯」単位を使う（既存方式の再利用・複製しない）。
+# 対応: DATE_HASH をどちらかの TIER が none でない時に1回だけ計算し、
+#   CREDIT_MARKER と DAILY_MARKER をそれぞれ導出する。
 CREDIT_MARKER=""
-if [ -n "$CREDIT_TIER" ] && [ "$CREDIT_TIER" != "none" ]; then
+DAILY_MARKER=""
+if { [ -n "$CREDIT_TIER" ] && [ "$CREDIT_TIER" != "none" ]; } || { [ -n "$DAILY_TIER" ] && [ "$DAILY_TIER" != "none" ]; }; then
   # 日付ハッシュを計算（python と同じ SHA256("YYYY-MM-DD")）
   DATE_HASH="$(printf '%s' "$(date -u +%Y-%m-%d)" | command python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.stdin.read().encode("utf-8")).hexdigest())' 2>/dev/null)"
   if [ -n "$DATE_HASH" ]; then
@@ -572,7 +835,14 @@ if [ -n "$CREDIT_TIER" ] && [ "$CREDIT_TIER" != "none" ]; then
     #   - 他案不採用理由: マーカーへ帯を書き込んで内容比較する案は、読み書きの失敗時に
     #     判定不能となり fail-open/close の分岐が増えるため不採用（ファイル名で表現すれば
     #     存在確認だけで済む）。
-    CREDIT_MARKER="$CACHE_DIR/${DATE_HASH}-tier-${CREDIT_TIER}"
+    if [ -n "$CREDIT_TIER" ] && [ "$CREDIT_TIER" != "none" ]; then
+      CREDIT_MARKER="$CACHE_DIR/${DATE_HASH}-tier-${CREDIT_TIER}"
+    fi
+    # [2026-08-31][feat] 日次マーカーは週次と別名前空間にする（同じ日付+帯でも週次/日次を
+    # 混同しない。例: 週次 warn かつ日次 strong を両方1回ずつ出す必要があるため）。
+    if [ -n "$DAILY_TIER" ] && [ "$DAILY_TIER" != "none" ]; then
+      DAILY_MARKER="$CACHE_DIR/${DATE_HASH}-daily-tier-${DAILY_TIER}"
+    fi
   fi
 fi
 
@@ -603,6 +873,20 @@ emit_credit_line_once() {
   printf '%s\n' "$CREDIT_LINE"
 }
 
+# [2026-08-31][feat] 日次節約モード文言の一回出し（週次 emit_credit_line_once と同型・別マーカー）。
+# 週次と同じ理由（実装へ着手しようとした瞬間だけ・日付+閾値帯単位でスロットル）で、
+# HIT/HEAVYHIT の経路でのみ呼ぶ。独立通知は作らない（2026-08-27 CaD の方針を踏襲）。
+emit_daily_credit_line_once() {
+  [ -n "$DAILY_LINE" ] || return 0
+  if [ -n "$DAILY_MARKER" ]; then
+    [ -f "$DAILY_MARKER" ] && return 0
+    printf '%s\n' "$DAILY_LINE"
+    : > "$DAILY_MARKER" 2>/dev/null || true
+    return 0
+  fi
+  printf '%s\n' "$DAILY_LINE"
+}
+
 # 実装意図キーワード検知（HIT）。セッション ID が取れない場合はスロットルできないため、
 # その場で1回だけ出して抜ける（マーカーは書かない。次回プロンプトでも同じ判定になり得るが
 # 非ブロックなので実害は小さい）。
@@ -612,6 +896,7 @@ if [ "$HIT" = "1" ]; then
 【三役体制】着手前に委譲判定を1行宣言してから進めること: ①10分未満の小修正/ガバナンス領域/対話型ブラウザ軽作業(claude-in-chrome)→Claudeサブエージェント内製（ブラウザは sonnet 第一候補・Fable直禁止） ②まとまった実装・並列・大量読み→AI worker（agent-dispatch） ③調査: 小=context-engine直・中大=参謀Kimi ④緊急時のみ利用者の明示指示でPM直実装（解消後は委譲へ自動復帰）。PM本体のinline実装は原則禁止。
 MSG
     emit_credit_line_once
+    emit_daily_credit_line_once
   else
     MARKER="$CACHE_DIR/$SESSION_HASH"
     if [ ! -f "$MARKER" ]; then
@@ -619,6 +904,7 @@ MSG
 【三役体制】着手前に委譲判定を1行宣言してから進めること: ①10分未満の小修正/ガバナンス領域/対話型ブラウザ軽作業(claude-in-chrome)→Claudeサブエージェント内製（ブラウザは sonnet 第一候補・Fable直禁止） ②まとまった実装・並列・大量読み→AI worker（agent-dispatch） ③調査: 小=context-engine直・中大=参謀Kimi ④緊急時のみ利用者の明示指示でPM直実装（解消後は委譲へ自動復帰）。PM本体のinline実装は原則禁止。
 MSG
       emit_credit_line_once
+      emit_daily_credit_line_once
       : > "$MARKER" 2>/dev/null || true
       agent_hub_telemetry_log "delegation_reminder" "delegation-routing-reminder" "fired" "" 2>/dev/null || true
     fi
@@ -633,6 +919,7 @@ if [ "$HEAVY_HIT" = "1" ]; then
 【三役体制】大量読みが続いています。参謀 Kimi / worker への委譲を検討してください。
 MSG
     emit_credit_line_once
+    emit_daily_credit_line_once
   else
     HEAVY_MARKER="$CACHE_DIR/$SESSION_HASH-heavy-read"
     if [ ! -f "$HEAVY_MARKER" ]; then
@@ -640,22 +927,63 @@ MSG
 【三役体制】大量読みが続いています。参謀 Kimi / worker への委譲を検討してください。
 MSG
       emit_credit_line_once
+      emit_daily_credit_line_once
       : > "$HEAVY_MARKER" 2>/dev/null || true
       agent_hub_telemetry_log "delegation_reminder" "delegation-routing-reminder-heavy-read" "fired" "" 2>/dev/null || true
     fi
   fi
 fi
 
-# [2026-08-27][fix] クレジット残量由来の「独立通知」を廃止する
+# [2026-08-31][feat] Claude 日次クレジット節約モード閾値の相乗り（週次と独立・非ブロック維持）
 # 背景:
-#   - 事象: 実装意図キーワードが無い会話（例:「今日は天気だけ確認」）でも残量文言が鳴る経路を
-#     入れていたが、SessionStart の残量パネル（credit-baton-preflight.sh）が毎セッション
-#     冒頭で同じ情報を出すため重複する。実装と無関係な会話で鳴るのはノイズにしかならない。
-#   - 守るべき業務ルール: 残量は「実装へ着手しようとした瞬間」に判断材料として添える。
-#     セッション全体の状況把握は SessionStart パネルが担う（役割を分ける）。
-#     pre-implementation-check.sh の 2026-04-26 CaD（毎回大きいリマインダーで体験悪化）を踏襲する。
-#   - 他案不採用理由: 独立通知を残したまま日付+帯で 1 日 1 回に絞る案も検討したが、
-#     SessionStart パネルと情報が完全に重複するため、経路自体を持たない方が保守が単純。
-# 対応: 残量文言は HIT / HEAVYHIT の経路でのみ emit_credit_line_once 経由で出す。
+#   - ユーザー依頼意図: 2026-08-31 実測で Claude を1日で約30%消費した（目標は1日15%未満）。
+#     12%到達（agents.yaml の claude_daily_warn_percent）で「節約モード」（実装=AI worker、
+#     探索=サブエージェント、Claude=指示・検証・判断に専念）へ切り替えたい。
+#   - 守るべき業務ルール: 「その日 UTC 日付で最初に観測した weekly 値」をその日の基準点として
+#     1ファイルへ記録し、以降の呼び出しでは現在の weekly からその基準点を差し引いた増分を
+#     『本日の使用量』として扱う。既存の週次ロジック（CREDIT_TIER/CREDIT_LINE）は変更しない。
+#     非ブロック（fail-open）を維持する。
+#   - 他案不採用理由: 日次データが無いことを理由に日次判定を実装しない案は、agents.yaml の
+#     閾値追加とポリシー明文化だけに留められる代替として認められているが、weekly の増分は
+#     「安価に足せる」実装であり、他の marker ファイル方式（例: CREDIT_MARKER の
+#     DATE_HASH 方式）と実装コストが同等のため実装する側を選んだ。
+# [2026-09-01][fix] 「ローリングウィンドウの減衰で過小評価（近似値）」の記述を訂正
+# 背景:
+#   - 実測（`codexbar usage --provider claude --format json`）で `usage.secondary.windowMinutes`
+#     は固定 10080分（7日）で `resetsAt` も固定日時を持つ、リセット日時までは単調増加するだけの
+#     固定ウィンドウだった（ローリングではない）。基準点ファイル方式が計算する増分は、
+#     この固定ウィンドウ内で decay（古い使用の自然な消滅）が起きないため、近似ではなく
+#     実質的に正確な「本日の使用量」である。2026-08-31 時点の本ブロックのコメント（および
+#     agents.yaml credit_preflight の同日付コメント）にあった「ローリングウィンドウ」
+#     「近似値」という記述は誤りだったため訂正する。変数名 `daily_used`（旧 `daily_used_approx`）
+#     も実態に合わせて改名済み。
+# [2026-09-01][feat] pace（deltaPercent/willLastToReset）を daily-pct とは独立の OR 条件として追加
+# 背景:
+#   - ユーザー依頼意図: 「今日使いすぎたのに気づけなかった」の真因調査で、codexbar が
+#     計算済みの pace.secondary（経過時間から見た「あるべき値」との差分・リセットまで
+#     持つ見込みか）を節約モードの発動条件にも使いたい。
+#   - 守るべき業務ルール: 自前でペースを再計算しない。閾値（claude_pace_delta_warn_points/
+#     strong_points/claude_pace_exhaustion_is_strong）は agents.yaml からライブ読みする。
+# [2026-09-01][fix] 発火条件を HIT/HEAVYHIT 限定から解放する（真因調査タスク item C）
+# 背景:
+#   - ユーザー依頼意図: 現状の日次判定は HIT/HEAVYHIT 経路（実装意図キーワード検知時・
+#     大量読み検知時）でしか発火しない。閾値を超えていても、実装っぽいキーワードを含む
+#     プロンプトを送らない限り気づけないのは、今回の目的（記憶や注意力に頼らず構造的に
+#     気づく）を満たさない。
+#   - 守るべき業務ルール: 2026-08-27 の CaD（「残量は実装へ着手しようとした瞬間だけに絞る。
+#     SessionStart パネルと重複させない」）は**週次 CREDIT_LINE には引き続き適用する**
+#     （変更しない）。日次/pace 由来の節約モード宣言（DAILY_LINE）だけは例外として、
+#     HIT/HEAVYHIT の有無に関わらず発火させる。理由: SessionStart は「セッション開始時」の
+#     一度きりの判定であり、長時間セッション中に閾値へ新たに達しても再宣言する手段が無い。
+#     ノイズ対策は既存の「日付＋閾値帯」単位マーカー（帯が変わらない限り1日1回だけ）で担保する。
+#   - 他案不採用理由: 「独立発火は一切禁止」という 2026-08-27 の方針をそのまま日次/pace にも
+#     適用する案は、まさに今回ユーザーが指摘した「12%を超えても気づけない」を再発させるため
+#     不採用。既存週次の独立発火禁止は維持しつつ、日次/pace だけ例外にする。
+# 対応: 既存の emit_daily_credit_line_once 呼び出し（HIT/HEAVYHIT 内）はそのまま残し、
+#   このコメントの直後に「HIT/HEAVYHIT を問わず DAILY_TIER が none でなければ発火する」
+#   無条件呼び出しを追加する（マーカーは共有のため二重発火はしない）。
+if [ -n "$DAILY_TIER" ] && [ "$DAILY_TIER" != "none" ]; then
+  emit_daily_credit_line_once
+fi
 
 exit 0

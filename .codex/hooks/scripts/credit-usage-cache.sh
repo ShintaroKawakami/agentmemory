@@ -116,6 +116,23 @@ for p in "${PROVIDERS[@]}"; do
   fi
 
   if [ "$p" = "claude" ]; then
+    # [2026-09-01][feat] pace フィールド（codexbar 実測ベース）を routes.claude へ追加
+    # 背景:
+    #   - ユーザー依頼意図: 「今日使いすぎたのに気づけなかった」の真因調査で、
+    #     `codexbar usage --provider claude --format json` の生出力に
+    #     usage.secondary.{usedPercent,resetsAt,windowMinutes} と
+    #     pace.secondary.{expectedUsedPercent,deltaPercent,stage,willLastToReset,summary,etaSeconds}
+    #     が既に揃っていることが実測で判明した（2026-09-01）。自前でペース計算をせず、
+    #     codexbar が計算済みのこれらの値をそのままキャッシュへ転記する
+    #     （reference-over-hardcode: 独自のペース再計算をしない）。
+    #   - 守るべき業務ルール: 他 provider（claude 以外）の抽出ロジックは変更しない。
+    #     値が存在しない場合はキーごと省略する（0 や null で埋めない。既存の
+    #     「取得不能 provider はキーごと入れない」方針と同じ扱いを個別フィールドにも適用）。
+    #   - 他案不採用理由: hook 側で expectedUsedPercent 等を独自に再計算する案は、
+    #     Anthropic 側の pace アルゴリズム（stage 判定・deficit/surplus 計算等）を
+    #     二重実装することになり、ズレ・保守負担が生じるため不採用。codexbar の計算結果を
+    #     そのまま使う。
+    # 対応: usage.secondary.resetsAt/windowMinutes と pace.secondary.* を任意フィールドとして追加。
     route_obj="$(printf '%s' "$out" | jq -c '
 def select_provider(p):
   (if type == "array" then .[] else . end) | select(.provider == p or (.provider | type == "string" and ascii_downcase == p));
@@ -141,7 +158,15 @@ select_provider("claude") |
       usedPercent: $max,
       session: $sess,
       weekly: $week
-    } + (if (.pace.secondary.willLastToReset | type == "boolean") then {willLastToReset: .pace.secondary.willLastToReset} else {} end)
+    }
+    + (if (.pace.secondary.willLastToReset | type == "boolean") then {willLastToReset: .pace.secondary.willLastToReset} else {} end)
+    + (if (.usage.secondary.resetsAt | type == "string") then {resetsAt: .usage.secondary.resetsAt} else {} end)
+    + (if (.usage.secondary.windowMinutes | type == "number") then {weeklyWindowMinutes: .usage.secondary.windowMinutes} else {} end)
+    + (if (.pace.secondary.expectedUsedPercent | type == "number") then {expectedUsedPercent: .pace.secondary.expectedUsedPercent} else {} end)
+    + (if (.pace.secondary.deltaPercent | type == "number") then {deltaPercent: .pace.secondary.deltaPercent} else {} end)
+    + (if (.pace.secondary.stage | type == "string") then {stage: .pace.secondary.stage} else {} end)
+    + (if (.pace.secondary.etaSeconds | type == "number") then {etaSeconds: .pace.secondary.etaSeconds} else {} end)
+    + (if (.pace.secondary.summary | type == "string") then {paceSummary: .pace.secondary.summary} else {} end)
   end
 ' 2>/dev/null || true)"
   else
