@@ -4,13 +4,13 @@
   ],
   "canonical_project": "agentmemory",
   "effective_hashes": {
-    "antigravity": "008c93438d5e3bffc0b0d94490a634927b7bf37c35eaf09edd95cc282d17b81b",
-    "claude": "008c93438d5e3bffc0b0d94490a634927b7bf37c35eaf09edd95cc282d17b81b",
-    "codex": "008c93438d5e3bffc0b0d94490a634927b7bf37c35eaf09edd95cc282d17b81b",
-    "cursor": "008c93438d5e3bffc0b0d94490a634927b7bf37c35eaf09edd95cc282d17b81b",
-    "kimi": "008c93438d5e3bffc0b0d94490a634927b7bf37c35eaf09edd95cc282d17b81b",
-    "opencode": "008c93438d5e3bffc0b0d94490a634927b7bf37c35eaf09edd95cc282d17b81b",
-    "warp": "008c93438d5e3bffc0b0d94490a634927b7bf37c35eaf09edd95cc282d17b81b"
+    "antigravity": "eebd7c6b6367fed8b5a7d12c387142231af1e6f7b219dcba3a38b67b47b4fd10",
+    "claude": "eebd7c6b6367fed8b5a7d12c387142231af1e6f7b219dcba3a38b67b47b4fd10",
+    "codex": "eebd7c6b6367fed8b5a7d12c387142231af1e6f7b219dcba3a38b67b47b4fd10",
+    "cursor": "eebd7c6b6367fed8b5a7d12c387142231af1e6f7b219dcba3a38b67b47b4fd10",
+    "kimi": "eebd7c6b6367fed8b5a7d12c387142231af1e6f7b219dcba3a38b67b47b4fd10",
+    "opencode": "eebd7c6b6367fed8b5a7d12c387142231af1e6f7b219dcba3a38b67b47b4fd10",
+    "warp": "eebd7c6b6367fed8b5a7d12c387142231af1e6f7b219dcba3a38b67b47b4fd10"
   },
   "harness_type": "mcp-server",
   "ledger_writer": {
@@ -19,7 +19,7 @@
   },
   "resolver_version": "1.1.0",
   "schema_version": 2,
-  "source_fingerprint": "sha256:f07fd282faab732837fa6be1a1996ec8c6841bbf5c89c684876f6e12b0e96d7e",
+  "source_fingerprint": "sha256:e8bfd8f5fcbc9cc743cb09a5362d3daec035a0ad85e1b38b7c6ac4b2dcf2c641",
   "surfaces": [
     {
       "asset_revisions": [
@@ -167,9 +167,9 @@
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:62a20f60d47c719fe0a94b2e4e6abf98645e9a3f00e13a013f70843c296ba889",
+      "content_digest": "sha256:4c8c696e545dc22546ce1700fd06bbd3172fbd34919829a11449787430eaf119",
       "kind": "command",
-      "materialization_digest": "sha256:af8c1ad4080cc63ddb61158ff03cb675a98355f9e11909a3839e883377c1c4c9",
+      "materialization_digest": "sha256:a1c893774960d5064a9b9b6b27fb7455b9bde6814e71e3f2ac8c63f07761d806",
       "probe": "fresh-command-discovery",
       "source_revision": "sha256:0d84309c3ee9a4defff0df5fbba2247c59922da67777193185be11e1a4580350",
       "symlink_policy": "forbidden",
@@ -197,9 +197,9 @@
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:089f4a572510d4a016b19bd2eaaad3ca43acf039cebd18a14d7076bdfd732225",
+      "content_digest": "sha256:7f62a5b1748042b3d2b784b397658fc46b57356ef3a1a29d4a0672ac696fb979",
       "kind": "constitution",
-      "materialization_digest": "sha256:c4aa326a58ef165697356bb3203305fe7cb072f48cd5304ea198b5f31e447f0e",
+      "materialization_digest": "sha256:c477ea4390556ea767403c87a8128d9e5f46612c85e4a19838c9596b4b0d1834",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -227,7 +227,7 @@
         },
         {
           "asset_id": "credit-baton-preflight",
-          "source_revision": "51499b4c754cca4b614212ca1ef944e27df238961b191e77b13b4e14a0b3cdad"
+          "source_revision": "8ced5b51b3b89f95bb8ae9273a70be43ac9a3559296be64f701cd2222218e44a"
         },
         {
           "asset_id": "delegation-routing-backstop",
@@ -235,7 +235,7 @@
         },
         {
           "asset_id": "delegation-routing-reminder",
-          "source_revision": "d440c0b1f19dd110ebd0a62740eef2de8bb391b0024701f183c07d9dfc5fca90"
+          "source_revision": "ab843c8a9f4d542df919886d8bfa1717b9f66c0e01c6d3ddb20b4512712e099d"
         },
         {
           "asset_id": "fable-implementation-guard",
@@ -271,11 +271,11 @@
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:81bb6782037d1c9bb722268ebffa94d79da1fe126be5fec810c86d033bd835b5",
+      "content_digest": "sha256:e4a9562d52e805969d3e3522f422af3851f88e147d3c87eb6530e6b8cff4aa85",
       "kind": "hook",
-      "materialization_digest": "sha256:d227ce92e4d129123317a2fc214a12c5169db8756e555e1623f4779ba9640d89",
+      "materialization_digest": "sha256:b7aded1803b5885e8b41fb33b4d0767242ed7b88563a29c86c687aa001fbf687",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:cf44a71dee8a26ec289ca52c373c1fb0dfea03e3fa2016cf81182e9531ec1420",
+      "source_revision": "sha256:e9183d8fbbacd2cb91e395b7dbed2e941fa4d9a16f425276b170a84b814efa0b",
       "symlink_policy": "forbidden",
       "target": ".gemini/hooks",
       "writer_id": "sync-antigravity-from-cc",
@@ -301,7 +301,7 @@
         },
         {
           "asset_id": "credit-baton-preflight",
-          "source_revision": "51499b4c754cca4b614212ca1ef944e27df238961b191e77b13b4e14a0b3cdad"
+          "source_revision": "8ced5b51b3b89f95bb8ae9273a70be43ac9a3559296be64f701cd2222218e44a"
         },
         {
           "asset_id": "delegation-routing-backstop",
@@ -309,7 +309,7 @@
         },
         {
           "asset_id": "delegation-routing-reminder",
-          "source_revision": "d440c0b1f19dd110ebd0a62740eef2de8bb391b0024701f183c07d9dfc5fca90"
+          "source_revision": "ab843c8a9f4d542df919886d8bfa1717b9f66c0e01c6d3ddb20b4512712e099d"
         },
         {
           "asset_id": "fable-implementation-guard",
@@ -347,9 +347,9 @@
       "client": "antigravity",
       "content_digest": "sha256:b44f420f67d44724ff7505e0c5903f6488d02af8dbc7980651b60d2355524270",
       "kind": "hook",
-      "materialization_digest": "sha256:86852ee3eb98738989764b694fb091a536eb80c58dfa691c15372040802afc7c",
+      "materialization_digest": "sha256:52d99af0479f1feeef6bb74b7dc29d34cbda5f1714c152b9982c38315bc973f3",
       "probe": "stable-client-config",
-      "source_revision": "sha256:cf44a71dee8a26ec289ca52c373c1fb0dfea03e3fa2016cf81182e9531ec1420",
+      "source_revision": "sha256:e9183d8fbbacd2cb91e395b7dbed2e941fa4d9a16f425276b170a84b814efa0b",
       "symlink_policy": "forbidden",
       "target": ".gemini/settings.json",
       "writer_id": "sync-antigravity-from-cc",
@@ -711,9 +711,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:62a20f60d47c719fe0a94b2e4e6abf98645e9a3f00e13a013f70843c296ba889",
+      "content_digest": "sha256:4c8c696e545dc22546ce1700fd06bbd3172fbd34919829a11449787430eaf119",
       "kind": "command",
-      "materialization_digest": "sha256:4ca9cfdc33acef1945d9054b758805a6818905281635875992eee813e9a95c71",
+      "materialization_digest": "sha256:252f44e83af136cff221abc5893b667d33ad277acd85fc5d29240dbd4d6e606f",
       "probe": "fresh-command-discovery",
       "source_revision": "sha256:0d84309c3ee9a4defff0df5fbba2247c59922da67777193185be11e1a4580350",
       "symlink_policy": "forbidden",
@@ -741,9 +741,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:4db1adb6074305c47a4f6a0c8b6be1b9d74fc12b11c0f367d0ca76510dfe2441",
+      "content_digest": "sha256:01b895daf494371a7df54f7a4057c55cd8c6076821107176dad3ae57ab729cad",
       "kind": "constitution",
-      "materialization_digest": "sha256:90bcc8f1b8e12785c83dc0a5d700df8aa63c30d08117b2df435317a0339def9a",
+      "materialization_digest": "sha256:c7e88bc5049c8bec0caf6310506b34a7ef22852ad39bf4d0c368deefc615402b",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -771,7 +771,7 @@
         },
         {
           "asset_id": "credit-baton-preflight",
-          "source_revision": "51499b4c754cca4b614212ca1ef944e27df238961b191e77b13b4e14a0b3cdad"
+          "source_revision": "8ced5b51b3b89f95bb8ae9273a70be43ac9a3559296be64f701cd2222218e44a"
         },
         {
           "asset_id": "delegation-routing-backstop",
@@ -779,7 +779,7 @@
         },
         {
           "asset_id": "delegation-routing-reminder",
-          "source_revision": "d440c0b1f19dd110ebd0a62740eef2de8bb391b0024701f183c07d9dfc5fca90"
+          "source_revision": "ab843c8a9f4d542df919886d8bfa1717b9f66c0e01c6d3ddb20b4512712e099d"
         },
         {
           "asset_id": "fable-implementation-guard",
@@ -815,11 +815,11 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:1e29637d8de68978841a3ffe35e0d12c1ff38d9796b3cbb9ed4cb1ed8e80ed69",
+      "content_digest": "sha256:0cb32ac9e02faf041651a1d6901784f3888863c1207f08438beb539a2424bddc",
       "kind": "hook",
-      "materialization_digest": "sha256:0876d00734c78e0fd8ada4155cdb73f1a071ae388ee135f00642a2c38f8119b8",
+      "materialization_digest": "sha256:d416f6aa0257011cf72b93867d5ea959b6f64ce360a95ff33c1a973d8aef16cd",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:cf44a71dee8a26ec289ca52c373c1fb0dfea03e3fa2016cf81182e9531ec1420",
+      "source_revision": "sha256:e9183d8fbbacd2cb91e395b7dbed2e941fa4d9a16f425276b170a84b814efa0b",
       "symlink_policy": "forbidden",
       "target": ".claude/hooks",
       "writer_id": "deploy-hooks",
@@ -845,7 +845,7 @@
         },
         {
           "asset_id": "credit-baton-preflight",
-          "source_revision": "51499b4c754cca4b614212ca1ef944e27df238961b191e77b13b4e14a0b3cdad"
+          "source_revision": "8ced5b51b3b89f95bb8ae9273a70be43ac9a3559296be64f701cd2222218e44a"
         },
         {
           "asset_id": "delegation-routing-backstop",
@@ -853,7 +853,7 @@
         },
         {
           "asset_id": "delegation-routing-reminder",
-          "source_revision": "d440c0b1f19dd110ebd0a62740eef2de8bb391b0024701f183c07d9dfc5fca90"
+          "source_revision": "ab843c8a9f4d542df919886d8bfa1717b9f66c0e01c6d3ddb20b4512712e099d"
         },
         {
           "asset_id": "fable-implementation-guard",
@@ -891,9 +891,9 @@
       "client": "claude",
       "content_digest": "sha256:352025d3122d303a5d58dfde139ccef9365fd7be53ee900e816f0a1bbc756b2a",
       "kind": "hook",
-      "materialization_digest": "sha256:2f8c09ee82e289def8845f609f2dc5da0cc290a6661a39f673967768abe0d488",
+      "materialization_digest": "sha256:b26cd489abfeab62faa7f619594839fc066b189d8329377a841fabdfc6e30711",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:cf44a71dee8a26ec289ca52c373c1fb0dfea03e3fa2016cf81182e9531ec1420",
+      "source_revision": "sha256:e9183d8fbbacd2cb91e395b7dbed2e941fa4d9a16f425276b170a84b814efa0b",
       "symlink_policy": "forbidden",
       "target": ".claude/settings.json",
       "writer_id": "deploy-hooks",
@@ -1155,9 +1155,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:ddf891fa1b760cdc619b59d9f11d06a5232da9bc3079bde6c9b0beeaae912048",
+      "content_digest": "sha256:a0f68079995e64db35751e25e9ec5ab66fed0dd6273e6bee78b5a9f2983a39cb",
       "kind": "skill",
-      "materialization_digest": "sha256:00a582c59c7d1687f3e21620c5a6ef79e6f3005b1f04d8d0da757320c8667299",
+      "materialization_digest": "sha256:6bf234cdab25e85fd617a5519105fc1366312e8c8105a5cfae640d8799b2cfa6",
       "probe": "fresh-skill-discovery",
       "source_revision": "sha256:3a9ad25e5352e52f1306cce44ae2fd21599dd478d25714f1667b8bfb23cdeb39",
       "symlink_policy": "forbidden",
@@ -1217,9 +1217,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:7b65c69d29dcf803160b0ee05d8939438bf5d782879404d5c96206117f39025d",
+      "content_digest": "sha256:77092493af5e9b982cf831c4d71643b35c0fdcc19913fa301df0d19fc0cd9e17",
       "kind": "subagent",
-      "materialization_digest": "sha256:732ffae880b30f733e5063651078ab9a9601b27eadce7b5c6b590ec37d7a005a",
+      "materialization_digest": "sha256:4fd01a43abca24f41b092cc460f8f177cd2dc5a36cf8ae648527a7c6214c44ea",
       "probe": "fresh-agent-discovery",
       "source_revision": "sha256:14b60d51ff8566159fa312985a37ccaebefb9ec12f105ba6cc4a1eafc30c0212",
       "symlink_policy": "forbidden",
@@ -1289,9 +1289,9 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:57cdf7ee0e610491186bfc1c13c835f1862676739e52a30d9874091d7f261a48",
+      "content_digest": "sha256:ff91deb10367a59f7ae45a0e22ba341e749655a556d02af8fe5b2398361a4523",
       "kind": "constitution",
-      "materialization_digest": "sha256:8edf1889bfd3910f166a212623b476704cdf13a6059a39c097c87d484ebd3ef9",
+      "materialization_digest": "sha256:4332f13a87186f5aae44d41e84f2299d5659cf77aecf1390dd5fb1b91bf8661e",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -1319,7 +1319,7 @@
         },
         {
           "asset_id": "credit-baton-preflight",
-          "source_revision": "51499b4c754cca4b614212ca1ef944e27df238961b191e77b13b4e14a0b3cdad"
+          "source_revision": "8ced5b51b3b89f95bb8ae9273a70be43ac9a3559296be64f701cd2222218e44a"
         },
         {
           "asset_id": "delegation-routing-backstop",
@@ -1327,7 +1327,7 @@
         },
         {
           "asset_id": "delegation-routing-reminder",
-          "source_revision": "d440c0b1f19dd110ebd0a62740eef2de8bb391b0024701f183c07d9dfc5fca90"
+          "source_revision": "ab843c8a9f4d542df919886d8bfa1717b9f66c0e01c6d3ddb20b4512712e099d"
         },
         {
           "asset_id": "fable-implementation-guard",
@@ -1363,11 +1363,11 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:0fac6931f06a68804eb23267409cefebef3bef82fcc9f167220855b012ed96bc",
+      "content_digest": "sha256:fde88d26f236f1b000dc5661a6a7a8999a7fb99a6f4188837521bcc8a0b9e99e",
       "kind": "hook",
-      "materialization_digest": "sha256:17389ca8bfa1da1ac0f2b5772528cf0577e1305b83b674389be6a9552fc3f221",
+      "materialization_digest": "sha256:8da5b8e44ed880bfdfee9890fb7df059cbadf0869feb468cc1c27ad5600ad8ae",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:cf44a71dee8a26ec289ca52c373c1fb0dfea03e3fa2016cf81182e9531ec1420",
+      "source_revision": "sha256:e9183d8fbbacd2cb91e395b7dbed2e941fa4d9a16f425276b170a84b814efa0b",
       "symlink_policy": "forbidden",
       "target": ".codex/hooks",
       "writer_id": "deploy-hooks",
@@ -1393,7 +1393,7 @@
         },
         {
           "asset_id": "credit-baton-preflight",
-          "source_revision": "51499b4c754cca4b614212ca1ef944e27df238961b191e77b13b4e14a0b3cdad"
+          "source_revision": "8ced5b51b3b89f95bb8ae9273a70be43ac9a3559296be64f701cd2222218e44a"
         },
         {
           "asset_id": "delegation-routing-backstop",
@@ -1401,7 +1401,7 @@
         },
         {
           "asset_id": "delegation-routing-reminder",
-          "source_revision": "d440c0b1f19dd110ebd0a62740eef2de8bb391b0024701f183c07d9dfc5fca90"
+          "source_revision": "ab843c8a9f4d542df919886d8bfa1717b9f66c0e01c6d3ddb20b4512712e099d"
         },
         {
           "asset_id": "fable-implementation-guard",
@@ -1439,9 +1439,9 @@
       "client": "codex",
       "content_digest": "sha256:88cf519d2873b36088e6a133249f9eda3b6c5a6f342ec66939a02092c6a410e1",
       "kind": "hook",
-      "materialization_digest": "sha256:f88c68d45862a66dc675989bb2450401398aa1554a23b869d2bbdda2c61fd658",
+      "materialization_digest": "sha256:bed6109cb3e0fd99c6dc74776e2bf0148651340ca5134b52cd5ac1793ec0475b",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:cf44a71dee8a26ec289ca52c373c1fb0dfea03e3fa2016cf81182e9531ec1420",
+      "source_revision": "sha256:e9183d8fbbacd2cb91e395b7dbed2e941fa4d9a16f425276b170a84b814efa0b",
       "symlink_policy": "forbidden",
       "target": ".codex/hooks.json",
       "writer_id": "deploy-hooks",
@@ -1585,9 +1585,9 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:57cdf7ee0e610491186bfc1c13c835f1862676739e52a30d9874091d7f261a48",
+      "content_digest": "sha256:ff91deb10367a59f7ae45a0e22ba341e749655a556d02af8fe5b2398361a4523",
       "kind": "rule",
-      "materialization_digest": "sha256:12a857c5cbc94c75e6c9e796333bfbedfa7ecc5f354675e74a1731d2aad169fa",
+      "materialization_digest": "sha256:4d551120548ce56191977cf02a83f5404f189355a67953a03a27a77ef4ea7e20",
       "probe": "fresh-rule-discovery",
       "source_revision": "sha256:3c33ae4ae1e56776680e59df6fc509cce620be679e811668e2d1a01aef588797",
       "symlink_policy": "forbidden",
@@ -1761,9 +1761,9 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:7b65c69d29dcf803160b0ee05d8939438bf5d782879404d5c96206117f39025d",
+      "content_digest": "sha256:77092493af5e9b982cf831c4d71643b35c0fdcc19913fa301df0d19fc0cd9e17",
       "kind": "subagent",
-      "materialization_digest": "sha256:0dccf06d0594d4f56aa1b21355acdf33934269196c2aac7b235972a8be4c048c",
+      "materialization_digest": "sha256:6c5760e26c202c2be516e82b17b1d536e42efa523155b844f03b2587ac6ddd49",
       "probe": "fresh-agent-discovery",
       "source_revision": "sha256:14b60d51ff8566159fa312985a37ccaebefb9ec12f105ba6cc4a1eafc30c0212",
       "symlink_policy": "forbidden",
@@ -1875,9 +1875,9 @@
         }
       ],
       "client": "cursor",
-      "content_digest": "sha256:57cdf7ee0e610491186bfc1c13c835f1862676739e52a30d9874091d7f261a48",
+      "content_digest": "sha256:ff91deb10367a59f7ae45a0e22ba341e749655a556d02af8fe5b2398361a4523",
       "kind": "constitution",
-      "materialization_digest": "sha256:267c774073d72671ef432bb75ba7523a6a9d51eb9ac59e443ac3fcc92c55cbcc",
+      "materialization_digest": "sha256:3ea190bdef0b1e69d80aabd63984eba330fe20ca6f552c6d0d69795c96969d99",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -1905,7 +1905,7 @@
         },
         {
           "asset_id": "credit-baton-preflight",
-          "source_revision": "51499b4c754cca4b614212ca1ef944e27df238961b191e77b13b4e14a0b3cdad"
+          "source_revision": "8ced5b51b3b89f95bb8ae9273a70be43ac9a3559296be64f701cd2222218e44a"
         },
         {
           "asset_id": "delegation-routing-backstop",
@@ -1913,7 +1913,7 @@
         },
         {
           "asset_id": "delegation-routing-reminder",
-          "source_revision": "d440c0b1f19dd110ebd0a62740eef2de8bb391b0024701f183c07d9dfc5fca90"
+          "source_revision": "ab843c8a9f4d542df919886d8bfa1717b9f66c0e01c6d3ddb20b4512712e099d"
         },
         {
           "asset_id": "fable-implementation-guard",
@@ -1949,11 +1949,11 @@
         }
       ],
       "client": "cursor",
-      "content_digest": "sha256:0d0fd2d7de670b41408e1c2a34e34faf4b9386c6629a3d69bd51fc52866f810c",
+      "content_digest": "sha256:5602362e46afbc5e2e0867f00b25f403d927c70f622aafafee32e3b70937ba65",
       "kind": "hook",
-      "materialization_digest": "sha256:4cc97a3d47069f3274c38b1ba3d848c308b0b43c94729deaebf48f3019ed37d0",
+      "materialization_digest": "sha256:570252f6ec12a6fbdd2e733e8c9d409d9515d6299bef98a3b005d1488b0ebad6",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:cf44a71dee8a26ec289ca52c373c1fb0dfea03e3fa2016cf81182e9531ec1420",
+      "source_revision": "sha256:e9183d8fbbacd2cb91e395b7dbed2e941fa4d9a16f425276b170a84b814efa0b",
       "symlink_policy": "forbidden",
       "target": ".cursor/hooks",
       "writer_id": "sync-cursor-from-cc",
@@ -1979,7 +1979,7 @@
         },
         {
           "asset_id": "credit-baton-preflight",
-          "source_revision": "51499b4c754cca4b614212ca1ef944e27df238961b191e77b13b4e14a0b3cdad"
+          "source_revision": "8ced5b51b3b89f95bb8ae9273a70be43ac9a3559296be64f701cd2222218e44a"
         },
         {
           "asset_id": "delegation-routing-backstop",
@@ -1987,7 +1987,7 @@
         },
         {
           "asset_id": "delegation-routing-reminder",
-          "source_revision": "d440c0b1f19dd110ebd0a62740eef2de8bb391b0024701f183c07d9dfc5fca90"
+          "source_revision": "ab843c8a9f4d542df919886d8bfa1717b9f66c0e01c6d3ddb20b4512712e099d"
         },
         {
           "asset_id": "fable-implementation-guard",
@@ -2025,9 +2025,9 @@
       "client": "cursor",
       "content_digest": "sha256:ad1f4e93b664f863db115f091b933f67ab17ee68c7670562de391613b92a8598",
       "kind": "hook",
-      "materialization_digest": "sha256:1b0cdfeffd60974c19492c70446b44b370d66465bd2b1e08c5c4a889ea2c6eb2",
+      "materialization_digest": "sha256:55e077c51e2e2d4a690120d583e4f3f27e6b3390e80998e116031a6df1838c8f",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:cf44a71dee8a26ec289ca52c373c1fb0dfea03e3fa2016cf81182e9531ec1420",
+      "source_revision": "sha256:e9183d8fbbacd2cb91e395b7dbed2e941fa4d9a16f425276b170a84b814efa0b",
       "symlink_policy": "forbidden",
       "target": ".cursor/hooks.json",
       "writer_id": "sync-cursor-from-cc",
@@ -2391,7 +2391,7 @@
       "client": "kimi",
       "content_digest": "sha256:b6d1568b0c737e790b17d2058cbe957949de38159dc291aa70994d66dec7e072",
       "kind": "ai_client",
-      "materialization_digest": "sha256:dfa707ac22d9e94368ab5ffb1a0f7636b8e7eab63b01163440bf7291a4fc7518",
+      "materialization_digest": "sha256:4ae2b5b76b0a34ae8bd9b57e89816778d7768c3f8914ad8b3976f38a541453ab",
       "probe": "stable-client-instruction",
       "source_revision": "sha256:4a244311b9f5fc8a04b79628d359a5fc68274acc74a61666df7d1878391918ec",
       "symlink_policy": "forbidden",
@@ -2461,9 +2461,9 @@
         }
       ],
       "client": "kimi",
-      "content_digest": "sha256:57cdf7ee0e610491186bfc1c13c835f1862676739e52a30d9874091d7f261a48",
+      "content_digest": "sha256:ff91deb10367a59f7ae45a0e22ba341e749655a556d02af8fe5b2398361a4523",
       "kind": "constitution",
-      "materialization_digest": "sha256:6f0a6bedfc8496678b17e21a78feb9dca5bc555810f84e2de1a65bf53eaa589a",
+      "materialization_digest": "sha256:ed3e27ff77eee7655f2e358b05894e3e53baa483e89af5e72b5f7db1c95f0885",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -2491,7 +2491,7 @@
         },
         {
           "asset_id": "credit-baton-preflight",
-          "source_revision": "51499b4c754cca4b614212ca1ef944e27df238961b191e77b13b4e14a0b3cdad"
+          "source_revision": "8ced5b51b3b89f95bb8ae9273a70be43ac9a3559296be64f701cd2222218e44a"
         },
         {
           "asset_id": "delegation-routing-backstop",
@@ -2499,7 +2499,7 @@
         },
         {
           "asset_id": "delegation-routing-reminder",
-          "source_revision": "d440c0b1f19dd110ebd0a62740eef2de8bb391b0024701f183c07d9dfc5fca90"
+          "source_revision": "ab843c8a9f4d542df919886d8bfa1717b9f66c0e01c6d3ddb20b4512712e099d"
         },
         {
           "asset_id": "fable-implementation-guard",
@@ -2535,11 +2535,11 @@
         }
       ],
       "client": "kimi",
-      "content_digest": "sha256:3af0ab6e695bd4cdee6c2d220fd3fa6b08af95c7bb7564c2ae830789cb5dd0a5",
+      "content_digest": "sha256:22efe2c8910d148ae56b705fbe6b471af9015e0cad7bc0ec82bc96e7033b30ef",
       "kind": "hook",
-      "materialization_digest": "sha256:38b8a0e9556235b7371168c2a138f4150ff2a5489cd434e21f7fd2e81b67f946",
+      "materialization_digest": "sha256:4efbdcc1b47c5bc63e0f9e0b06f76281e8d3c1b48d02867232ab91b1b6523bc9",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:cf44a71dee8a26ec289ca52c373c1fb0dfea03e3fa2016cf81182e9531ec1420",
+      "source_revision": "sha256:e9183d8fbbacd2cb91e395b7dbed2e941fa4d9a16f425276b170a84b814efa0b",
       "symlink_policy": "forbidden",
       "target": ".kimi-code/hooks",
       "writer_id": "sync-kimi-from-cc",
@@ -2683,9 +2683,9 @@
         }
       ],
       "client": "kimi",
-      "content_digest": "sha256:57cdf7ee0e610491186bfc1c13c835f1862676739e52a30d9874091d7f261a48",
+      "content_digest": "sha256:ff91deb10367a59f7ae45a0e22ba341e749655a556d02af8fe5b2398361a4523",
       "kind": "rule",
-      "materialization_digest": "sha256:146c416cd16198e3981e3453d67b0e5eed9414086b121fb083ab0d03e4676b43",
+      "materialization_digest": "sha256:150def172ec0f90a88e2c72ff2a15047984ac497c13e96a8943175bf9a359921",
       "probe": "fresh-rule-discovery",
       "source_revision": "sha256:3c33ae4ae1e56776680e59df6fc509cce620be679e811668e2d1a01aef588797",
       "symlink_policy": "forbidden",
@@ -2941,7 +2941,7 @@
         },
         {
           "asset_id": "credit-baton-preflight",
-          "source_revision": "51499b4c754cca4b614212ca1ef944e27df238961b191e77b13b4e14a0b3cdad"
+          "source_revision": "8ced5b51b3b89f95bb8ae9273a70be43ac9a3559296be64f701cd2222218e44a"
         },
         {
           "asset_id": "delegation-routing-backstop",
@@ -2949,7 +2949,7 @@
         },
         {
           "asset_id": "delegation-routing-reminder",
-          "source_revision": "d440c0b1f19dd110ebd0a62740eef2de8bb391b0024701f183c07d9dfc5fca90"
+          "source_revision": "ab843c8a9f4d542df919886d8bfa1717b9f66c0e01c6d3ddb20b4512712e099d"
         },
         {
           "asset_id": "fable-implementation-guard",
@@ -2987,9 +2987,9 @@
       "client": "opencode",
       "content_digest": "sha256:2dd96af747129231c15ff849ec6cc36513813bdbafd6a7e858b8dc65e52c9470",
       "kind": "hook",
-      "materialization_digest": "sha256:a092b1f804834e522bdce9ce49ef3b85c9cc4996fd4ffc445c900e78dd4ab447",
+      "materialization_digest": "sha256:ceb2f1ed0479698da88bdeaa5d9eb4a6f40cc297ca72ffea0634acf57de0ff31",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:cf44a71dee8a26ec289ca52c373c1fb0dfea03e3fa2016cf81182e9531ec1420",
+      "source_revision": "sha256:e9183d8fbbacd2cb91e395b7dbed2e941fa4d9a16f425276b170a84b814efa0b",
       "symlink_policy": "forbidden",
       "target": ".opencode/plugins",
       "writer_id": "sync-opencode-from-cc",
@@ -3225,9 +3225,9 @@
         }
       ],
       "client": "warp",
-      "content_digest": "sha256:57cdf7ee0e610491186bfc1c13c835f1862676739e52a30d9874091d7f261a48",
+      "content_digest": "sha256:ff91deb10367a59f7ae45a0e22ba341e749655a556d02af8fe5b2398361a4523",
       "kind": "constitution",
-      "materialization_digest": "sha256:9338ae79da2c3eb0a54063b41d19806cab76999d6b273b138f5b81aa5301509d",
+      "materialization_digest": "sha256:64b4aa586d6f4f5118f3a2684f7f017631612305bd212081f38a6571f976ef4e",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -3373,9 +3373,9 @@
         }
       ],
       "client": "warp",
-      "content_digest": "sha256:57cdf7ee0e610491186bfc1c13c835f1862676739e52a30d9874091d7f261a48",
+      "content_digest": "sha256:ff91deb10367a59f7ae45a0e22ba341e749655a556d02af8fe5b2398361a4523",
       "kind": "rule",
-      "materialization_digest": "sha256:47f336293988319fa4008ab3292238e4085ac1a545f15d8dc402dfe4021b71f2",
+      "materialization_digest": "sha256:e9cddee839ad384a2a667279c91e20cac9c8e0c672da80a48667d1203d9c57ac",
       "probe": "fresh-rule-discovery",
       "source_revision": "sha256:3c33ae4ae1e56776680e59df6fc509cce620be679e811668e2d1a01aef588797",
       "symlink_policy": "forbidden",

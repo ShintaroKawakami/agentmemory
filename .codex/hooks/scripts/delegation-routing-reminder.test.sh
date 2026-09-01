@@ -691,4 +691,52 @@ reset_missing_output="$(
 )"
 echo "$reset_missing_output" | grep -q "本日約13%" || fail "resetsAt欠落時もfail-openで従来どおり増分計算されるべき: $reset_missing_output"
 
+# ===== [2026-09-01][test] agents.yaml 3段フォールバック解決テスト =====
+# 背景: 配布先PJ（jtt-cms/jtt-apps/jtt-system/jtt-cafe-pj/hermes/mcp-servers系）には
+# agents.yaml が存在せず、これまで load_credit_thresholds 等が常に None を返して
+# 残量・節約モード機能が黙って無効化されていた（実測・本PRの主目的）。AGENTS_YAML_PATH を
+# 明示せず、PJ にも agents.yaml が無い実運用の形を検証する。AGENT_HUB_AGENTS_YAML
+# （fable-implementation-guard.sh が既に採用済みの env と同名・同粒度。agents.yaml への
+# 絶対パスを直接指す）を一時ファイルへ向ける。
+
+# 34) PJ に agents.yaml が無く、AGENT_HUB_AGENTS_YAML フォールバック先に存在する
+#     → 閾値が読まれ、warn 帯の残量文言が出る
+FB_TMP="$(mktemp -d)"
+FB_PJ="$FB_TMP/pj"
+mkdir -p "$FB_PJ" "$FB_PJ/runtime-cache"
+FB_AGENTS_YAML="$FB_TMP/agents.yaml"
+make_agents_yaml "$FB_AGENTS_YAML" 55 75
+make_credit_cache "$FB_PJ/credit-usage.json" 62
+fb_output="$(
+  printf '%s' "$(payload "このバグを修正して" "sess-fallback-warn")" |
+    env -u AGENTS_YAML_PATH \
+      AGENT_HUB_AGENTS_YAML="$FB_AGENTS_YAML" \
+      CLAUDE_PROJECT_DIR="$FB_PJ" \
+      CREDIT_CACHE_PATH="$FB_PJ/credit-usage.json" \
+      DELEGATION_REMINDER_CACHE_DIR="$FB_PJ/runtime-cache" \
+      bash "$HOOK" 2>&1
+)"
+echo "$fb_output" | grep -q "三役体制" || fail "Test 34: PJ に agents.yaml が無い時、従来文言が出ない: $fb_output"
+echo "$fb_output" | grep -q "Claude 週次 62%" || fail "Test 34: AGENT_HUB_AGENTS_YAML フォールバックで残量文言が出ない: $fb_output"
+rm -rf "$FB_TMP"
+
+# 35) PJ にも AGENT_HUB_AGENTS_YAML フォールバック先にも agents.yaml が無い
+#     → 残量機能だけ黙って無効化され、三役体制メッセージは従来通り非ブロックで出る（exit 0）
+FB_TMP2="$(mktemp -d)"
+mkdir -p "$FB_TMP2/pj"
+set +e
+fb_missing_output="$(
+  printf '%s' "$(payload "このバグを修正して" "sess-fallback-missing")" |
+    env -u AGENTS_YAML_PATH \
+      AGENT_HUB_AGENTS_YAML="$FB_TMP2/agent-hub-missing/agents.yaml" \
+      CLAUDE_PROJECT_DIR="$FB_TMP2/pj" \
+      bash "$HOOK" 2>&1
+)"
+fb_missing_exit=$?
+set -e
+[ "$fb_missing_exit" -eq 0 ] || fail "Test 35: agents.yaml が完全に無い時に exit 0 にならない（exit=$fb_missing_exit）"
+echo "$fb_missing_output" | grep -q "三役体制" || fail "Test 35: agents.yaml が完全に無くても従来文言は出るべき: $fb_missing_output"
+echo "$fb_missing_output" | grep -q "Claude 週次" && fail "Test 35: agents.yaml が完全に無いのに残量文言が出てしまう: $fb_missing_output" || true
+rm -rf "$FB_TMP2"
+
 echo "PASS: delegation-routing-reminder"

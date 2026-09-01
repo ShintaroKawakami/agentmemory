@@ -365,4 +365,70 @@ exit_code=$?
 [ "$exit_code" -eq 0 ] || fail "Test 12 (2回目): exit 0 にならない（exit=$exit_code）"
 echo "$out" | grep -q "本日約13%" || fail "Test 12: resetsAt欠落時もfail-openで従来どおり増分計算されるべき: $out"
 
+# ===== [2026-09-01][test] agents.yaml 3段フォールバック解決テスト =====
+# 背景: 配布先PJ（jtt-cms/jtt-apps/jtt-system/jtt-cafe-pj/hermes/mcp-servers系）には
+# agents.yaml が存在せず、これまで hook は毎回無言 exit 0 していた（実測・本PRの主目的）。
+# AGENTS_YAML_PATH を明示せず、PJ にも agents.yaml が無い実運用の形を検証する。
+# AGENT_HUB_AGENTS_YAML（fable-implementation-guard.sh が既に採用済みの env と同名・同粒度。
+# agents.yaml への絶対パスを直接指す）を一時ファイルへ向け、実マシンの
+# ~/business/AGENT-HUB/agents.yaml の中身には依存しない。
+
+# --- Test 13: PJ に agents.yaml が無く、AGENT_HUB_AGENTS_YAML フォールバック先に存在する
+#     → 閾値が読まれ、残量パネルが出る ---
+FALLBACK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/credit-preflight-fallback.XXXXXX")"
+FALLBACK_PJ="$FALLBACK_TMP/pj"
+mkdir -p "$FALLBACK_PJ/cache" "$FALLBACK_PJ/daily-baseline-cache"
+
+FALLBACK_AGENTS_YAML="$FALLBACK_TMP/agents.yaml"
+cat > "$FALLBACK_AGENTS_YAML" <<'YAML'
+worker_delegation:
+  credit_preflight:
+    cache_path: "~/.cache/agent-hub/credit-usage.json"
+    cache_ttl_seconds: 900
+    display_routes: ["claude", "glm"]
+    claude_weekly_warn_percent: 55
+    claude_weekly_strong_percent: 75
+YAML
+
+FALLBACK_CACHE_FILE="$FALLBACK_PJ/cache/credit-usage.json"
+cat > "$FALLBACK_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$NOW_ISO",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 62, "session": 16, "weekly": 62, "willLastToReset": false},
+    "glm": {"usedPercent": 2}
+  }
+}
+JSON
+
+fallback_out="$(
+  env -u AGENTS_YAML_PATH \
+    AGENT_HUB_AGENTS_YAML="$FALLBACK_AGENTS_YAML" \
+    CLAUDE_PROJECT_DIR="$FALLBACK_PJ" \
+    CREDIT_USAGE_CACHE_FILE="$FALLBACK_CACHE_FILE" \
+    DELEGATION_REMINDER_CACHE_DIR="$FALLBACK_PJ/daily-baseline-cache" \
+    bash "$TARGET_SCRIPT"
+)"
+fallback_exit=$?
+[ "$fallback_exit" -eq 0 ] || fail "Test 13: exit 0 にならない（exit=$fallback_exit）"
+echo "$fallback_out" | grep -q "Claude 週次" || fail "Test 13: PJ に agents.yaml が無くAGENT_HUB_AGENTS_YAMLフォールバックでも残量パネルが出ない: $fallback_out"
+echo "$fallback_out" | grep -q "62%" || fail "Test 13: フォールバック時の62%表示が無い: $fallback_out"
+rm -rf "$FALLBACK_TMP"
+
+# --- Test 14: PJ にも AGENT_HUB_AGENTS_YAML フォールバック先にも agents.yaml が無い
+#     → これまで通り無言で exit 0（fail-open。エラーを出さない） ---
+FALLBACK_TMP2="$(mktemp -d "${TMPDIR:-/tmp}/credit-preflight-nofallback.XXXXXX")"
+mkdir -p "$FALLBACK_TMP2/pj"
+no_fallback_out="$(
+  env -u AGENTS_YAML_PATH \
+    AGENT_HUB_AGENTS_YAML="$FALLBACK_TMP2/agent-hub-missing/agents.yaml" \
+    CLAUDE_PROJECT_DIR="$FALLBACK_TMP2/pj" \
+    bash "$TARGET_SCRIPT"
+)"
+no_fallback_exit=$?
+[ "$no_fallback_exit" -eq 0 ] || fail "Test 14: agents.yaml が完全に無い時に exit 0 にならない（exit=$no_fallback_exit）"
+[ -z "$no_fallback_out" ] || fail "Test 14: agents.yaml が完全に無い時は無音であるべき: $no_fallback_out"
+rm -rf "$FALLBACK_TMP2"
+
 echo "PASS: credit-baton-preflight"
