@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-28T07:13:22.904059+00:00",
-  "source_commit": "29985da02bdc63bbca685301df8a353caaabf001",
+  "generated_at": "2026-09-01T13:41:53.716267+00:00",
+  "source_commit": "4171e61e4f4b8677a3d2022925f07b1e9bf50bef",
   "source_rule_files": [
     ".claude/rules/general/ai-model-selection.md",
     ".claude/rules/general/ai-worker-watch.md",
@@ -32,6 +32,8 @@
     ".claude/hooks/lib/quality-check-common.sh",
     ".claude/hooks/lib/storage-url-common.py",
     ".claude/hooks/lib/upstream-write-guard.py",
+    ".claude/hooks/scripts/ai-worker-watch-enforce.sh",
+    ".claude/hooks/scripts/ai-worker-watch-enforce.test.sh",
     ".claude/hooks/scripts/block-destructive-git.sh",
     ".claude/hooks/scripts/block-destructive-git.test.sh",
     ".claude/hooks/scripts/block-main-commit.sh",
@@ -114,6 +116,8 @@
     ".cursor/hooks/lib/quality-check-common.sh",
     ".cursor/hooks/lib/storage-url-common.py",
     ".cursor/hooks/lib/upstream-write-guard.py",
+    ".cursor/hooks/scripts/ai-worker-watch-enforce.sh",
+    ".cursor/hooks/scripts/ai-worker-watch-enforce.test.sh",
     ".cursor/hooks/scripts/block-destructive-git.sh",
     ".cursor/hooks/scripts/block-destructive-git.test.sh",
     ".cursor/hooks/scripts/block-main-commit.sh",
@@ -206,7 +210,7 @@
     "definitions_path": null
   },
   "warning_summary": {
-    "total": 9,
+    "total": 10,
     "unsupported_events": [],
     "unsupported_matcher_tokens": [
       "Shell",
@@ -214,7 +218,8 @@
       "WriteFile",
       "Agent",
       "Skill",
-      "Task"
+      "Task",
+      "mcp__ai-worker-mcp__delegate_impl"
     ],
     "other": []
   },
@@ -225,6 +230,7 @@
     "unsupported_cursor_cli_pretooluse_matcher_token:Agent",
     "unsupported_cursor_cli_pretooluse_matcher_token:Skill",
     "unsupported_cursor_cli_pretooluse_matcher_token:Task",
+    "unsupported_cursor_cli_posttooluse_matcher_token:mcp__ai-worker-mcp__delegate_impl",
     "unsupported_cursor_cli_posttooluse_matcher_token:Agent",
     "unsupported_cursor_cli_posttooluse_matcher_token:Skill",
     "unsupported_cursor_cli_posttooluse_matcher_token:Task"

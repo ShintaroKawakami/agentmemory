@@ -39,7 +39,7 @@ alwaysApply: true
 
 ## 生成元情報
 
-- warnings: `10`
+- warnings: `11`
 - source_files:
 - `CLAUDE.md`
 - `.claude/rules/general/ai-model-selection.md`
@@ -72,6 +72,8 @@ alwaysApply: true
 - `.claude/hooks/lib/quality-check-common.sh`
 - `.claude/hooks/lib/storage-url-common.py`
 - `.claude/hooks/lib/upstream-write-guard.py`
+- `.claude/hooks/scripts/ai-worker-watch-enforce.sh`
+- `.claude/hooks/scripts/ai-worker-watch-enforce.test.sh`
 - `.claude/hooks/scripts/block-destructive-git.sh`
 - `.claude/hooks/scripts/block-destructive-git.test.sh`
 - `.claude/hooks/scripts/block-main-commit.sh`
@@ -150,6 +152,8 @@ alwaysApply: true
 - `.cursor/hooks/lib/quality-check-common.sh`
 - `.cursor/hooks/lib/storage-url-common.py`
 - `.cursor/hooks/lib/upstream-write-guard.py`
+- `.cursor/hooks/scripts/ai-worker-watch-enforce.sh`
+- `.cursor/hooks/scripts/ai-worker-watch-enforce.test.sh`
 - `.cursor/hooks/scripts/block-destructive-git.sh`
 - `.cursor/hooks/scripts/block-destructive-git.test.sh`
 - `.cursor/hooks/scripts/block-main-commit.sh`

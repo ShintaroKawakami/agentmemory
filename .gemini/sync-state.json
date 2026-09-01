@@ -1,7 +1,7 @@
 {
   "tool": "antigravity-sync",
-  "generated_at": "2026-08-30T11:19:51.437438+00:00",
-  "source_commit": "df2e97f",
+  "generated_at": "2026-09-01T13:42:00.432044+00:00",
+  "source_commit": "4171e61",
   "project_root": ".",
   "generated_gemini_md": true,
   "copied_agents": [
@@ -29,6 +29,8 @@
     "lib/quality-check-common.sh",
     "lib/storage-url-common.py",
     "lib/upstream-write-guard.py",
+    "scripts/ai-worker-watch-enforce.sh",
+    "scripts/ai-worker-watch-enforce.test.sh",
     "scripts/block-destructive-git.sh",
     "scripts/block-destructive-git.test.sh",
     "scripts/block-main-commit.sh",
@@ -127,6 +129,7 @@
     "PreToolUse matcher=Bash|Edit|MultiEdit|Shell|StrReplaceFile|Write|WriteFile は Gemini の run_shell_command へ未変換のためスキップ",
     "PreToolUse matcher=Skill|Task|Agent は Gemini の run_shell_command へ未変換のためスキップ",
     "SessionStart→SessionStart は現状の runtime bridge 未対応のためスキップ",
+    "PostToolUse matcher=mcp__ai-worker-mcp__delegate_impl は Gemini の write_file|replace へ未変換のためスキップ",
     "PostToolUse matcher=Edit|Write|MultiEdit は Gemini の write_file|replace へ未変換のためスキップ",
     "PostToolUse matcher=Edit|Write|MultiEdit は Gemini の write_file|replace へ未変換のためスキップ",
     "PostToolUse matcher=Skill|Task|Agent は Gemini の write_file|replace へ未変換のためスキップ",
