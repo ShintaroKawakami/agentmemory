@@ -53,6 +53,15 @@ TEST_CACHE_FILE="$TMP_DIR/cache/credit-usage.json"
 export CREDIT_USAGE_CACHE_FILE="$TEST_CACHE_FILE"
 mkdir -p "$(dirname "$TEST_CACHE_FILE")"
 
+# [2026-09-01][test] 日次基準点ファイルを実 ~/.cache へ書かせない
+# 背景: credit-baton-preflight.sh は delegation-reminder-cache.sh の
+# resolve_delegation_reminder_cache_dir() を read-only で使い、日次基準点ファイル
+# （daily-baseline-<date>.txt）の置き場を決める。DELEGATION_REMINDER_CACHE_DIR を
+# 明示しないと実環境の XDG cache 配下にディレクトリが作られてしまうため、
+# delegation-routing-reminder.test.sh と同じ方式でテスト専用ディレクトリへ固定する。
+export DELEGATION_REMINDER_CACHE_DIR="$TMP_DIR/daily-baseline-cache"
+mkdir -p "$DELEGATION_REMINDER_CACHE_DIR"
+
 # --- Test 1: キャッシュが無いとき exit 0 かつ何も表示しないこと ---
 rm -f "$TEST_CACHE_FILE"
 out="$(bash "$TARGET_SCRIPT")"
@@ -162,5 +171,198 @@ is_fast="$(python3 -c "print(1 if float($duration) < 1.5 else 0)")"
 
 [ "$exit_code" -eq 0 ] || fail "Test 5: exit 0 にならない（exit=$exit_code）"
 [ "$is_fast" -eq 1 ] || fail "Test 5: hook が同期ブロックしている（所要時間: ${duration}s, 期待値: < 1.5s）"
+
+# ===== [2026-09-01] 日次/pace 節約モード自動宣言 + 鮮度表示強化テスト =====
+unset CODEXBAR_BIN
+
+TEST_AGENTS_YAML_DAILY="$TMP_DIR/agents-daily.yaml"
+cat > "$TEST_AGENTS_YAML_DAILY" <<'YAML'
+worker_delegation:
+  credit_preflight:
+    as_of: "2026-08-27"
+    cache_path: "~/.cache/agent-hub/credit-usage.json"
+    cache_ttl_seconds: 900
+    display_routes: ["claude", "glm", "antigravity", "kimi", "codex", "cursor", "ocg"]
+    claude_weekly_warn_percent: 55
+    claude_weekly_strong_percent: 75
+    claude_daily_warn_percent: 12
+    claude_daily_strong_percent: 15
+    claude_pace_delta_warn_points: 10
+    claude_pace_delta_strong_points: 20
+    claude_pace_exhaustion_is_strong: true
+YAML
+
+# --- Test 6: 日次基準点確立(1回目)では節約モードを宣言しない ---
+rm -rf "${DELEGATION_REMINDER_CACHE_DIR:?}"/daily-baseline-* 2>/dev/null || true
+cat > "$TEST_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$NOW_ISO",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 20, "session": 5, "weekly": 20, "willLastToReset": true, "deltaPercent": 2, "expectedUsedPercent": 18},
+    "glm": {"usedPercent": 2}
+  }
+}
+JSON
+out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML_DAILY" bash "$TARGET_SCRIPT")"
+exit_code=$?
+[ "$exit_code" -eq 0 ] || fail "Test 6: exit 0 にならない（exit=$exit_code）"
+echo "$out" | grep -q "節約モード" && fail "Test 6: 基準点確立1回目で節約モードが出てしまう: $out" || true
+
+# --- Test 7: 基準点=20のまま週次33%（本日約13%）で節約モードを自動宣言する ---
+cat > "$TEST_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$NOW_ISO",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 33, "session": 8, "weekly": 33, "willLastToReset": true, "deltaPercent": 5, "expectedUsedPercent": 28},
+    "glm": {"usedPercent": 2}
+  }
+}
+JSON
+out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML_DAILY" bash "$TARGET_SCRIPT")"
+exit_code=$?
+[ "$exit_code" -eq 0 ] || fail "Test 7: exit 0 にならない（exit=$exit_code）"
+echo "$out" | grep -q "【節約モード】" || fail "Test 7: 日次閾値超過で節約モードが宣言されない: $out"
+echo "$out" | grep -q "実装は ai-worker" || fail "Test 7: 節約モード宣言に分担（実装=ai-worker）が無い: $out"
+echo "$out" | grep -q "⛔" && fail "Test 7: warn帯(daily=13%)なのにstrongの⛔が出てしまう: $out" || true
+
+# --- Test 8: willLastToReset:false + claude_pace_exhaustion_is_strong:true で強い宣言になる ---
+cat > "$TEST_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$NOW_ISO",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 34, "session": 8, "weekly": 34, "willLastToReset": false, "deltaPercent": 3, "expectedUsedPercent": 28, "etaSeconds": 172800},
+    "glm": {"usedPercent": 2}
+  }
+}
+JSON
+out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML_DAILY" bash "$TARGET_SCRIPT")"
+exit_code=$?
+[ "$exit_code" -eq 0 ] || fail "Test 8: exit 0 にならない（exit=$exit_code）"
+echo "$out" | grep -q "⛔【節約モード】" || fail "Test 8: willLastToReset:falseで強い宣言にならない: $out"
+echo "$out" | grep -q "枯渇見込み" || fail "Test 8: etaSecondsからの枯渇見込み表示が無い: $out"
+
+# --- Test 9: 鮮度表示の強化。TTLの2倍(1800s)より大きく古い(2時間前)キャッシュには ⚠️ を出す ---
+OLD_ISO="$(date -u -d '2 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-2H +%Y-%m-%dT%H:%M:%SZ)"
+cat > "$TEST_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$OLD_ISO",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 20, "session": 5, "weekly": 20, "willLastToReset": true},
+    "glm": {"usedPercent": 2}
+  }
+}
+JSON
+out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML" bash "$TARGET_SCRIPT")"
+exit_code=$?
+[ "$exit_code" -eq 0 ] || fail "Test 9: exit 0 にならない（exit=$exit_code）"
+echo "$out" | grep -q "⚠️ クレジット残量" || fail "Test 9: 2時間前の古いキャッシュで ⚠️ 表示にならない: $out"
+echo "$out" | grep -q "最新の値ではない可能性があります" || fail "Test 9: 鮮度警告の説明文が出ていない: $out"
+
+# ===== [2026-09-01] Codexレビュー指摘対応: resetsAt（週次カウンタ世代）跨ぎテスト =====
+# 指摘: 基準点と同じUTC日の途中でresetsAtを跨ぐと weekly-baseline が負になり max(0,...) で
+# 0に潰れ、実際は使っているのに節約モードが発火しない。具体例: 基準点80% → リセット後15%
+# 使用 → max(0,15-80)=0 と誤判定。
+
+# --- Test 10: 同じUTC日のうちにresetsAtが変わった（世代切替）ケース:
+#     基準点が取り直され、リセット後の使用分（観測値そのもの）が日次として正しくカウントされる ---
+rm -rf "${DELEGATION_REMINDER_CACHE_DIR:?}"/daily-baseline-* 2>/dev/null || true
+cat > "$TEST_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$NOW_ISO",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 80, "session": 40, "weekly": 80, "willLastToReset": true, "resetsAt": "2026-08-30T09:00:00Z"}
+  }
+}
+JSON
+out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML_DAILY" bash "$TARGET_SCRIPT")"
+exit_code=$?
+[ "$exit_code" -eq 0 ] || fail "Test 10 (1回目): exit 0 にならない（exit=$exit_code）"
+baseline_file_10="$(find "$DELEGATION_REMINDER_CACHE_DIR" -maxdepth 1 -type f -name 'daily-baseline-*' | head -1)"
+[ -n "$baseline_file_10" ] || fail "Test 10: 基準点ファイルが作られていない"
+python3 -c "import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get('baseline')==80 else 1)" "$baseline_file_10" \
+  || fail "Test 10 前提: 1回目の基準点が80になっていない: $(cat "$baseline_file_10")"
+# 2回目: 同じUTC日のうちにresetsAtが変わり(=リセット発生)、weekly=15%（旧計算だとmax(0,15-80)=0で誤判定）
+cat > "$TEST_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$NOW_ISO",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 15, "session": 5, "weekly": 15, "willLastToReset": true, "resetsAt": "2026-09-06T09:00:00Z"}
+  }
+}
+JSON
+out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML_DAILY" bash "$TARGET_SCRIPT")"
+exit_code=$?
+[ "$exit_code" -eq 0 ] || fail "Test 10 (2回目): exit 0 にならない（exit=$exit_code）"
+echo "$out" | grep -q "節約モード" || fail "Test 10: 世代切替後、新世代の使用分(15%)で節約モードが発火すべき: $out"
+echo "$out" | grep -q "本日約15%" || fail "Test 10: 世代切替後、日次使用量が新世代の観測値(15%)そのもので再カウントされていない: $out"
+echo "$out" | grep -q "本日約0%" && fail "Test 10: 旧バグ再現: max(0,15-80)=0に潰れている: $out" || true
+echo "$out" | grep -q "週次カウンタ変更直後のため本日分は一部のみ" || fail "Test 10: 世代切替時の『本日分は一部のみ』注記が出ていない: $out"
+baseline_file_10b="$(find "$DELEGATION_REMINDER_CACHE_DIR" -maxdepth 1 -type f -name 'daily-baseline-*' | head -1)"
+python3 -c "import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get('baseline')==15 and d.get('resetsAt')=='2026-09-06T09:00:00Z' else 1)" "$baseline_file_10b" \
+  || fail "Test 10: 世代切替後、基準点ファイルが新世代(baseline=15,resetsAt=新値)へ更新されていない: $(cat "$baseline_file_10b")"
+
+# --- Test 11: resetsAtが同一のまま推移する通常ケース: 既存挙動が変わらない（回帰確認） ---
+rm -rf "${DELEGATION_REMINDER_CACHE_DIR:?}"/daily-baseline-* 2>/dev/null || true
+cat > "$TEST_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$NOW_ISO",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 20, "session": 5, "weekly": 20, "willLastToReset": true, "resetsAt": "2026-09-06T09:00:00Z"}
+  }
+}
+JSON
+out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML_DAILY" bash "$TARGET_SCRIPT")"
+exit_code=$?
+[ "$exit_code" -eq 0 ] || fail "Test 11 (1回目): exit 0 にならない（exit=$exit_code）"
+# resetsAtは同じまま weekly だけ 33% へ増加（日次+13%で warn帯）
+cat > "$TEST_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$NOW_ISO",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 33, "session": 8, "weekly": 33, "willLastToReset": true, "resetsAt": "2026-09-06T09:00:00Z"}
+  }
+}
+JSON
+out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML_DAILY" bash "$TARGET_SCRIPT")"
+exit_code=$?
+[ "$exit_code" -eq 0 ] || fail "Test 11 (2回目): exit 0 にならない（exit=$exit_code）"
+echo "$out" | grep -q "本日約13%" || fail "Test 11: resetsAt不変時は従来どおり増分(13%)で計算されるべき: $out"
+echo "$out" | grep -q "週次カウンタ変更直後のため本日分は一部のみ" && fail "Test 11: resetsAt不変なのに世代切替注記が出てしまう: $out" || true
+
+# --- Test 12: resetsAtがキャッシュに無いケース: 世代判定できず fail-open して従来どおり動く ---
+rm -rf "${DELEGATION_REMINDER_CACHE_DIR:?}"/daily-baseline-* 2>/dev/null || true
+cat > "$TEST_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$NOW_ISO",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 20, "session": 5, "weekly": 20, "willLastToReset": true}
+  }
+}
+JSON
+out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML_DAILY" bash "$TARGET_SCRIPT")"
+exit_code=$?
+[ "$exit_code" -eq 0 ] || fail "Test 12 (1回目): exit 0 にならない（exit=$exit_code）"
+cat > "$TEST_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$NOW_ISO",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 33, "session": 8, "weekly": 33, "willLastToReset": true}
+  }
+}
+JSON
+out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML_DAILY" bash "$TARGET_SCRIPT")"
+exit_code=$?
+[ "$exit_code" -eq 0 ] || fail "Test 12 (2回目): exit 0 にならない（exit=$exit_code）"
+echo "$out" | grep -q "本日約13%" || fail "Test 12: resetsAt欠落時もfail-openで従来どおり増分計算されるべき: $out"
 
 echo "PASS: credit-baton-preflight"

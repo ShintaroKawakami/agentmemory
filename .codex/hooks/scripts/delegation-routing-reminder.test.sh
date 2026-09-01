@@ -231,6 +231,10 @@ setup_credit_test() {
   mkdir -p "$tmp_dir"
   # 残量スロットルのマーカーを消す（実リポではなくテスト専用 CACHE_DIR のみ）
   find "$CACHE_DIR" -maxdepth 1 -type f -name '*-tier-*' -delete 2>/dev/null || true
+  # [2026-08-31][test] 日次基準点ファイルもケース間で持ち越されないようにする
+  # 背景: daily-baseline-<UTC日付>.txt は「-tier-」を含まないため、上の find では消えない。
+  #   ケースをまたいで基準点が固定されたままだと「baseline=20で始まる」前提のテストが崩れる。
+  find "$CACHE_DIR" -maxdepth 1 -type f -name 'daily-baseline-*' -delete 2>/dev/null || true
 }
 
 make_agents_yaml() {
@@ -262,6 +266,92 @@ make_credit_cache() {
     "kimi": {"usedPercent": 21},
     "codex": {"usedPercent": 70},
     "cursor": {"usedPercent": 79},
+    "ocg": {"usedPercent": 0}
+  }
+}
+EOF
+}
+
+# [2026-08-31][test] 日次節約モード用: 週次閾値は高く固定し（週次経路が誤って発火しないように）、
+# 日次閾値だけをテストしたいケースで使う agents.yaml ヘルパー。
+make_agents_yaml_with_daily() {
+  local path="$1"
+  local weekly_warn="${2:-55}"
+  local weekly_strong="${3:-75}"
+  local daily_warn="${4:-12}"
+  local daily_strong="${5:-15}"
+  cat > "$path" <<EOF
+worker_delegation:
+  credit_preflight:
+    cache_path: "~/.cache/agent-hub/credit-usage.json"
+    cache_ttl_seconds: 900
+    claude_weekly_warn_percent: $weekly_warn
+    claude_weekly_strong_percent: $weekly_strong
+    claude_daily_warn_percent: $daily_warn
+    claude_daily_strong_percent: $daily_strong
+EOF
+}
+
+# [2026-09-01][test] pace 閾値も含めた agents.yaml ヘルパー（真因調査タスク item C 検証用）。
+make_agents_yaml_with_daily_and_pace() {
+  local path="$1"
+  local weekly_warn="${2:-55}"
+  local weekly_strong="${3:-75}"
+  local daily_warn="${4:-12}"
+  local daily_strong="${5:-15}"
+  local pace_warn="${6:-10}"
+  local pace_strong="${7:-20}"
+  local exhaustion_is_strong="${8:-true}"
+  cat > "$path" <<EOF
+worker_delegation:
+  credit_preflight:
+    cache_path: "~/.cache/agent-hub/credit-usage.json"
+    cache_ttl_seconds: 900
+    claude_weekly_warn_percent: $weekly_warn
+    claude_weekly_strong_percent: $weekly_strong
+    claude_daily_warn_percent: $daily_warn
+    claude_daily_strong_percent: $daily_strong
+    claude_pace_delta_warn_points: $pace_warn
+    claude_pace_delta_strong_points: $pace_strong
+    claude_pace_exhaustion_is_strong: $exhaustion_is_strong
+EOF
+}
+
+# [2026-09-01][test] pace フィールド（deltaPercent/willLastToReset/expectedUsedPercent/etaSeconds）
+# を含む credit-usage.json ヘルパー。
+make_credit_cache_with_pace() {
+  local path="$1"
+  local weekly="${2:-20}"
+  local delta="${3:-3}"
+  local will_last="${4:-true}"
+  local expected="${5:-17}"
+  local eta="${6:-0}"
+  cat > "$path" <<EOF
+{
+  "updatedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": $weekly, "session": 16, "weekly": $weekly, "willLastToReset": $will_last, "deltaPercent": $delta, "expectedUsedPercent": $expected, "etaSeconds": $eta, "stage": "ahead"},
+    "glm": {"usedPercent": 2},
+    "ocg": {"usedPercent": 0}
+  }
+}
+EOF
+}
+
+# [2026-09-01][test] resetsAt（週次カウンタの世代識別子）を含む credit-usage.json ヘルパー。
+# Codexレビュー指摘（世代切替の誤判定）の回帰テスト用。
+make_credit_cache_with_resets_at() {
+  local path="$1"
+  local weekly="${2:-80}"
+  local resets_at="${3:-2026-09-06T09:00:00Z}"
+  cat > "$path" <<EOF
+{
+  "updatedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": $weekly, "session": 16, "weekly": $weekly, "willLastToReset": true, "resetsAt": "$resets_at"},
+    "glm": {"usedPercent": 2},
     "ocg": {"usedPercent": 0}
   }
 }
@@ -406,5 +496,199 @@ no_exec_output="$(
 )"
 [ -z "$(echo "$no_exec_output" | grep "FAKE_CODEXBAR_CALLED")" ] || fail "codexbar が呼ばれている: $no_exec_output"
 echo "$no_exec_output" | grep -q "Claude 週次" || fail "codexbar非実行テストで残量文言が出ない: $no_exec_output"
+
+# ===== [2026-08-31] 日次クレジット節約モードテスト =====
+# 週次閾値は高く固定（55/75）し、週次経路が誤って発火しないようにする。
+# 日次は「その日最初に観測した weekly 値」を基準点にした増分近似のため、
+# 1回目の呼び出しで基準点を確立してから2回目以降で差分を確認する。
+
+# 23) 1回目呼び出し（daily_used=0）では節約モード文言が出ない（基準点を確立するだけ）
+setup_credit_test "$CREDIT_TMP/daily-none"
+make_agents_yaml_with_daily "$CREDIT_TMP/daily-none/agents.yaml" 55 75 12 15
+make_credit_cache "$CREDIT_TMP/daily-none/credit-usage.json" 20
+daily_none_output="$(
+  printf '%s' "$(payload "このバグを修正して" "sess-daily-none-1")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/daily-none/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/daily-none/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$daily_none_output" | grep -q "三役体制" || fail "daily基準点確立1回目で従来文言が出ない: $daily_none_output"
+echo "$daily_none_output" | grep -q "節約モード" && fail "daily_used=0で節約モード文言が出てしまう: $daily_none_output" || true
+baseline_file="$(find "$CACHE_DIR" -maxdepth 1 -type f -name 'daily-baseline-*' | head -1)"
+[ -n "$baseline_file" ] || fail "daily基準点ファイルが作られていない"
+# [2026-09-01][test] 基準点ファイルは resetsAt（世代識別子）も持つ JSON 形式（Codexレビュー対応）。
+baseline_json="$(cat "$baseline_file")"
+python3 -c "import json,sys; d=json.loads(sys.argv[1]); sys.exit(0 if d.get('baseline')==20 else 1)" "$baseline_json" \
+  || fail "daily基準点の値が weekly=20 と一致しない: $baseline_json"
+
+# 24) 基準点=20のまま weekly=33（daily_used=13）に上がると warn 帯の節約モード文言が出る
+setup_credit_test "$CREDIT_TMP/daily-warn"
+make_agents_yaml_with_daily "$CREDIT_TMP/daily-warn/agents.yaml" 55 75 12 15
+make_credit_cache "$CREDIT_TMP/daily-warn/credit-usage.json" 20
+printf '%s' "$(payload "作って" "sess-daily-warn-1")" |
+  CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/daily-warn/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/daily-warn/credit-usage.json" bash "$HOOK" >/dev/null 2>&1
+make_credit_cache "$CREDIT_TMP/daily-warn/credit-usage.json" 33
+daily_warn_output="$(
+  printf '%s' "$(payload "作って" "sess-daily-warn-2")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/daily-warn/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/daily-warn/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$daily_warn_output" | grep -q "節約モード" || fail "daily_used=13(warn帯)で節約モード文言が出ない: $daily_warn_output"
+echo "$daily_warn_output" | grep -q "約13%" || fail "daily節約モード文言に本日使用量13%が出ていない: $daily_warn_output"
+echo "$daily_warn_output" | grep -q "⛔" && fail "warn帯なのに strong の強い表現(⛔)が出てしまう: $daily_warn_output" || true
+echo "$daily_warn_output" | grep -q "Claude 週次" && fail "週次閾値(55%)未満なのに週次文言が出てしまう: $daily_warn_output" || true
+
+# 25) 基準点=20のまま weekly=37（daily_used=17）に上がると strong 帯の強い表現が出る
+setup_credit_test "$CREDIT_TMP/daily-strong"
+make_agents_yaml_with_daily "$CREDIT_TMP/daily-strong/agents.yaml" 55 75 12 15
+make_credit_cache "$CREDIT_TMP/daily-strong/credit-usage.json" 20
+printf '%s' "$(payload "作って" "sess-daily-strong-1")" |
+  CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/daily-strong/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/daily-strong/credit-usage.json" bash "$HOOK" >/dev/null 2>&1
+make_credit_cache "$CREDIT_TMP/daily-strong/credit-usage.json" 37
+daily_strong_output="$(
+  printf '%s' "$(payload "作って" "sess-daily-strong-2")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/daily-strong/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/daily-strong/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$daily_strong_output" | grep -q "⛔【節約モード】" || fail "daily_used=17(strong帯)で強い表現が出ない: $daily_strong_output"
+echo "$daily_strong_output" | grep -q "約17%" || fail "daily節約モード文言に本日使用量17%が出ていない: $daily_strong_output"
+
+# 26) 同じ日付+帯の2回目は無音（日次マーカーのスロットル確認。週次と同型）
+setup_credit_test "$CREDIT_TMP/daily-throttle"
+make_agents_yaml_with_daily "$CREDIT_TMP/daily-throttle/agents.yaml" 55 75 12 15
+make_credit_cache "$CREDIT_TMP/daily-throttle/credit-usage.json" 20
+printf '%s' "$(payload "作って" "sess-daily-throttle-1")" |
+  CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/daily-throttle/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/daily-throttle/credit-usage.json" bash "$HOOK" >/dev/null 2>&1
+make_credit_cache "$CREDIT_TMP/daily-throttle/credit-usage.json" 33
+throttle_output1="$(
+  printf '%s' "$(payload "作って" "sess-daily-throttle-2")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/daily-throttle/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/daily-throttle/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$throttle_output1" | grep -q "節約モード" || fail "daily throttleテスト1回目で発火しない: $throttle_output1"
+throttle_output2="$(
+  printf '%s' "$(payload "作って" "sess-daily-throttle-3")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/daily-throttle/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/daily-throttle/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$throttle_output2" | grep -q "三役体制" || fail "daily throttle2回目で従来文言が出ない: $throttle_output2"
+echo "$throttle_output2" | grep -q "節約モード" && fail "同じ日付+帯の2回目で節約モード文言が出てしまう: $throttle_output2" || true
+# 帯を strong に上げると再通知される
+make_credit_cache "$CREDIT_TMP/daily-throttle/credit-usage.json" 37
+throttle_output3="$(
+  printf '%s' "$(payload "作って" "sess-daily-throttle-4")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/daily-throttle/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/daily-throttle/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$throttle_output3" | grep -q "⛔【節約モード】" || fail "daily帯がstrongに上がったら再通知されるべき: $throttle_output3"
+
+# 27) agents.yaml に日次閾値キーが無い環境（旧設定）では、weekly が動いても節約モード文言は出ない
+#     （load_daily_credit_thresholds が None を返し、日次機能が黙って無効化されることを確認）
+setup_credit_test "$CREDIT_TMP/daily-no-keys"
+make_agents_yaml "$CREDIT_TMP/daily-no-keys/agents.yaml" 55 75
+make_credit_cache "$CREDIT_TMP/daily-no-keys/credit-usage.json" 40
+no_daily_keys_output="$(
+  printf '%s' "$(payload "作って" "sess-daily-no-keys")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/daily-no-keys/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/daily-no-keys/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$no_daily_keys_output" | grep -q "三役体制" || fail "daily閾値キー無しで従来文言が出ない: $no_daily_keys_output"
+echo "$no_daily_keys_output" | grep -q "節約モード" && fail "daily閾値キー無しでも節約モード文言が出てしまう: $no_daily_keys_output" || true
+
+# ===== [2026-09-01] 発火条件を HIT/HEAVYHIT から解放する broadened-trigger テスト =====
+# 真因調査タスク item C: 閾値超過時は HIT/HEAVYHIT でなくても発火するようにする。
+
+# 28) 実装意図キーワードが無いプロンプトでも、daily-pct 閾値を超えていれば節約モードが発火する
+#     （旧仕様は HIT/HEAVYHIT 経路限定だったが、SessionStart 一度きりに依存しない自己修復のため解放）
+setup_credit_test "$CREDIT_TMP/broadened-daily"
+make_agents_yaml_with_daily "$CREDIT_TMP/broadened-daily/agents.yaml" 55 75 12 15
+make_credit_cache "$CREDIT_TMP/broadened-daily/credit-usage.json" 20
+printf '%s' "$(payload "今日は天気だけ確認" "sess-broadened-daily-1")" |
+  CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/broadened-daily/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/broadened-daily/credit-usage.json" bash "$HOOK" >/dev/null 2>&1
+make_credit_cache "$CREDIT_TMP/broadened-daily/credit-usage.json" 33
+broadened_daily_output="$(
+  printf '%s' "$(payload "今日は天気だけ確認" "sess-broadened-daily-2")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/broadened-daily/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/broadened-daily/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$broadened_daily_output" | grep -q "節約モード" || fail "実装キーワード無しでも daily 閾値超過なら発火すべき（broadened trigger）: $broadened_daily_output"
+echo "$broadened_daily_output" | grep -q "三役体制" && fail "実装キーワード無しで三役体制メッセージまで出てしまう（HITは維持されるべきでない）: $broadened_daily_output" || true
+
+# 29) pace（deltaPercent）だけが閾値超過で daily-pct は閾値未満のケースでも、pace 単独で発火する
+setup_credit_test "$CREDIT_TMP/pace-only"
+make_agents_yaml_with_daily_and_pace "$CREDIT_TMP/pace-only/agents.yaml" 55 75 12 15 10 20 false
+make_credit_cache_with_pace "$CREDIT_TMP/pace-only/credit-usage.json" 20 5 true 15 0
+printf '%s' "$(payload "今日は天気だけ確認" "sess-pace-only-1")" |
+  CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/pace-only/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/pace-only/credit-usage.json" bash "$HOOK" >/dev/null 2>&1
+# 2回目: 週次はほぼ変わらず(daily-pctはwarn未満)だが、deltaPercent(pace)が15pts(>warn10, <strong20)
+make_credit_cache_with_pace "$CREDIT_TMP/pace-only/credit-usage.json" 22 15 true 15 0
+pace_only_output="$(
+  printf '%s' "$(payload "今日は天気だけ確認" "sess-pace-only-2")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/pace-only/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/pace-only/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$pace_only_output" | grep -q "節約モード" || fail "pace(deltaPercent)単独の閾値超過で発火すべき: $pace_only_output"
+echo "$pace_only_output" | grep -q "期待15%" || fail "pace詳細(期待%)がメッセージに出ていない: $pace_only_output"
+echo "$pace_only_output" | grep -q "⛔" && fail "pace warn帯(15pts)なのにstrongの強い表現が出てしまう: $pace_only_output" || true
+
+# 30) willLastToReset:false + claude_pace_exhaustion_is_strong:true で、deltaPercentが小さくてもstrongになる
+setup_credit_test "$CREDIT_TMP/pace-exhaustion"
+make_agents_yaml_with_daily_and_pace "$CREDIT_TMP/pace-exhaustion/agents.yaml" 55 75 12 15 10 20 true
+make_credit_cache_with_pace "$CREDIT_TMP/pace-exhaustion/credit-usage.json" 20 2 false 18 90000
+pace_exhaustion_output="$(
+  printf '%s' "$(payload "今日は天気だけ確認" "sess-pace-exhaustion-1")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/pace-exhaustion/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/pace-exhaustion/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$pace_exhaustion_output" | grep -q "⛔【節約モード】" || fail "willLastToReset:falseでexhaustion_is_strong:trueならdeltaPercentが小さくてもstrongになるべき: $pace_exhaustion_output"
+echo "$pace_exhaustion_output" | grep -q "枯渇見込み" || fail "willLastToReset:false時にetaSecondsからの枯渇見込み表示が出ていない: $pace_exhaustion_output"
+
+# ===== [2026-09-01] Codexレビュー指摘対応: resetsAt（週次カウンタ世代）跨ぎテスト =====
+# 指摘: 基準点と同じUTC日の途中でresetsAtを跨ぐと weekly-baseline が負になり max(0,...) で
+# 0に潰れ、実際は使っているのに節約モードが発火しない。具体例: 基準点80% → リセット後15%
+# 使用 → max(0,15-80)=0 と誤判定。
+
+# 31) 同じUTC日のうちにresetsAtが変わった（世代切替）ケース:
+#     基準点が取り直され、リセット後の使用分が日次として正しくカウントされる
+setup_credit_test "$CREDIT_TMP/reset-generation-switch"
+make_agents_yaml_with_daily "$CREDIT_TMP/reset-generation-switch/agents.yaml" 55 75 12 15
+# 1回目: リセット前世代(resetsAt=A)、weekly=80%で基準点確立
+make_credit_cache_with_resets_at "$CREDIT_TMP/reset-generation-switch/credit-usage.json" 80 "2026-08-30T09:00:00Z"
+printf '%s' "$(payload "今日は天気だけ確認" "sess-reset-switch-1")" |
+  CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/reset-generation-switch/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/reset-generation-switch/credit-usage.json" bash "$HOOK" >/dev/null 2>&1
+baseline_before_switch="$(find "$CACHE_DIR" -maxdepth 1 -type f -name 'daily-baseline-*' | head -1)"
+python3 -c "import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get('baseline')==80 else 1)" "$baseline_before_switch" \
+  || fail "世代切替テスト前提: 1回目の基準点が80になっていない"
+# 2回目: 同じUTC日のうちにresetsAtが変わり(=リセット発生)、weekly=15%（旧計算だとmax(0,15-80)=0で誤判定）
+make_credit_cache_with_resets_at "$CREDIT_TMP/reset-generation-switch/credit-usage.json" 15 "2026-09-06T09:00:00Z"
+reset_switch_output="$(
+  printf '%s' "$(payload "今日は天気だけ確認" "sess-reset-switch-2")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/reset-generation-switch/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/reset-generation-switch/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$reset_switch_output" | grep -q "節約モード" || fail "世代切替後、新世代の使用分(15%)で節約モードが発火すべき: $reset_switch_output"
+echo "$reset_switch_output" | grep -q "本日約15%" || fail "世代切替後、日次使用量が新世代の値(15%)で再カウントされていない: $reset_switch_output"
+echo "$reset_switch_output" | grep -q "本日約0%" && fail "旧バグ再現: max(0,15-80)=0に潰れている: $reset_switch_output" || true
+echo "$reset_switch_output" | grep -q "週次カウンタ変更直後のため本日分は一部のみ" || fail "世代切替時の『本日分は一部のみ』注記が出ていない: $reset_switch_output"
+# 基準点ファイルが新世代の値(15)へ更新されていることも確認
+baseline_after_switch="$(find "$CACHE_DIR" -maxdepth 1 -type f -name 'daily-baseline-*' | head -1)"
+python3 -c "import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get('baseline')==15 and d.get('resetsAt')=='2026-09-06T09:00:00Z' else 1)" "$baseline_after_switch" \
+  || fail "世代切替後、基準点ファイルが新世代(baseline=15, resetsAt=新値)へ更新されていない: $(cat "$baseline_after_switch")"
+
+# 32) resetsAtが同一のまま推移する通常ケース: 既存挙動が変わらない（回帰確認）
+setup_credit_test "$CREDIT_TMP/reset-same"
+make_agents_yaml_with_daily "$CREDIT_TMP/reset-same/agents.yaml" 55 75 12 15
+make_credit_cache_with_resets_at "$CREDIT_TMP/reset-same/credit-usage.json" 20 "2026-09-06T09:00:00Z"
+printf '%s' "$(payload "今日は天気だけ確認" "sess-reset-same-1")" |
+  CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/reset-same/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/reset-same/credit-usage.json" bash "$HOOK" >/dev/null 2>&1
+# resetsAtは同じまま weekly だけ 33% へ増加（日次+13%で warn帯）
+make_credit_cache_with_resets_at "$CREDIT_TMP/reset-same/credit-usage.json" 33 "2026-09-06T09:00:00Z"
+reset_same_output="$(
+  printf '%s' "$(payload "今日は天気だけ確認" "sess-reset-same-2")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/reset-same/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/reset-same/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$reset_same_output" | grep -q "本日約13%" || fail "resetsAt不変時は従来どおり増分(13%)で計算されるべき: $reset_same_output"
+echo "$reset_same_output" | grep -q "週次カウンタ変更直後のため本日分は一部のみ" && fail "resetsAt不変なのに世代切替注記が出てしまう: $reset_same_output" || true
+
+# 33) resetsAtがキャッシュに無いケース: 世代判定できず fail-open して従来どおり動く
+setup_credit_test "$CREDIT_TMP/reset-missing"
+make_agents_yaml_with_daily "$CREDIT_TMP/reset-missing/agents.yaml" 55 75 12 15
+make_credit_cache "$CREDIT_TMP/reset-missing/credit-usage.json" 20
+printf '%s' "$(payload "今日は天気だけ確認" "sess-reset-missing-1")" |
+  CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/reset-missing/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/reset-missing/credit-usage.json" bash "$HOOK" >/dev/null 2>&1
+make_credit_cache "$CREDIT_TMP/reset-missing/credit-usage.json" 33
+reset_missing_output="$(
+  printf '%s' "$(payload "今日は天気だけ確認" "sess-reset-missing-2")" |
+    CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENTS_YAML_PATH="$CREDIT_TMP/reset-missing/agents.yaml" CREDIT_CACHE_PATH="$CREDIT_TMP/reset-missing/credit-usage.json" bash "$HOOK" 2>&1
+)"
+echo "$reset_missing_output" | grep -q "本日約13%" || fail "resetsAt欠落時もfail-openで従来どおり増分計算されるべき: $reset_missing_output"
 
 echo "PASS: delegation-routing-reminder"

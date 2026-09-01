@@ -184,4 +184,89 @@ jq -e 'has("routes") and (.routes | has("cursor") | not)' "$TEST_CACHE_FILE" >/d
 jq -e 'has("routes") and (.routes | has("ocg") | not)' "$TEST_CACHE_FILE" >/dev/null || fail "Test 4: ocg のキーが routes に残っている"
 jq -e 'has("routes") and (.routes | has("antigravity") | not)' "$TEST_CACHE_FILE" >/dev/null || fail "Test 4: antigravity のキーが routes に残っている"
 
+# [2026-09-01][test] Test 5: pace フィールド（真因調査タスク item B）が routes.claude へ
+# 転記されること。credit-baton-preflight.sh / delegation-routing-reminder.sh の節約モード判定が
+# 読む expectedUsedPercent / deltaPercent / stage / resetsAt / weeklyWindowMinutes / etaSeconds /
+# paceSummary を、codexbar の生出力そのままで検証する。
+cat > "$STUB_BIN_DIR/codexbar" <<'EOF'
+#!/bin/sh
+provider=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --provider) provider="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+case "$provider" in
+  claude)
+    cat <<'JSON'
+[
+  {
+    "provider": "claude",
+    "usage": {
+      "primary": { "usedPercent": 43, "windowMinutes": 300 },
+      "secondary": { "usedPercent": 37, "windowMinutes": 10080, "resetsAt": "2026-09-06T09:00:00Z" }
+    },
+    "pace": {
+      "secondary": {
+        "willLastToReset": false,
+        "expectedUsedPercent": 25,
+        "deltaPercent": 12,
+        "stage": "ahead",
+        "etaSeconds": 255600,
+        "summary": "12% in deficit | Expected 25% used | Runs out in 2d 23h"
+      }
+    }
+  }
+]
+JSON
+    ;;
+  *)
+    echo "[]"
+    ;;
+esac
+EOF
+chmod +x "$STUB_BIN_DIR/codexbar"
+
+rm -f "$TEST_CACHE_FILE"
+CODEXBAR_BIN="$STUB_BIN_DIR/codexbar" bash "$TARGET_SCRIPT"
+
+[ -f "$TEST_CACHE_FILE" ] || fail "Test 5: キャッシュファイルが生成されていない"
+jq -e '.routes.claude.weekly == 37' "$TEST_CACHE_FILE" >/dev/null || fail "Test 5: claude.weekly != 37"
+jq -e '.routes.claude.resetsAt == "2026-09-06T09:00:00Z"' "$TEST_CACHE_FILE" >/dev/null || fail "Test 5: claude.resetsAt が転記されていない"
+jq -e '.routes.claude.weeklyWindowMinutes == 10080' "$TEST_CACHE_FILE" >/dev/null || fail "Test 5: claude.weeklyWindowMinutes != 10080"
+jq -e '.routes.claude.expectedUsedPercent == 25' "$TEST_CACHE_FILE" >/dev/null || fail "Test 5: claude.expectedUsedPercent != 25"
+jq -e '.routes.claude.deltaPercent == 12' "$TEST_CACHE_FILE" >/dev/null || fail "Test 5: claude.deltaPercent != 12"
+jq -e '.routes.claude.stage == "ahead"' "$TEST_CACHE_FILE" >/dev/null || fail "Test 5: claude.stage != ahead"
+jq -e '.routes.claude.etaSeconds == 255600' "$TEST_CACHE_FILE" >/dev/null || fail "Test 5: claude.etaSeconds != 255600"
+jq -e '.routes.claude.paceSummary | length > 0' "$TEST_CACHE_FILE" >/dev/null || fail "Test 5: claude.paceSummary が転記されていない"
+jq -e '.routes.claude.willLastToReset == false' "$TEST_CACHE_FILE" >/dev/null || fail "Test 5: claude.willLastToReset != false"
+
+# --- Test 6: pace オブジェクト自体が無い場合、pace フィールドを捏造しない（キーごと省略） ---
+cat > "$STUB_BIN_DIR/codexbar" <<'EOF'
+#!/bin/sh
+provider=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --provider) provider="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+case "$provider" in
+  claude)
+    echo '[{"provider":"claude","usage":{"primary":{"usedPercent":10,"windowMinutes":300},"secondary":{"usedPercent":30,"windowMinutes":10080}}}]'
+    ;;
+  *)
+    echo "[]"
+    ;;
+esac
+EOF
+chmod +x "$STUB_BIN_DIR/codexbar"
+rm -f "$TEST_CACHE_FILE"
+CODEXBAR_BIN="$STUB_BIN_DIR/codexbar" bash "$TARGET_SCRIPT"
+jq -e '(.routes.claude | has("expectedUsedPercent")) | not' "$TEST_CACHE_FILE" >/dev/null || fail "Test 6: pace未提供時に expectedUsedPercent を捏造してしまっている"
+jq -e '(.routes.claude | has("deltaPercent")) | not' "$TEST_CACHE_FILE" >/dev/null || fail "Test 6: pace未提供時に deltaPercent を捏造してしまっている"
+jq -e '(.routes.claude | has("resetsAt")) | not' "$TEST_CACHE_FILE" >/dev/null || fail "Test 6: resetsAt未提供時に捏造してしまっている"
+
 echo "PASS: credit-usage-cache"
