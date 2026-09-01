@@ -14,7 +14,37 @@ set -u
 #     2) 閾値をスクリプトに直書きする案は、変更時に直す場所が分散するため不採用。
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-AGENTS_YAML="${AGENTS_YAML_PATH:-$PROJECT_DIR/agents.yaml}"
+
+# [2026-09-01][fix] agents.yaml が配布先PJに存在しないため hook が SessionStart のたびに
+# 無言 exit 0 していた件（真因調査・実測: jtt-cms/jtt-apps/jtt-system/jtt-cafe-pj/hermes/
+# mcp-servers系のPJすべてに agents.yaml が無いことを ls で確認済み。ファイル配布・
+# settings.json 配線は正しいのに、この直後の存在チェックだけで毎回止まっていた）。
+# 背景:
+#   - ユーザー依頼意図: 閾値の正本 agents.yaml（worker_delegation.credit_preflight セクション）
+#     は AGENT-HUB 1本のままにしつつ、配布先PJでも残量パネル・節約モード宣言が動くようにしたい。
+#   - 守るべき業務ルール: 解決順序は ①AGENTS_YAML_PATH（既存のテスト用オーバーライドを壊さない）
+#     ②$PROJECT_DIR/agents.yaml（AGENT-HUB 自身で作業しているケース）③AGENT_HUB_AGENTS_YAML
+#     （既定 $HOME/business/AGENT-HUB/agents.yaml、env で上書き可）の3段。最終的に
+#     解決したパスも存在しなければ、これまで通り静かに exit 0（fail-open。エラーで
+#     SessionStart を汚さない）。
+#   - 他案不採用理由:
+#     1) 各PJへ agents.yaml を配布複製する案 → 閾値の正本が分散し、変更のたびに全PJへ
+#        再配布が必要になるため不採用（`.claude/rules/general/reference-over-hardcode.md`
+#        の参照型設計に反する）。
+#     2) 閾値をスクリプトへ直書きする案 → 本ファイル冒頭の 2026-08-27 CaD で
+#        「変更時に直す場所が分散する」として既に不採用済み。今回も踏襲し直書きしない。
+#     3) 新しい env `AGENT_HUB_ROOT`（ディレクトリを指す）を新設する案 →
+#        同じ hook-library 内の `fable-implementation-guard.sh` が既に
+#        `AGENT_HUB_AGENTS_YAML`（agents.yaml への絶対パスを直接指す env）を採用済みであり、
+#        新変数を足すと同じ役割の env が2つに分散するため不採用。既存の命名・粒度に揃える。
+# 対応: AGENTS_YAML の解決を3段フォールバックへ変更する。
+if [ -n "${AGENTS_YAML_PATH:-}" ]; then
+  AGENTS_YAML="$AGENTS_YAML_PATH"
+elif [ -f "$PROJECT_DIR/agents.yaml" ]; then
+  AGENTS_YAML="$PROJECT_DIR/agents.yaml"
+else
+  AGENTS_YAML="${AGENT_HUB_AGENTS_YAML:-$HOME/business/AGENT-HUB/agents.yaml}"
+fi
 
 if [ ! -f "$AGENTS_YAML" ]; then
   exit 0

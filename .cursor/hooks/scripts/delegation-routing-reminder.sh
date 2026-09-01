@@ -126,8 +126,40 @@ fi
 # [2026-08-27][feat] クレジット残量キャッシュ・閾値読み取り（fail-open）。
 # agents.yaml から閾値を読み、credit-usage.json から routes.claude.weekly を取得する。
 # どちらか欠けてもエラーを出さず、残量機能を黙って無効化する。
-AGENTS_YAML_PATH="${AGENTS_YAML_PATH:-$(git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_DIR")/agents.yaml}"
+#
+# [2026-09-01][fix] agents.yaml が配布先PJに存在しないため、この読み取りが常に失敗し
+# （load_credit_thresholds / load_daily_credit_thresholds / load_pace_thresholds が
+# 全て None を返し）残量・節約モード機能が黙って無効化されていた件。
+# 背景・守るべき業務ルール・他案不採用理由は credit-baton-preflight.sh の同日付コメントと
+# 同一（二重管理防止のため詳細はそちらを参照）。
+# 対応: 解決順序を ①AGENTS_YAML_PATH（既存のテスト用オーバーライド・利用者指定を優先）
+#   ②$PROJECT_DIR/agents.yaml（AGENT-HUB 自身のケース） ③AGENT_HUB_AGENTS_YAML
+#   （既定 $HOME/business/AGENT-HUB/agents.yaml、env で上書き可）の agents.yaml、の3段へ
+#   変更する。従来の `git rev-parse --show-toplevel` 再計算は、本ファイル冒頭で PROJECT_DIR
+#   として既に同じ方法（CLAUDE_PROJECT_DIR 優先 + git rev-parse フォールバック）で解決済み
+#   のため、二重計算をやめて PROJECT_DIR をそのまま再利用する。
+#   新しい env `AGENT_HUB_ROOT`（ディレクトリを指す）は新設しない。同じ hook-library 内の
+#   `fable-implementation-guard.sh` が既に `AGENT_HUB_AGENTS_YAML`（agents.yaml への絶対
+#   パスを直接指す env）を採用済みであり、新変数を足すと同じ役割の env が2つに分散するため
+#   不採用。既存の命名・粒度に揃える。
+if [ -n "${AGENTS_YAML_PATH:-}" ]; then
+  : # 既存のテスト用オーバーライド・利用者指定をそのまま使う
+elif [ -f "$PROJECT_DIR/agents.yaml" ]; then
+  AGENTS_YAML_PATH="$PROJECT_DIR/agents.yaml"
+else
+  AGENTS_YAML_PATH="${AGENT_HUB_AGENTS_YAML:-$HOME/business/AGENT-HUB/agents.yaml}"
+fi
 CREDIT_CACHE_PATH="${CREDIT_CACHE_PATH:-${XDG_CACHE_HOME:-$HOME/.cache}/agent-hub/credit-usage.json}"
+# [2026-09-01][fix] 検証中に発見した隣接バグ: AGENTS_YAML_PATH / CREDIT_CACHE_PATH は
+# どちらも export されておらず、呼び出し元（settings/delegation-routing-reminder.json）が
+# これらの env var を渡さない実運用（実測: hook 定義に env 指定は無い）では、python
+# サブプロセス（別プロセスとして起動される command python3 <(...)）の os.environ には
+# 常に空文字しか渡っていなかった。既存テストが green だったのは、テスト側が常にこの2変数を
+# 呼び出し前の環境変数として明示 export していた（env var 経由でシェル起動時から既に export
+# 属性を持っていた）ためで、今回追加した3段フォールバック（AGENTS_YAML_PATH 未設定時に
+# 内部で計算する分岐）は、export し忘れると同じ理由で python から見えない。
+# 対応: 解決後に明示 export する。
+export AGENTS_YAML_PATH CREDIT_CACHE_PATH
 
 # python スクリプト本体（プロセス置換でファイル引数として渡す。stdin は RAW_INPUT 専用）。
 DELEGATION_REMINDER_PY() {
