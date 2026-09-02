@@ -4,13 +4,13 @@
   ],
   "canonical_project": "agentmemory",
   "effective_hashes": {
-    "antigravity": "d6e729c1d97b2deb6d39dc8ca8529a538d3cf82c3340480ad94d580b87b65869",
-    "claude": "d6e729c1d97b2deb6d39dc8ca8529a538d3cf82c3340480ad94d580b87b65869",
-    "codex": "d6e729c1d97b2deb6d39dc8ca8529a538d3cf82c3340480ad94d580b87b65869",
-    "cursor": "d6e729c1d97b2deb6d39dc8ca8529a538d3cf82c3340480ad94d580b87b65869",
-    "kimi": "d6e729c1d97b2deb6d39dc8ca8529a538d3cf82c3340480ad94d580b87b65869",
-    "opencode": "d6e729c1d97b2deb6d39dc8ca8529a538d3cf82c3340480ad94d580b87b65869",
-    "warp": "d6e729c1d97b2deb6d39dc8ca8529a538d3cf82c3340480ad94d580b87b65869"
+    "antigravity": "6b124ee9f80b3e678db75a599385adea8f85f182ba3a786f4d83711824e3d4e7",
+    "claude": "6b124ee9f80b3e678db75a599385adea8f85f182ba3a786f4d83711824e3d4e7",
+    "codex": "6b124ee9f80b3e678db75a599385adea8f85f182ba3a786f4d83711824e3d4e7",
+    "cursor": "6b124ee9f80b3e678db75a599385adea8f85f182ba3a786f4d83711824e3d4e7",
+    "kimi": "6b124ee9f80b3e678db75a599385adea8f85f182ba3a786f4d83711824e3d4e7",
+    "opencode": "6b124ee9f80b3e678db75a599385adea8f85f182ba3a786f4d83711824e3d4e7",
+    "warp": "6b124ee9f80b3e678db75a599385adea8f85f182ba3a786f4d83711824e3d4e7"
   },
   "harness_type": "mcp-server",
   "ledger_writer": {
@@ -19,7 +19,7 @@
   },
   "resolver_version": "1.1.0",
   "schema_version": 2,
-  "source_fingerprint": "sha256:66b86694555c1664438f917d1dcf7ac563de6a8814e2c932de5c027b17c751b0",
+  "source_fingerprint": "sha256:de72fac1aa862ddbb35ecc0ce08df2ee85924541781f7dfbebbcec4c14c1d9c6",
   "surfaces": [
     {
       "asset_revisions": [
@@ -167,9 +167,9 @@
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:7d97ab89e94831e1570845fe6864b77d00d92281ed553d75c8aaaef2d893071a",
+      "content_digest": "sha256:08858e657130745e6b1e899c4b0bba0402003ac597ffa0cd29082998f6a64445",
       "kind": "command",
-      "materialization_digest": "sha256:97430858f709d1d244e69e5498705a5d3581deef9ec989310fc130eaa3b87f9e",
+      "materialization_digest": "sha256:9706e40c1d1b2fd75f24ae73be7627ba16e2bddc44f8c11fbc52aba3c18336b2",
       "probe": "fresh-command-discovery",
       "source_revision": "sha256:0d84309c3ee9a4defff0df5fbba2247c59922da67777193185be11e1a4580350",
       "symlink_policy": "forbidden",
@@ -197,9 +197,9 @@
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:26993e04bee0c5495edc18d26e459def9f002a45d4c877afd390364ad5088255",
+      "content_digest": "sha256:b8f67dee2b11a6e361f0cc4f858c345fe34cdc05737b807ed9f93335999abb28",
       "kind": "constitution",
-      "materialization_digest": "sha256:f252a3b637c38a287780a4f111f51d8190d04f43d71f780f8ea5bbad6816837a",
+      "materialization_digest": "sha256:98978d881aed5123a081c3148b845e0c8388837c7d6825f1898b91e23506a48d",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -719,9 +719,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:7d97ab89e94831e1570845fe6864b77d00d92281ed553d75c8aaaef2d893071a",
+      "content_digest": "sha256:08858e657130745e6b1e899c4b0bba0402003ac597ffa0cd29082998f6a64445",
       "kind": "command",
-      "materialization_digest": "sha256:6d8cf1d47d40c48bf57fc0d47e8d546cb2b6cff2870cd0e59b0474cab9da2478",
+      "materialization_digest": "sha256:e8ae8c1a49a8ee52a600e9c96e682218e76439bec1087fb715479cd28ceaa275",
       "probe": "fresh-command-discovery",
       "source_revision": "sha256:0d84309c3ee9a4defff0df5fbba2247c59922da67777193185be11e1a4580350",
       "symlink_policy": "forbidden",
@@ -749,9 +749,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:93d40ab835fd938f752ed455cc219382e32a4da5f2eb9373d87fe1276e958f37",
+      "content_digest": "sha256:a17c1c94dec61261519d0f31cfe65801cde490c48aa5a7bdb8831fffc495fbb7",
       "kind": "constitution",
-      "materialization_digest": "sha256:e70c0458b0262768125c3909dea36922f942885902d707ad40c39644cb8d3b04",
+      "materialization_digest": "sha256:d093cc29925be8d2811fec573a38f9609283e790bebb39e36f4300e9332fd118",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -1087,11 +1087,11 @@
         },
         {
           "asset_id": "avoid-ai-writing",
-          "source_revision": "1489364d73f9a3d5d49c829c61b2ea140558984bda7ca85efe4cae15fd0ea541"
+          "source_revision": "e1ec2ab65d4d0941b5db984e6555b1c0e31fd4b2b4d3c2d97f7d9230fe496805"
         },
         {
           "asset_id": "avoid-ai-writing-ja",
-          "source_revision": "afbfcc90b3468a6e34fc4a4c3cf452d455ed066956d75d952c1a655ef1dcca47"
+          "source_revision": "84a168b97af0169af059bee9f68866230a66ab451793eb191d56c6d93f018f1b"
         },
         {
           "asset_id": "brainstorm",
@@ -1099,7 +1099,7 @@
         },
         {
           "asset_id": "briefing-ref",
-          "source_revision": "e3f388d58d41988770b3234a6f5f383a257529537896bb9badc4104684d77af5"
+          "source_revision": "f26274ddd22f7f608abe1941ec9a37a7c8dea56faef07a41770ba3e75960e83e"
         },
         {
           "asset_id": "cc-context-optimizer",
@@ -1107,11 +1107,11 @@
         },
         {
           "asset_id": "ci-credit-optimizer",
-          "source_revision": "536ee03c73a917dea8c6e9deb50481f78b6d23b87c467c1e77868986574172ac"
+          "source_revision": "b1b5a5fb8a1f91110f91f4bb19dfcdf4a555ad74a761bd3b7175379399cc1ee7"
         },
         {
           "asset_id": "codex-review",
-          "source_revision": "13284180f30684de3cebb8d38b6d115c8021bcc4d2a6d33deb81f8225aa2ed9d"
+          "source_revision": "a29a13de1e5a5675a97acce5218c3c0ec499dba2ee0ef9039acf579a88d09705"
         },
         {
           "asset_id": "create-pr",
@@ -1119,7 +1119,7 @@
         },
         {
           "asset_id": "cursor-cloud",
-          "source_revision": "c62d989e95a700a112cf64ac93e9e13869e4c5840216a1f095df031e54cabd5f"
+          "source_revision": "9ef6ec9b2f6d6a233175963c2cc3563c588ad71030eb4d9dc64c4183b092f276"
         },
         {
           "asset_id": "dev-guardrails",
@@ -1127,11 +1127,11 @@
         },
         {
           "asset_id": "handover-manual",
-          "source_revision": "313d600748df78e8fb19016625d7c723a4d7f64b361810e09b5db5096c928eeb"
+          "source_revision": "649bc07a2a5b646574be4a855476681fa70a84b34e7bc79788afbc1c28830f19"
         },
         {
           "asset_id": "mcp-dev-kit",
-          "source_revision": "64881907b09d1ad0acfaa18858ade0b5f88a1ae28ab2e02e409d4e5919c0c102"
+          "source_revision": "36f89bffe90b7a4c0698ea98104aa0b17d7e4c9b03e0663867e00597407b8260"
         },
         {
           "asset_id": "new-project",
@@ -1143,7 +1143,7 @@
         },
         {
           "asset_id": "post-merge",
-          "source_revision": "acda9cc51462a64131ef4f0a340c8804c39a9b0537f1e82a675e9ff5a7694c11"
+          "source_revision": "74a725efbfc0dc64ba86fbf912908c29a9b2f9bbda8226618a9accf3cffaba9a"
         },
         {
           "asset_id": "project-prompt-review",
@@ -1155,15 +1155,15 @@
         },
         {
           "asset_id": "skill-audit",
-          "source_revision": "5e4bc4e526fc934e5a7462c0fa48fe946b11e60eaf2448bd0c98e18598b0a6cf"
+          "source_revision": "03b61c960601c31d5e8a862e2a07aa40a795a632abab366f9056f5aafe7632e8"
         },
         {
           "asset_id": "skill-doctor",
-          "source_revision": "e3f2b424ed8fd814f103e7421c05ce3fa7944e3bc4976fcfd40b80586f39d963"
+          "source_revision": "16d0245b0142b6bfedb6acbea24ea68730f0c53f0dd7800cb92883f06c28859d"
         },
         {
           "asset_id": "skill-doctor-ja",
-          "source_revision": "00dfc904ff7732e208548ec063c01341ea93363acfa3aa12b717702040b41a17"
+          "source_revision": "b91c8736b6290cac4d1703f1379fe5cb85f93950fecc28fd943ca6da4439eb61"
         },
         {
           "asset_id": "slide-deck",
@@ -1171,11 +1171,11 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:dbf937ada1db7827fba5e0fdf0d283bf033c5e414d46edf2ebef9229798dcdb5",
+      "content_digest": "sha256:79efc91d5bd218d448569dc2447796125319f0fd1d8e1cc404cc3078e6af77a8",
       "kind": "skill",
-      "materialization_digest": "sha256:a25d6e0a9c6249c106364f2fed00e33fdc1753cdfcd2335dd17e7eed1cfcb0aa",
+      "materialization_digest": "sha256:a6e2cb485dbe000e27430e94f5270c02f3a78395a14d795f831045c7561cacc2",
       "probe": "fresh-skill-discovery",
-      "source_revision": "sha256:de991c64a1245803b5cc20978adc9ddbc84a68992558b7c7afda86df746c3988",
+      "source_revision": "sha256:1c52362a05c27489399e1e0d81f97301278e17000bf98b038e6e57b80f80358c",
       "symlink_policy": "forbidden",
       "target": ".claude/skills",
       "writer_id": "sync-runtime-skills",
@@ -1233,9 +1233,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:76c130f5f2f0e36b426a914fb5e6eab8146f76522d49a2d4441dd78b7efa27f3",
+      "content_digest": "sha256:279c6ebdb56e2536ea0b57d25c763fc322f888149ce77776227e01f33cb62022",
       "kind": "subagent",
-      "materialization_digest": "sha256:4a832ebb2d594df719ea43e9a395c0b4ba03bbe1264a5fb96dbe10687ef48197",
+      "materialization_digest": "sha256:ff465077f2dd48fb8f8db8c0b421994e358e63712583468905a8003c703c974e",
       "probe": "fresh-agent-discovery",
       "source_revision": "sha256:fdf39f79d38678f1d43e2408b8a97aa87ca68aab682d263d3eedbe694c927f0e",
       "symlink_policy": "forbidden",
@@ -1305,9 +1305,9 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:0554b723ec782bc3aabdb59dd5adfc2101dfd0c2d5933aa2b2b2632fa4290ba8",
+      "content_digest": "sha256:1f11b7f5b17ba10d4c848210b3718b4b0bccd10050374c502f73c4071f71f0f0",
       "kind": "constitution",
-      "materialization_digest": "sha256:d0c9138d319159e79238657ee89de1d917449c1f95cf4949c9b96f42c43a4582",
+      "materialization_digest": "sha256:21efad0e0d222eb7a53dd0525253e9dcdcf0340eac08d9b0c4263c2a87a80e3f",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -1609,9 +1609,9 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:0554b723ec782bc3aabdb59dd5adfc2101dfd0c2d5933aa2b2b2632fa4290ba8",
+      "content_digest": "sha256:1f11b7f5b17ba10d4c848210b3718b4b0bccd10050374c502f73c4071f71f0f0",
       "kind": "rule",
-      "materialization_digest": "sha256:61c9bcce5bd612150e87121b0b01aad914cb8857d1db5868223ffe3e7c65b1c6",
+      "materialization_digest": "sha256:09babba8d045637e7f5cdf8537114e3c1e7f9ed82be9a61a956a97196487b61e",
       "probe": "fresh-rule-discovery",
       "source_revision": "sha256:3c33ae4ae1e56776680e59df6fc509cce620be679e811668e2d1a01aef588797",
       "symlink_policy": "forbidden",
@@ -1639,11 +1639,11 @@
         },
         {
           "asset_id": "avoid-ai-writing",
-          "source_revision": "1489364d73f9a3d5d49c829c61b2ea140558984bda7ca85efe4cae15fd0ea541"
+          "source_revision": "e1ec2ab65d4d0941b5db984e6555b1c0e31fd4b2b4d3c2d97f7d9230fe496805"
         },
         {
           "asset_id": "avoid-ai-writing-ja",
-          "source_revision": "afbfcc90b3468a6e34fc4a4c3cf452d455ed066956d75d952c1a655ef1dcca47"
+          "source_revision": "84a168b97af0169af059bee9f68866230a66ab451793eb191d56c6d93f018f1b"
         },
         {
           "asset_id": "brainstorm",
@@ -1651,7 +1651,7 @@
         },
         {
           "asset_id": "briefing-ref",
-          "source_revision": "e3f388d58d41988770b3234a6f5f383a257529537896bb9badc4104684d77af5"
+          "source_revision": "f26274ddd22f7f608abe1941ec9a37a7c8dea56faef07a41770ba3e75960e83e"
         },
         {
           "asset_id": "cc-context-optimizer",
@@ -1659,11 +1659,11 @@
         },
         {
           "asset_id": "ci-credit-optimizer",
-          "source_revision": "536ee03c73a917dea8c6e9deb50481f78b6d23b87c467c1e77868986574172ac"
+          "source_revision": "b1b5a5fb8a1f91110f91f4bb19dfcdf4a555ad74a761bd3b7175379399cc1ee7"
         },
         {
           "asset_id": "codex-review",
-          "source_revision": "13284180f30684de3cebb8d38b6d115c8021bcc4d2a6d33deb81f8225aa2ed9d"
+          "source_revision": "a29a13de1e5a5675a97acce5218c3c0ec499dba2ee0ef9039acf579a88d09705"
         },
         {
           "asset_id": "create-pr",
@@ -1671,7 +1671,7 @@
         },
         {
           "asset_id": "cursor-cloud",
-          "source_revision": "c62d989e95a700a112cf64ac93e9e13869e4c5840216a1f095df031e54cabd5f"
+          "source_revision": "9ef6ec9b2f6d6a233175963c2cc3563c588ad71030eb4d9dc64c4183b092f276"
         },
         {
           "asset_id": "dev-guardrails",
@@ -1679,11 +1679,11 @@
         },
         {
           "asset_id": "handover-manual",
-          "source_revision": "313d600748df78e8fb19016625d7c723a4d7f64b361810e09b5db5096c928eeb"
+          "source_revision": "649bc07a2a5b646574be4a855476681fa70a84b34e7bc79788afbc1c28830f19"
         },
         {
           "asset_id": "mcp-dev-kit",
-          "source_revision": "64881907b09d1ad0acfaa18858ade0b5f88a1ae28ab2e02e409d4e5919c0c102"
+          "source_revision": "36f89bffe90b7a4c0698ea98104aa0b17d7e4c9b03e0663867e00597407b8260"
         },
         {
           "asset_id": "new-project",
@@ -1695,7 +1695,7 @@
         },
         {
           "asset_id": "post-merge",
-          "source_revision": "acda9cc51462a64131ef4f0a340c8804c39a9b0537f1e82a675e9ff5a7694c11"
+          "source_revision": "74a725efbfc0dc64ba86fbf912908c29a9b2f9bbda8226618a9accf3cffaba9a"
         },
         {
           "asset_id": "project-prompt-review",
@@ -1707,15 +1707,15 @@
         },
         {
           "asset_id": "skill-audit",
-          "source_revision": "5e4bc4e526fc934e5a7462c0fa48fe946b11e60eaf2448bd0c98e18598b0a6cf"
+          "source_revision": "03b61c960601c31d5e8a862e2a07aa40a795a632abab366f9056f5aafe7632e8"
         },
         {
           "asset_id": "skill-doctor",
-          "source_revision": "e3f2b424ed8fd814f103e7421c05ce3fa7944e3bc4976fcfd40b80586f39d963"
+          "source_revision": "16d0245b0142b6bfedb6acbea24ea68730f0c53f0dd7800cb92883f06c28859d"
         },
         {
           "asset_id": "skill-doctor-ja",
-          "source_revision": "00dfc904ff7732e208548ec063c01341ea93363acfa3aa12b717702040b41a17"
+          "source_revision": "b91c8736b6290cac4d1703f1379fe5cb85f93950fecc28fd943ca6da4439eb61"
         },
         {
           "asset_id": "slide-deck",
@@ -1725,9 +1725,9 @@
       "client": "codex",
       "content_digest": "sha256:2387116da2e44711e8214a549042b7c9e1b8b0a8d05cb5c9fe9f18bd01fe4acb",
       "kind": "skill",
-      "materialization_digest": "sha256:03f14a279f52f3cfd06d470c26893ea97d6bb50fecab4c5ea84c5b72ca599458",
+      "materialization_digest": "sha256:69a8f20a504ee165ce0eb8fbac58c55ff169a31839d14def5d61709f1797c846",
       "probe": "fresh-skill-discovery",
-      "source_revision": "sha256:de991c64a1245803b5cc20978adc9ddbc84a68992558b7c7afda86df746c3988",
+      "source_revision": "sha256:1c52362a05c27489399e1e0d81f97301278e17000bf98b038e6e57b80f80358c",
       "symlink_policy": "forbidden",
       "target": ".agents/skills",
       "writer_id": "sync-runtime-skills",
@@ -1785,9 +1785,9 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:76c130f5f2f0e36b426a914fb5e6eab8146f76522d49a2d4441dd78b7efa27f3",
+      "content_digest": "sha256:279c6ebdb56e2536ea0b57d25c763fc322f888149ce77776227e01f33cb62022",
       "kind": "subagent",
-      "materialization_digest": "sha256:2415ccf305a5fcb05e169156f6f75f2a0b6d4aec1338d9ef0f0632c1d727c2bd",
+      "materialization_digest": "sha256:b03d3f7ae1498ac41e0e4c5a8636aa69efc444a623c27962aacc636f36be3a8f",
       "probe": "fresh-agent-discovery",
       "source_revision": "sha256:fdf39f79d38678f1d43e2408b8a97aa87ca68aab682d263d3eedbe694c927f0e",
       "symlink_policy": "forbidden",
@@ -1899,9 +1899,9 @@
         }
       ],
       "client": "cursor",
-      "content_digest": "sha256:0554b723ec782bc3aabdb59dd5adfc2101dfd0c2d5933aa2b2b2632fa4290ba8",
+      "content_digest": "sha256:1f11b7f5b17ba10d4c848210b3718b4b0bccd10050374c502f73c4071f71f0f0",
       "kind": "constitution",
-      "materialization_digest": "sha256:cd87f539366d24e989a0557f46636d299a184352066dc03efd772a7341a6672d",
+      "materialization_digest": "sha256:c3811df9306cf04886ce6f70b4c1886cdf631da41b98aaf2ab32b382264b35ab",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -2233,11 +2233,11 @@
         },
         {
           "asset_id": "avoid-ai-writing",
-          "source_revision": "1489364d73f9a3d5d49c829c61b2ea140558984bda7ca85efe4cae15fd0ea541"
+          "source_revision": "e1ec2ab65d4d0941b5db984e6555b1c0e31fd4b2b4d3c2d97f7d9230fe496805"
         },
         {
           "asset_id": "avoid-ai-writing-ja",
-          "source_revision": "afbfcc90b3468a6e34fc4a4c3cf452d455ed066956d75d952c1a655ef1dcca47"
+          "source_revision": "84a168b97af0169af059bee9f68866230a66ab451793eb191d56c6d93f018f1b"
         },
         {
           "asset_id": "brainstorm",
@@ -2245,7 +2245,7 @@
         },
         {
           "asset_id": "briefing-ref",
-          "source_revision": "e3f388d58d41988770b3234a6f5f383a257529537896bb9badc4104684d77af5"
+          "source_revision": "f26274ddd22f7f608abe1941ec9a37a7c8dea56faef07a41770ba3e75960e83e"
         },
         {
           "asset_id": "cc-context-optimizer",
@@ -2253,11 +2253,11 @@
         },
         {
           "asset_id": "ci-credit-optimizer",
-          "source_revision": "536ee03c73a917dea8c6e9deb50481f78b6d23b87c467c1e77868986574172ac"
+          "source_revision": "b1b5a5fb8a1f91110f91f4bb19dfcdf4a555ad74a761bd3b7175379399cc1ee7"
         },
         {
           "asset_id": "codex-review",
-          "source_revision": "13284180f30684de3cebb8d38b6d115c8021bcc4d2a6d33deb81f8225aa2ed9d"
+          "source_revision": "a29a13de1e5a5675a97acce5218c3c0ec499dba2ee0ef9039acf579a88d09705"
         },
         {
           "asset_id": "create-pr",
@@ -2265,7 +2265,7 @@
         },
         {
           "asset_id": "cursor-cloud",
-          "source_revision": "c62d989e95a700a112cf64ac93e9e13869e4c5840216a1f095df031e54cabd5f"
+          "source_revision": "9ef6ec9b2f6d6a233175963c2cc3563c588ad71030eb4d9dc64c4183b092f276"
         },
         {
           "asset_id": "dev-guardrails",
@@ -2273,11 +2273,11 @@
         },
         {
           "asset_id": "handover-manual",
-          "source_revision": "313d600748df78e8fb19016625d7c723a4d7f64b361810e09b5db5096c928eeb"
+          "source_revision": "649bc07a2a5b646574be4a855476681fa70a84b34e7bc79788afbc1c28830f19"
         },
         {
           "asset_id": "mcp-dev-kit",
-          "source_revision": "64881907b09d1ad0acfaa18858ade0b5f88a1ae28ab2e02e409d4e5919c0c102"
+          "source_revision": "36f89bffe90b7a4c0698ea98104aa0b17d7e4c9b03e0663867e00597407b8260"
         },
         {
           "asset_id": "new-project",
@@ -2289,7 +2289,7 @@
         },
         {
           "asset_id": "post-merge",
-          "source_revision": "acda9cc51462a64131ef4f0a340c8804c39a9b0537f1e82a675e9ff5a7694c11"
+          "source_revision": "74a725efbfc0dc64ba86fbf912908c29a9b2f9bbda8226618a9accf3cffaba9a"
         },
         {
           "asset_id": "project-prompt-review",
@@ -2301,15 +2301,15 @@
         },
         {
           "asset_id": "skill-audit",
-          "source_revision": "5e4bc4e526fc934e5a7462c0fa48fe946b11e60eaf2448bd0c98e18598b0a6cf"
+          "source_revision": "03b61c960601c31d5e8a862e2a07aa40a795a632abab366f9056f5aafe7632e8"
         },
         {
           "asset_id": "skill-doctor",
-          "source_revision": "e3f2b424ed8fd814f103e7421c05ce3fa7944e3bc4976fcfd40b80586f39d963"
+          "source_revision": "16d0245b0142b6bfedb6acbea24ea68730f0c53f0dd7800cb92883f06c28859d"
         },
         {
           "asset_id": "skill-doctor-ja",
-          "source_revision": "00dfc904ff7732e208548ec063c01341ea93363acfa3aa12b717702040b41a17"
+          "source_revision": "b91c8736b6290cac4d1703f1379fe5cb85f93950fecc28fd943ca6da4439eb61"
         },
         {
           "asset_id": "slide-deck",
@@ -2319,9 +2319,9 @@
       "client": "cursor",
       "content_digest": "sha256:2387116da2e44711e8214a549042b7c9e1b8b0a8d05cb5c9fe9f18bd01fe4acb",
       "kind": "skill",
-      "materialization_digest": "sha256:885669431882d49fb91683252c2f43e113243542bf860f3f4a99ce81ac4e3488",
+      "materialization_digest": "sha256:ecdcfc68b9a36fce1f17397b277088a99bb70a9997ae76637d91d85487facf41",
       "probe": "fresh-skill-discovery",
-      "source_revision": "sha256:de991c64a1245803b5cc20978adc9ddbc84a68992558b7c7afda86df746c3988",
+      "source_revision": "sha256:1c52362a05c27489399e1e0d81f97301278e17000bf98b038e6e57b80f80358c",
       "symlink_policy": "forbidden",
       "target": ".cursor/skills",
       "writer_id": "sync-runtime-skills",
@@ -2423,7 +2423,7 @@
       "client": "kimi",
       "content_digest": "sha256:b6d1568b0c737e790b17d2058cbe957949de38159dc291aa70994d66dec7e072",
       "kind": "ai_client",
-      "materialization_digest": "sha256:7ea122fa9fbc4ac9eee064800e9f86fb244ee3f4afa3d9ed129aa8e9b59eac9d",
+      "materialization_digest": "sha256:3e77d3d9efd69625c11f99c462849d3dbf7d439e919693c14cae5f8942225d5b",
       "probe": "stable-client-instruction",
       "source_revision": "sha256:4a244311b9f5fc8a04b79628d359a5fc68274acc74a61666df7d1878391918ec",
       "symlink_policy": "forbidden",
@@ -2493,9 +2493,9 @@
         }
       ],
       "client": "kimi",
-      "content_digest": "sha256:0554b723ec782bc3aabdb59dd5adfc2101dfd0c2d5933aa2b2b2632fa4290ba8",
+      "content_digest": "sha256:1f11b7f5b17ba10d4c848210b3718b4b0bccd10050374c502f73c4071f71f0f0",
       "kind": "constitution",
-      "materialization_digest": "sha256:5443236b024adf8c24c949ca01668270ac2b2b6b02a7dead2a1a09a9fb10c031",
+      "materialization_digest": "sha256:3509be598e0a45dbaf11b071363430c484726acc1dfe9259de65567e0b5f60ba",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -2719,9 +2719,9 @@
         }
       ],
       "client": "kimi",
-      "content_digest": "sha256:0554b723ec782bc3aabdb59dd5adfc2101dfd0c2d5933aa2b2b2632fa4290ba8",
+      "content_digest": "sha256:1f11b7f5b17ba10d4c848210b3718b4b0bccd10050374c502f73c4071f71f0f0",
       "kind": "rule",
-      "materialization_digest": "sha256:598eb5df5776f89fb8da786c9dff4e46aa45d7ba4149ebe6915217a61b3729a3",
+      "materialization_digest": "sha256:8e9b8869cea6f1b20d8c040285400288b352dfcadfb36832e15803f16ce7a28d",
       "probe": "fresh-rule-discovery",
       "source_revision": "sha256:3c33ae4ae1e56776680e59df6fc509cce620be679e811668e2d1a01aef588797",
       "symlink_policy": "forbidden",
@@ -2749,11 +2749,11 @@
         },
         {
           "asset_id": "avoid-ai-writing",
-          "source_revision": "1489364d73f9a3d5d49c829c61b2ea140558984bda7ca85efe4cae15fd0ea541"
+          "source_revision": "e1ec2ab65d4d0941b5db984e6555b1c0e31fd4b2b4d3c2d97f7d9230fe496805"
         },
         {
           "asset_id": "avoid-ai-writing-ja",
-          "source_revision": "afbfcc90b3468a6e34fc4a4c3cf452d455ed066956d75d952c1a655ef1dcca47"
+          "source_revision": "84a168b97af0169af059bee9f68866230a66ab451793eb191d56c6d93f018f1b"
         },
         {
           "asset_id": "brainstorm",
@@ -2761,7 +2761,7 @@
         },
         {
           "asset_id": "briefing-ref",
-          "source_revision": "e3f388d58d41988770b3234a6f5f383a257529537896bb9badc4104684d77af5"
+          "source_revision": "f26274ddd22f7f608abe1941ec9a37a7c8dea56faef07a41770ba3e75960e83e"
         },
         {
           "asset_id": "cc-context-optimizer",
@@ -2769,11 +2769,11 @@
         },
         {
           "asset_id": "ci-credit-optimizer",
-          "source_revision": "536ee03c73a917dea8c6e9deb50481f78b6d23b87c467c1e77868986574172ac"
+          "source_revision": "b1b5a5fb8a1f91110f91f4bb19dfcdf4a555ad74a761bd3b7175379399cc1ee7"
         },
         {
           "asset_id": "codex-review",
-          "source_revision": "13284180f30684de3cebb8d38b6d115c8021bcc4d2a6d33deb81f8225aa2ed9d"
+          "source_revision": "a29a13de1e5a5675a97acce5218c3c0ec499dba2ee0ef9039acf579a88d09705"
         },
         {
           "asset_id": "create-pr",
@@ -2781,7 +2781,7 @@
         },
         {
           "asset_id": "cursor-cloud",
-          "source_revision": "c62d989e95a700a112cf64ac93e9e13869e4c5840216a1f095df031e54cabd5f"
+          "source_revision": "9ef6ec9b2f6d6a233175963c2cc3563c588ad71030eb4d9dc64c4183b092f276"
         },
         {
           "asset_id": "dev-guardrails",
@@ -2789,11 +2789,11 @@
         },
         {
           "asset_id": "handover-manual",
-          "source_revision": "313d600748df78e8fb19016625d7c723a4d7f64b361810e09b5db5096c928eeb"
+          "source_revision": "649bc07a2a5b646574be4a855476681fa70a84b34e7bc79788afbc1c28830f19"
         },
         {
           "asset_id": "mcp-dev-kit",
-          "source_revision": "64881907b09d1ad0acfaa18858ade0b5f88a1ae28ab2e02e409d4e5919c0c102"
+          "source_revision": "36f89bffe90b7a4c0698ea98104aa0b17d7e4c9b03e0663867e00597407b8260"
         },
         {
           "asset_id": "new-project",
@@ -2805,7 +2805,7 @@
         },
         {
           "asset_id": "post-merge",
-          "source_revision": "acda9cc51462a64131ef4f0a340c8804c39a9b0537f1e82a675e9ff5a7694c11"
+          "source_revision": "74a725efbfc0dc64ba86fbf912908c29a9b2f9bbda8226618a9accf3cffaba9a"
         },
         {
           "asset_id": "project-prompt-review",
@@ -2817,15 +2817,15 @@
         },
         {
           "asset_id": "skill-audit",
-          "source_revision": "5e4bc4e526fc934e5a7462c0fa48fe946b11e60eaf2448bd0c98e18598b0a6cf"
+          "source_revision": "03b61c960601c31d5e8a862e2a07aa40a795a632abab366f9056f5aafe7632e8"
         },
         {
           "asset_id": "skill-doctor",
-          "source_revision": "e3f2b424ed8fd814f103e7421c05ce3fa7944e3bc4976fcfd40b80586f39d963"
+          "source_revision": "16d0245b0142b6bfedb6acbea24ea68730f0c53f0dd7800cb92883f06c28859d"
         },
         {
           "asset_id": "skill-doctor-ja",
-          "source_revision": "00dfc904ff7732e208548ec063c01341ea93363acfa3aa12b717702040b41a17"
+          "source_revision": "b91c8736b6290cac4d1703f1379fe5cb85f93950fecc28fd943ca6da4439eb61"
         },
         {
           "asset_id": "slide-deck",
@@ -2835,9 +2835,9 @@
       "client": "kimi",
       "content_digest": "sha256:2387116da2e44711e8214a549042b7c9e1b8b0a8d05cb5c9fe9f18bd01fe4acb",
       "kind": "skill",
-      "materialization_digest": "sha256:ff2d3c8d02d8082ed4ce75c104109f2f35f8aa2bd40874f8dd4b941692dd206e",
+      "materialization_digest": "sha256:d51818f3802b7fb5058712cdf6432780b4767e0b610b4b9844a37fbc56ead4cc",
       "probe": "fresh-skill-discovery",
-      "source_revision": "sha256:de991c64a1245803b5cc20978adc9ddbc84a68992558b7c7afda86df746c3988",
+      "source_revision": "sha256:1c52362a05c27489399e1e0d81f97301278e17000bf98b038e6e57b80f80358c",
       "symlink_policy": "forbidden",
       "target": ".kimi-code/skills",
       "writer_id": "sync-runtime-skills",
@@ -3265,9 +3265,9 @@
         }
       ],
       "client": "warp",
-      "content_digest": "sha256:0554b723ec782bc3aabdb59dd5adfc2101dfd0c2d5933aa2b2b2632fa4290ba8",
+      "content_digest": "sha256:1f11b7f5b17ba10d4c848210b3718b4b0bccd10050374c502f73c4071f71f0f0",
       "kind": "constitution",
-      "materialization_digest": "sha256:cb8db9362151f5ae65277da3bb8aa49ad16830a87ac474bc8c17921435b5ff3a",
+      "materialization_digest": "sha256:fba97ffe55bfccf8c01a7b8196259067adaedf449915868b7e754215ded0d17e",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:a34a80544159656a0c940906f8aab091913c7821dde682023dcd840a76ad01f3",
       "symlink_policy": "forbidden",
@@ -3413,9 +3413,9 @@
         }
       ],
       "client": "warp",
-      "content_digest": "sha256:0554b723ec782bc3aabdb59dd5adfc2101dfd0c2d5933aa2b2b2632fa4290ba8",
+      "content_digest": "sha256:1f11b7f5b17ba10d4c848210b3718b4b0bccd10050374c502f73c4071f71f0f0",
       "kind": "rule",
-      "materialization_digest": "sha256:3ac4ffbafef78a27823987cbc60679ba445e6953bff3635f822a0053acc08013",
+      "materialization_digest": "sha256:e89287c129c0022c5a087b6fbccb710141371c7ec794e3f96ee8f7262db3306a",
       "probe": "fresh-rule-discovery",
       "source_revision": "sha256:3c33ae4ae1e56776680e59df6fc509cce620be679e811668e2d1a01aef588797",
       "symlink_policy": "forbidden",
