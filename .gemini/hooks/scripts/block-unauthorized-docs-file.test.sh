@@ -30,7 +30,7 @@ PY2
   printf '%s' "$payload" | CLAUDE_PROJECT_DIR="$TMP_PROJECT" bash "$HOOK_PATH"
 }
 PYTHON_ONLY_BIN="$TMP_PROJECT/python-only"; mkdir -p "$PYTHON_ONLY_BIN"
-for utility in python3 dirname cat; do ln -s "$(command -v "$utility")" "$PYTHON_ONLY_BIN/$utility"; done
+for utility in python3 dirname cat git; do ln -s "$(command -v "$utility")" "$PYTHON_ONLY_BIN/$utility"; done
 run_python_fallback_hook() { printf '%s' "$1" | PATH="$PYTHON_ONLY_BIN" CLAUDE_PROJECT_DIR="$TMP_PROJECT" /bin/bash "$HOOK_PATH"; }
 run_json_python() { json_payload "$1" "$2" | PATH="$PYTHON_ONLY_BIN" CLAUDE_PROJECT_DIR="$TMP_PROJECT" /bin/bash "$HOOK_PATH"; }
 assert_allowed() { [ -z "$1" ] || { printf '[FAIL] %s expected allow, got: %s\n' "$2" "$1" >&2; exit 1; }; }
@@ -88,6 +88,39 @@ assert_allowed "$(run_python_fallback_hook "$RAW_DOC_CREATE")" "Python fallback 
 for patch in "$RAW_ALLOWLIST_ADD" "$RAW_ALLOWLIST_UPDATE" "$RAW_ALLOWLIST_DELETE" "$RAW_ALLOWLIST_MOVE"; do
   assert_denied "$(run_python_fallback_hook "$patch")" "Python fallback raw allowlist operation"
 done
+
+# Codex commonly patches a dedicated sibling worktree while the session root remains the
+# primary checkout. Same-repository worktrees keep the protected-file boundary; unrelated
+# sibling directories remain outside this project and must not be over-blocked.
+PRIMARY_REPO="$TMP_PROJECT/repo-primary"
+SIBLING_WORKTREE="$TMP_PROJECT/repo-sibling"
+UNRELATED_DIR="$TMP_PROJECT/unrelated"
+mkdir -p "$PRIMARY_REPO/docs" "$UNRELATED_DIR/docs"
+git -C "$PRIMARY_REPO" init -q
+git -C "$PRIMARY_REPO" config user.email test@example.invalid
+git -C "$PRIMARY_REPO" config user.name hook-test
+: >"$PRIMARY_REPO/README.md"
+git -C "$PRIMARY_REPO" add README.md
+git -C "$PRIMARY_REPO" commit -qm init
+git -C "$PRIMARY_REPO" worktree add -qb hook-test-sibling "$SIBLING_WORKTREE"
+SIBLING_ALLOWLIST_PATCH=$'*** Begin Patch\n*** Add File: ../repo-sibling/docs/.ssot-allowlist\n+entry\n*** End Patch'
+SIBLING_README_PATCH=$'*** Begin Patch\n*** Update File: ../repo-sibling/README.md\n@@\n+ordinary\n*** End Patch'
+UNRELATED_ALLOWLIST_PATCH=$'*** Begin Patch\n*** Add File: ../unrelated/docs/.ssot-allowlist\n+entry\n*** End Patch'
+assert_denied "$(printf '%s' "$SIBLING_ALLOWLIST_PATCH" | CLAUDE_PROJECT_DIR="$PRIMARY_REPO" bash "$HOOK_PATH")" "same-repository sibling worktree allowlist"
+assert_allowed "$(printf '%s' "$SIBLING_README_PATCH" | CLAUDE_PROJECT_DIR="$PRIMARY_REPO" bash "$HOOK_PATH")" "same-repository sibling worktree ordinary file"
+assert_denied "$(json_payload tool_input_command "$SIBLING_ALLOWLIST_PATCH" | CLAUDE_PROJECT_DIR="$PRIMARY_REPO" bash "$HOOK_PATH")" "Codex command transport sibling worktree allowlist"
+assert_allowed "$(json_payload tool_input_command "$SIBLING_README_PATCH" | CLAUDE_PROJECT_DIR="$PRIMARY_REPO" bash "$HOOK_PATH")" "Codex command transport sibling worktree ordinary file"
+assert_allowed "$(printf '%s' "$UNRELATED_ALLOWLIST_PATCH" | CLAUDE_PROJECT_DIR="$PRIMARY_REPO" bash "$HOOK_PATH")" "unrelated sibling directory"
+assert_denied "$(printf '%s' "$SIBLING_ALLOWLIST_PATCH" | PATH="$PYTHON_ONLY_BIN" CLAUDE_PROJECT_DIR="$PRIMARY_REPO" /bin/bash "$HOOK_PATH")" "Python fallback same-repository sibling worktree allowlist"
+assert_denied "$(json_payload tool_input_command "$SIBLING_ALLOWLIST_PATCH" | PATH="$PYTHON_ONLY_BIN" CLAUDE_PROJECT_DIR="$PRIMARY_REPO" /bin/bash "$HOOK_PATH")" "Python fallback Codex command transport sibling worktree allowlist"
+
+# Preserve the existing symlink boundary: a project-level docs symlink still counts as docs.
+SYMLINK_PROJECT="$TMP_PROJECT/symlink-project"
+EXTERNAL_DOCS="$TMP_PROJECT/external-docs"
+mkdir -p "$SYMLINK_PROJECT" "$EXTERNAL_DOCS"
+ln -s "$EXTERNAL_DOCS" "$SYMLINK_PROJECT/docs"
+assert_denied "$(printf '%s' "$RAW_ALLOWLIST_ADD" | CLAUDE_PROJECT_DIR="$SYMLINK_PROJECT" bash "$HOOK_PATH")" "symlinked docs allowlist"
+assert_denied "$(printf '%s' "$RAW_ALLOWLIST_ADD" | PATH="$PYTHON_ONLY_BIN" CLAUDE_PROJECT_DIR="$SYMLINK_PROJECT" /bin/bash "$HOOK_PATH")" "Python fallback symlinked docs allowlist"
 # Shell operations that alter the protected file are denied; normal docs still pass.
 for command in 'rm docs/.ssot-allowlist' 'mv docs/.ssot-allowlist tmp' 'mv tmp docs/.ssot-allowlist' 'mv -t tmp docs/.ssot-allowlist' 'mv --target-directory=tmp docs/.ssot-allowlist' ': > docs/.ssot-allowlist' 'truncate -s 0 docs/.ssot-allowlist' 'cp tmp docs/.ssot-allowlist' 'install tmp docs/.ssot-allowlist'; do
   assert_denied "$(run_hook Bash "$command")" "Bash protected allowlist: $command"
