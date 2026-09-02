@@ -12,6 +12,7 @@ json_payload() { python3 - "$@" <<'PY2'
 import json, sys
 mode, patch = sys.argv[1], sys.argv[2]
 if mode == "tool_input": data = {"tool_name":"apply_patch", "tool_input":{"patch":patch}}
+elif mode == "tool_input_command": data = {"tool_name":"apply_patch", "tool_input":{"command":patch}}
 elif mode == "arguments_string": data = {"tool_name":"apply_patch", "arguments":patch}
 elif mode == "arguments_object": data = {"tool_name":"apply_patch", "arguments":{"patch":patch}}
 else: raise SystemExit(mode)
@@ -54,11 +55,12 @@ assert_denied "$(run_raw "$RAW_ALLOWLIST_DELETE")" "raw allowlist delete"
 assert_denied "$(run_raw "$RAW_ALLOWLIST_MOVE")" "raw allowlist move"
 assert_allowed "$(run_raw 'ordinary non-json text')" "arbitrary raw text is not apply_patch"
 assert_denied "$(run_raw $'*** Begin Patch\n*** End Patch')" "recognized malformed raw patch"
-for route in tool_input arguments_string arguments_object; do
+for route in tool_input tool_input_command arguments_string arguments_object; do
  assert_allowed "$(run_json "$route" "$RAW_ALLOWED")" "JSON $route preserves allowed update"
  assert_denied "$(run_json "$route" "$RAW_ALLOWLIST_UPDATE")" "JSON $route protects allowlist"
 done
-for route in tool_input arguments_string arguments_object; do
+assert_denied "$(run_json tool_input_command 'ordinary command text')" "arbitrary command is not a patch"
+for route in tool_input tool_input_command arguments_string arguments_object; do
  assert_allowed "$(run_json_python "$route" "$RAW_ALLOWED")" "Python fallback $route preserves allowed update"
  assert_denied "$(run_json_python "$route" "$RAW_ALLOWLIST_UPDATE")" "Python fallback $route protects allowlist"
 done
@@ -74,7 +76,7 @@ PY2
 RAW_ALLOWLIST_ADD=$'*** Begin Patch\n*** Add File: docs/.ssot-allowlist\n+entry\n*** End Patch'
 RAW_ALLOWLIST_DELETE=$'*** Begin Patch\n*** Delete File: docs/.ssot-allowlist\n*** End Patch'
 RAW_ALLOWLIST_MOVE=$'*** Begin Patch\n*** Update File: docs/prd/prd-active.md\n*** Move to: docs/.ssot-allowlist\n@@\n-old\n+new\n*** End Patch'
-for route in tool_input arguments_string arguments_object; do
+for route in tool_input tool_input_command arguments_string arguments_object; do
   assert_allowed "$(run_json "$route" "$RAW_DOC_CREATE")" "JSON $route ordinary docs create"
   for patch in "$RAW_ALLOWLIST_ADD" "$RAW_ALLOWLIST_DELETE" "$RAW_ALLOWLIST_MOVE"; do
     assert_denied "$(run_json "$route" "$patch")" "JSON $route allowlist operation"

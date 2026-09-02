@@ -286,6 +286,16 @@ if [ "$TOOL_NAME" = "apply_patch" ]; then
   if [ -z "$PATCH_TEXT" ]; then
     PATCH_TEXT=$(extract_field patch)
     [ -n "$PATCH_TEXT" ] || PATCH_TEXT=$(extract_field input)
+    # [2026-09-02][fix]
+    # Codex の実 runtime bridge は apply_patch 本文を tool_input.command に載せる場合がある。
+    # command 全般を patch とみなすと任意テキストが検査経路へ入るため、既存の exact marker
+    # と同じく先頭が `*** Begin Patch` の値だけを採用する。従来経路と fail-closed は維持する。
+    if [ -z "$PATCH_TEXT" ]; then
+      COMMAND_PATCH_TEXT=$(extract_field command)
+      case "$COMMAND_PATCH_TEXT" in
+        '*** Begin Patch'*) PATCH_TEXT="$COMMAND_PATCH_TEXT" ;;
+      esac
+    fi
     [ -n "$PATCH_TEXT" ] || emit_deny_safe "[hook:block-unauthorized-docs] apply_patch の対象パスを検査できないため、安全側でブロックしました。"
   fi
   PATCH_PATHS=$(printf '%s\n' "$PATCH_TEXT" | python3 -c '
