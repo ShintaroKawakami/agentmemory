@@ -13,6 +13,7 @@ const PROJECT_PATTERN = /^[a-z0-9][a-z0-9._/-]{0,127}$/;
 const AGENT_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const MAX_BODY_BYTES = 256 * 1024;
 const DEFAULT_TIMEOUT_MS = 4_000;
+const HANDOFF_LOOKUP_LIMIT = 60;
 
 type MemoryCategory = "reference" | "decision" | "fact" | "implementation_handoff";
 
@@ -416,7 +417,10 @@ export class ScopedMemoryService {
     }
     const result = await this.search(scope, {
       query: `implementation_handoff ${scope.project}`,
-      limit: 20,
+      // Search returns relevance-ranked results before applying this limit.
+      // Handoff reads must inspect the full per-project window so a newly saved
+      // low-relevance record cannot be hidden behind an older handoff.
+      limit: HANDOFF_LOOKUP_LIMIT,
     });
     const handoffs = Array.isArray(result["results"])
       ? (result["results"] as Array<Record<string, unknown>>).filter(
