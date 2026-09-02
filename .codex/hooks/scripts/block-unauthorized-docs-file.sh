@@ -191,21 +191,60 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
 
 # docs/ 配下なら絶対パス + docs/ からの相対パスを返す。配下でなければ空。
 normalize_docs_path() {
-  FP="$1" ROOT="$PROJECT_DIR" python3 - <<'PY' 2>/dev/null || true
+  FP="$1" ROOT="$PROJECT_DIR" HOOK_TOOL_NAME="$TOOL_NAME" python3 - <<'PY' 2>/dev/null || true
 import os
+import subprocess
 # [2026-06-01][fix] codex PR#65 指摘②: abspath は symlink を解決しないため、
 # docs/ 自体や中間ディレクトリが symlink の場合に承認制を回避できた。realpath で
 # symlink と相対(..)を実体パスに正規化してから docs/ 配下判定を行う。比較対象の
 # docs も realpath で揃え、新規ファイル(末端未存在)は既存接頭辞だけ解決される。
 fp = os.environ.get("FP", "")
-root = os.path.realpath(os.environ.get("ROOT", "."))
+root_input = os.path.abspath(os.environ.get("ROOT", "."))
+root = os.path.realpath(root_input)
+
+# [2026-09-02][fix]
+# 背景:
+#   - ユーザー依頼意図: Codex が専用 worktree を使う通常運用でも、承認台帳の自己変更を実行時に止める。
+#   - 守るべき業務ルール: 同じ repository の登録済み worktree は同じ保護を受ける一方、無関係な隣接
+#     directory まで project docs と誤認して通常作業を止めない。
+#   - 他案不採用理由: PROJECT_DIR 外を一律 deny する案は別 repository や一時ファイルまで止めるため不採用。
+# 対応: patch 対象が PROJECT_DIR 外なら `git worktree list` から同じ repository の worktree root だけを
+#   解決し、その root の docs/ を既存判定へ通す。
+def contains(base, candidate):
+    return candidate == base or candidate.startswith(base + os.sep)
+
+def effective_root(lexical_candidate, resolved_candidate):
+    if contains(root_input, lexical_candidate) or contains(root, resolved_candidate):
+        return root
+    # Sibling-worktree patching is a Codex apply_patch execution shape. Keep
+    # Claude Write/Edit and shell behavior unchanged.
+    if os.environ.get("HOOK_TOOL_NAME") != "apply_patch":
+        return ""
+    try:
+        output = subprocess.check_output(
+            ["git", "-C", root, "worktree", "list", "--porcelain"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    worktrees = []
+    for line in output.splitlines():
+        if line.startswith("worktree "):
+            path = os.path.realpath(line[len("worktree "):])
+            if contains(path, lexical_candidate) or contains(path, resolved_candidate):
+                worktrees.append(path)
+    return max(worktrees, key=len, default="")
+
 if not fp:
     print("")
 else:
-    target = fp if os.path.isabs(fp) else os.path.join(root, fp)
+    target = fp if os.path.isabs(fp) else os.path.join(root_input, fp)
+    lexical_target = os.path.abspath(target)
     ap = os.path.realpath(target)
-    docs = os.path.realpath(os.path.join(root, "docs"))
-    if ap == docs or ap.startswith(docs + os.sep):
+    target_root = effective_root(lexical_target, ap)
+    docs = os.path.realpath(os.path.join(target_root, "docs")) if target_root else ""
+    if docs and (ap == docs or ap.startswith(docs + os.sep)):
         print(ap + "\t" + os.path.relpath(ap, docs))
     else:
         print("")
