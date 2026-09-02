@@ -49,7 +49,7 @@
 
 **境界（2026-08-08）**: 見積り10分未満の小実装とガバナンス領域（`.claude/` `hook` 等の worker 編集不可領域）は Claude サブエージェント内製、大タスク・並列・大量読みは worker（判定手順は `skills/agent-dispatch` が正本）。
 
-**三役の呼称（2026-08-31）**: 監督=Claude / Codex 5.6 / Cursor（PM クライアント）／参謀=Kimi K3／職人=CodeBar残量と task fit で配分する Codex 5.6 Luna/Terra・Kimi K3・GLM 5.3 系・Gemini 3.7 Flash High。Codex Sol は難所限定、Spark と OpenCode Go は overflow。Antigravity が自動選定された時は High を基準にする。正本: `agents.yaml` の `role_titles` と `worker_delegation`。
+**三役の呼称（2026-08-31）**: 監督=Claude / Codex 5.6 / Cursor（PM クライアント）／参謀=Kimi K3／職人=CodeBar残量と task fit で配分する Codex 5.6 Luna/Terra・Kimi K3・GLM 5.3 系・Gemini Flash High。Codex Sol は難所限定、Spark と OpenCode Go は overflow。Antigravity が自動選定された時は High を基準にする。現行Gemini世代は `agents.yaml#model_catalog.model_families.gemini-flash` を参照する。
 
 **Fable 使用条件（2026-08-11・ctx-save）**: Fable は難所（設計・承認判断／原因不明バグの診断／ガバナンス領域編集）限定。調査・大量読み・軽作業は使わない。重い調査が主目的のセッションは、セッションモデル自体を Sonnet 既定で開始する（第二弾 2026-08-11）。正本・境界の全文は `agents.yaml` の `task_routing.fable_usage_policy`（`session_model_default` 含む）を参照（複製しない）。
 
