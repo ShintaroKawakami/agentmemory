@@ -42,22 +42,25 @@ extract_field() {
       let value = "";
       try {
         const parsed = JSON.parse(raw);
-        const source =
-          parsed && typeof parsed.tool_input === "object" && parsed.tool_input !== null
-            ? parsed.tool_input
-            : parsed && typeof parsed.toolInput === "object" && parsed.toolInput !== null
-            ? parsed.toolInput
-            : parsed;
-        if (source && typeof source[field] === "string") {
-          value = source[field];
-        } else if (
-          parsed &&
-          typeof parsed.arguments === "object" &&
-          parsed.arguments !== null &&
-          typeof parsed.arguments[field] === "string"
-        ) {
-          value = parsed.arguments[field];
-        } else if (
+        const isObject = (candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate);
+        const containers = [
+          isObject(parsed && parsed.tool_input) ? parsed.tool_input : null,
+          isObject(parsed && parsed.toolInput) ? parsed.toolInput : null,
+          isObject(parsed && parsed.arguments) ? parsed.arguments : null,
+          isObject(parsed) ? parsed : null,
+        ];
+        for (const container of containers) {
+          if (!container) continue;
+          if (typeof container[field] === "string" && container[field]) {
+            value = container[field];
+            break;
+          }
+          if (field === "cwd" && typeof container.workdir === "string" && container.workdir) {
+            value = container.workdir;
+            break;
+          }
+        }
+        if (!value &&
           parsed &&
           typeof parsed.arguments === "string" &&
           (field === "patch" || field === "input")
@@ -80,20 +83,28 @@ raw = os.environ.get("HOOK_JSON", "")
 value = ""
 try:
     parsed = json.loads(raw)
-    source = (
-        parsed.get("tool_input")
-        or parsed.get("toolInput")
-        or parsed
-        if isinstance(parsed, dict)
-        else {}
-    )
-    candidate = source.get(field) if isinstance(source, dict) else None
-    if not isinstance(candidate, str) and isinstance(parsed, dict):
-        arguments = parsed.get("arguments")
-        if isinstance(arguments, dict):
-            candidate = arguments.get(field, "")
-        elif isinstance(arguments, str) and field in {"patch", "input"}:
-            candidate = arguments
+    if isinstance(parsed, dict):
+        containers = (
+            parsed.get("tool_input"),
+            parsed.get("toolInput"),
+            parsed.get("arguments"),
+            parsed,
+        )
+        candidate = None
+        for container in containers:
+            if not isinstance(container, dict):
+                continue
+            possible = container.get(field)
+            if isinstance(possible, str) and possible:
+                candidate = possible
+                break
+            if field == "cwd":
+                possible = container.get("workdir")
+                if isinstance(possible, str) and possible:
+                    candidate = possible
+                    break
+        if not candidate and isinstance(parsed.get("arguments"), str) and field in {"patch", "input"}:
+            candidate = parsed["arguments"]
     if isinstance(candidate, str):
         value = candidate
 except Exception:
