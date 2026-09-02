@@ -287,9 +287,11 @@ if [ "$TOOL_NAME" = "apply_patch" ]; then
     PATCH_TEXT=$(extract_field patch)
     [ -n "$PATCH_TEXT" ] || PATCH_TEXT=$(extract_field input)
     # [2026-09-02][fix]
-    # Codex の実 runtime bridge は apply_patch 本文を tool_input.command に載せる場合がある。
-    # command 全般を patch とみなすと任意テキストが検査経路へ入るため、既存の exact marker
-    # と同じく先頭が `*** Begin Patch` の値だけを採用する。従来経路と fail-closed は維持する。
+    # 背景:
+    #   - ユーザー依頼意図: Codex でも正しい apply_patch が安全確認を通り、禁止対象は止まるようにする。
+    #   - 守るべき業務ルール: 対象のパスを確認できない変更は通さず、安全確認を省略しない。
+    #   - 他案不採用理由: command 全体を patch とみなすと、任意の入力を patch と誤認するため不採用。
+    # 対応: tool_input.command は先頭が `*** Begin Patch` の場合だけ patch として読み取り、既存の安全側の扱いを保つ。
     if [ -z "$PATCH_TEXT" ]; then
       COMMAND_PATCH_TEXT=$(extract_field command)
       case "$COMMAND_PATCH_TEXT" in
