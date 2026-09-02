@@ -277,6 +277,46 @@ describe("ScopedMemoryService", () => {
       handoff: { project: "agent-hub", content: "Newest project handoff" },
     });
   });
+
+  it("selects the newest handoff beyond the relevance-ranked result window", async () => {
+    const backend = new FakeBackend();
+    backend.searchResponse = {
+      results: [
+        ...Array.from({ length: 20 }, (_, index) => ({
+          observation: {
+            id: `older-${index}`,
+            narrative: encoded(
+              "agent-hub",
+              "implementation_handoff",
+              `Older handoff ${index}`,
+              `2026-08-03T${String(index).padStart(2, "0")}:00:00Z`,
+            ),
+          },
+          score: 1 - index / 100,
+        })),
+        {
+          observation: {
+            id: "newest",
+            narrative: encoded("agent-hub", "implementation_handoff", "Newest handoff", "2026-08-04T00:00:00Z"),
+          },
+          score: 0.01,
+        },
+      ],
+    };
+    const service = new ScopedMemoryService(backend, config.allowedProjects);
+
+    const result = await service.getHandoff({ project: "agent-hub", agent: "claude-code" });
+
+    expect(backend.searches[0]).toMatchObject({
+      project: "agent-hub",
+      limit: 60,
+    });
+    expect(result).toMatchObject({
+      project: "agent-hub",
+      fallbackUsed: false,
+      handoff: { id: "newest", content: "Newest handoff" },
+    });
+  });
 });
 
 describe("JTT scoped MCP surface", () => {
