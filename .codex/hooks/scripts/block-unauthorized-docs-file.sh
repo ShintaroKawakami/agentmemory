@@ -1,5 +1,5 @@
 #!/bin/bash
-# @description Blocks unauthorized new docs/ SSOT files from file-edit and shell commands.
+# @description Blocks AI edits to docs/.ssot-allowlist while allowing ordinary docs work.
 # @module hook-library/block-unauthorized-docs-file
 # @status stable
 
@@ -42,11 +42,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../lib/hook-io.sh"
 
-# 構造化 SSOT ディレクトリ（固定ファイルセットを持つ＝新規ファイルを承認制にする）
-# design/ release-notes/ archives/ など作業用ディレクトリは含めない（素通りさせる）。
-# plan/ は廃止（プランは ~/.claude/plans/ 等のグローバルへ）。WORK_DIRS から外し完全禁止扱いにする。
-GATED_DIRS="prd architecture business api database operation benchmark testing"
-WORK_DIRS="design release-notes"
+# [2026-09-02][policy]
+# 個人開発の通常作業を止めない。docs の作成・更新・削除・移動は許可し、
+# AI が自分で承認台帳を書き換える唯一の抜け道 docs/.ssot-allowlist だけを deny する。
 
 # baseline 許可（docs-structure-rules.md と一致。構造定義で既に承認済みの正本ファイル）。
 is_baseline_allowed() {
@@ -166,6 +164,14 @@ PY
 
 read_stdin
 
+# A Codex bridge can pass a raw unified patch body instead of JSON. Recognize only
+# an input whose first byte begins the exact apply_patch marker; arbitrary raw text
+# remains outside the apply_patch path. JSON routes remain handled by hook-io.
+RAW_PATCH_TEXT=""
+if ! printf '%s' "$HOOK_INPUT" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1 && case "$HOOK_INPUT" in '*** Begin Patch'*) true ;; *) false ;; esac; then
+  RAW_PATCH_TEXT="$HOOK_INPUT"
+fi
+
 # [2026-07-16][fix]
 # 背景:
 #   - 依頼意図: Codex の apply_patch でも docs SSOT 承認制と docs/.ssot-allowlist 自己承認禁止を効かせる。
@@ -176,6 +182,7 @@ read_stdin
 # 対応: apply_patch の patch/input から Add/Update/Delete/Move 対象を抽出し、既存の path gate へ渡す。
 # tool_name はトップレベルと bridge 環境変数から取得。matcher 設定がずれても fail-open を避けるため空は通す。
 TOOL_NAME=$(printf '%s' "$HOOK_INPUT" | python3 -c "import json,os,sys; d=json.load(sys.stdin); print(d.get('tool_name') or d.get('toolName') or d.get('name') or os.environ.get('CLAUDE_TOOL_NAME',''))" 2>/dev/null || true)
+[ -n "$RAW_PATCH_TEXT" ] && TOOL_NAME="apply_patch"
 if [ -n "$TOOL_NAME" ] && [ "$TOOL_NAME" != "apply_patch" ] && [ "$TOOL_NAME" != "Write" ] && [ "$TOOL_NAME" != "Edit" ] && [ "$TOOL_NAME" != "MultiEdit" ] && [ "$TOOL_NAME" != "WriteFile" ] && [ "$TOOL_NAME" != "StrReplaceFile" ] && [ "$TOOL_NAME" != "Bash" ] && [ "$TOOL_NAME" != "Shell" ]; then
   exit 0
 fi
@@ -227,59 +234,18 @@ is_gated_rel() {
 
 check_docs_path() {
   local file_path="$1"
-  local normalized target_path rel top deny_msg
+  local normalized rel deny_msg
   normalized="$(normalize_docs_path "$file_path")"
   [ -z "$normalized" ] && return 0
-  target_path="${normalized%%	*}"
   rel="${normalized#*	}"
 
+  # B policy: normal docs work stays available; only AI self-approval is blocked.
   if [ "$rel" = ".ssot-allowlist" ]; then
     deny_msg="[hook:block-unauthorized-docs] docs/.ssot-allowlist の AI 編集をブロックしました。
 
-docs/.ssot-allowlist は未承認 SSOT 作成を許可する台帳なので、AI が自分で追記すると承認制の抜け道になります。
-伸太郎殿に図解で必要性を説明し、承認後は伸太郎殿の手動更新として扱ってください。"
+通常の docs 作成・更新・削除・移動は止めません。docs/.ssot-allowlist だけは、AI が自分で許可を作る抜け道になるため、人の確認が必要です。"
     emit_deny_safe "$deny_msg"
   fi
-
-  # 既存ファイルの更新・上書きは自由（新規作成のみ承認制）
-  [ -e "$target_path" ] && return 0
-
-  # 第1階層ディレクトリを判定（docs/直下ファイルは TOP="" 扱い）
-  case "$rel" in
-    */*) top="${rel%%/*}" ;;
-    *) top="" ;;
-  esac
-
-  is_gated_rel "$rel" "$top" || return 0
-
-  # docs/plan/ は廃止。プランはグローバル（~/.claude/plans/ 等）へ作る。専用メッセージで deny。
-  if [ "$top" = "plan" ]; then
-    deny_msg="[hook:block-unauthorized-docs] docs/plan/ への新規ファイル作成をブロックしました: docs/${rel}
-
-docs/plan/ は廃止されました。プランファイルは docs/ ではなくグローバルに作成してください:
-  - Claude Code のプラン → ~/.claude/plans/（プランモードが自動で書き出す）
-  - 各PJの docs/plan/ には新規プランを置かない（古いファイルの堆積を防ぐため）
-
-docs/.ssot-allowlist に plan/... を追加しても docs/plan/ の新規作成は許可されません。"
-    emit_deny_safe "$deny_msg"
-  fi
-
-  # baseline / allowlist のいずれかに該当すれば許可
-  is_baseline_allowed "$rel" && return 0
-  matches_allowlist_file "$rel" "$PROJECT_DIR/docs/.ssot-allowlist" && return 0
-
-  # 未承認の新規 SSOT → ブロック
-  deny_msg="[hook:block-unauthorized-docs] docs/ 配下への未承認の新規 SSOT ファイル作成をブロックしました: docs/${rel}
-
-docs/ 配下の SSOT は承認制です（推測でファイル名を決めて勝手に作らない）。次の手順を踏んでください:
-  1. 図解（ASCII）で「なぜこのファイルが必要か」「なぜ既存の構成（prd-active.md 等）では不足か」を伸太郎殿に説明する
-  2. 伸太郎殿の承認を得る
-  3. 承認後、docs/.ssot-allowlist を伸太郎殿の手動更新として1行追記してから再作成する
-
-ブロックされないもの: 既存ファイルの更新・編集 / baseline 固定 SSOT（prd-active.md 等）/ design/ release-notes/ 等の作業用ディレクトリ。
-詳細: .claude/skills/dev-guardrails/references/docs-structure-rules.md §7"
-
-  emit_deny_safe "$deny_msg"
 }
 
 # apps/<app>/docs/ 配下の正規化。root docs/ とは別の階層なので独立した検査を行う。
@@ -310,37 +276,18 @@ PY
 
 # apps/<app>/docs/ 配下の新規 SSOT 検査。root docs/ ロジックとは独立して動作する。
 check_per_app_docs_path() {
-  local file_path="$1"
-  local normalized target_path rel deny_msg
-  normalized="$(normalize_per_app_docs_path "$file_path")"
-  [ -z "$normalized" ] && return 0
-  target_path="${normalized%%	*}"
-  rel="${normalized#*	}"
-
-  # 既存ファイルの更新・上書きは自由（新規作成のみ承認制）
-  [ -e "$target_path" ] && return 0
-
-  # baseline のいずれかに該当すれば許可
-  is_per_app_baseline_allowed "$rel" && return 0
-
-  # 未承認の新規 SSOT → ブロック
-  deny_msg="[hook:block-unauthorized-docs] apps/<app>/docs/ 配下への未承認の新規 SSOT ファイル作成をブロックしました: ${rel}
-
-apps/<app>/docs/ 配下の SSOT は承認制です（推測でファイル名を決めて勝手に作らない）。次の手順を踏んでください:
-  1. 図解（ASCII）で「なぜこのファイルが必要か」「なぜ既存の構成（<app>-prd-active.md 等）では不足か」を伸太郎殿に説明する
-  2. 伸太郎殿の承認を得る
-  3. 承認後、docs/.ssot-allowlist を伸太郎殿の手動更新として1行追記してから再作成する
-
-ブロックされないもの: 既存ファイルの更新・編集 / baseline 固定 SSOT（<app>-business-rules.md 等）。
-詳細: .claude/skills/dev-guardrails/references/docs-structure-rules.md §11"
-
-  emit_deny_safe "$deny_msg"
+  # B policy: apps/<app>/docs/ is ordinary project documentation.
+  # Keep this function as the common call site, but never gate normal docs work.
+  return 0
 }
 
 if [ "$TOOL_NAME" = "apply_patch" ]; then
-  PATCH_TEXT=$(extract_field patch)
-  [ -n "$PATCH_TEXT" ] || PATCH_TEXT=$(extract_field input)
-  [ -n "$PATCH_TEXT" ] || emit_deny_safe "[hook:block-unauthorized-docs] apply_patch の対象パスを検査できないため、安全側でブロックしました。"
+  PATCH_TEXT="$RAW_PATCH_TEXT"
+  if [ -z "$PATCH_TEXT" ]; then
+    PATCH_TEXT=$(extract_field patch)
+    [ -n "$PATCH_TEXT" ] || PATCH_TEXT=$(extract_field input)
+    [ -n "$PATCH_TEXT" ] || emit_deny_safe "[hook:block-unauthorized-docs] apply_patch の対象パスを検査できないため、安全側でブロックしました。"
+  fi
   PATCH_PATHS=$(printf '%s\n' "$PATCH_TEXT" | python3 -c '
 import re, sys
 paths = []
@@ -353,6 +300,8 @@ for line in sys.stdin.read().splitlines():
 for path in dict.fromkeys(paths):
     print(path)
 ')
+  # A recognized apply_patch body without an actionable target cannot be inspected.
+  # Unlike arbitrary non-JSON text, this is a declared patch transport, so fail closed.
   [ -n "$PATCH_PATHS" ] || emit_deny_safe "[hook:block-unauthorized-docs] apply_patch の対象パスを解釈できないため、安全側でブロックしました。"
   while IFS= read -r candidate; do
     [ -z "$candidate" ] && continue
@@ -367,7 +316,7 @@ if [ "$TOOL_NAME" = "Bash" ] || [ "$TOOL_NAME" = "Shell" ]; then
   CWD=$(extract_field cwd)
   [ -z "$CWD" ] && CWD="$PROJECT_DIR"
   [ -z "$COMMAND" ] && exit 0
-  printf '%s' "$COMMAND" | grep -Eq '(^|[[:space:];|&])(:>|[0-9]*>{1,2}|&>{1,2}|touch|cat[[:space:]].*([0-9]*>{1,2}|&>{1,2})|cp|mv|install|mkdir|tee|sed[[:space:]].*-i|perl[[:space:]].*-pi)' || exit 0
+  printf '%s' "$COMMAND" | grep -Eq '(^|[[:space:];|&])(:>|[0-9]*>{1,2}|&>{1,2}|touch|cat[[:space:]].*([0-9]*>{1,2}|&>{1,2})|cp|mv|rm|install|mkdir|tee|truncate|sed[[:space:]].*-i|perl[[:space:]].*-pi)' || exit 0
   CANDIDATES=$(
     COMMAND_TEXT="$COMMAND" CWD_TEXT="$CWD" PROJECT_DIR="$PROJECT_DIR" python3 - <<'PY'
 import os
@@ -501,6 +450,18 @@ while i < len(tokens):
         segment = copy_like_operands(tok, raw_segment)
         if segment:
             add_copy_like_paths(segment)
+    # Moving an allowlist file away deletes the protected source. Other copy-like
+    # commands only alter their destination, which is already handled above.
+    if tok == "mv":
+        for candidate in segment[:-1]:
+            add_path(candidate)
+    if tok in {"rm", "truncate"}:
+        for candidate in tokens[i + 1:]:
+            if candidate in metachars:
+                break
+            if candidate.startswith("-") or candidate.isdigit():
+                continue
+            add_path(candidate)
     # [2026-05-27][fix] R2 follow-up: sed/perl の in-place 編集ターゲットも検査対象にする。
     #   背景: 前段 grep は sed -i / perl -pi を作成・編集系として検知するが、ここで対象ファイルを
     #   paths に追加していなかったため docs/.ssot-allowlist の AI 編集が素通りしていた。
