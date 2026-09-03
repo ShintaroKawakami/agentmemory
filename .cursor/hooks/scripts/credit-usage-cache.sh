@@ -130,6 +130,16 @@ for p in "${PROVIDERS[@]}"; do
   #   - 他案不採用理由: resolve-subagent.py 側だけで補正する案は、hook 側の表示
   #     （credit-baton-preflight.sh の「Codex 96%」表示）に残るバグを直さないため不採用。
   #     cache 生成時点で GPT と Spark を分離するのが単一の直し所になる。
+  #
+  # [2026-09-03][fix] 選ばれた値に期間と意味を付ける（Issue #2375）
+  # 背景:
+  #   - ユーザー依頼意図: usedPercent だけでは「5時間/週次」と「使用/残量」を判別できず、
+  #     表示と自動振り分けが同じ数値を逆向きに解釈しうるため、値と意味を一体で保存する。
+  #   - 守るべき業務ルール: GPT/Sparkの分離と現行の最大使用率選択は維持し、選ばれた
+  #     window から usedPercent と metric を同時に取る。生成元codexbarの値は使用率なので
+  #     semanticsは used とする。
+  #   - 他案不採用理由: GPTを週次へ固定する案は5時間枠の枯渇を見逃す。全windowを配列で
+  #     保存する案は、現在最も厳しい枠だけで判断する既存契約に対して過剰なため不採用。
   if [ "$p" = "codex" ]; then
     route_obj="$(printf '%s' "$out" | jq -c '
 def select_provider(p):
@@ -137,17 +147,30 @@ def select_provider(p):
 
 def extract_windows:
   [
-    .usage.primary,
-    .usage.secondary,
+    (if (.usage.primary | type) == "object" then .usage.primary + {_metric: "5h"} else empty end),
+    (if (.usage.secondary | type) == "object" then .usage.secondary + {_metric: "weekly"} else empty end),
     .usage.tertiary,
     (if .usage.extraRateWindows then .usage.extraRateWindows[] | (if type == "object" and .window then (.window + {id: .id}) else . end) else empty end)
   ] | map(select(type == "object" and . != null));
 
 def is_spark: ((.id // "") | test("^codex-spark"));
 
+def gpt_metric:
+  if (._metric | type) == "string" then ._metric
+  elif .windowMinutes == 300 then "5h"
+  elif .windowMinutes == 10080 then "weekly"
+  else empty
+  end;
+
 select_provider("codex") |
-  (extract_windows | map(select(is_spark | not)) | map(.usedPercent | numbers)) as $gptvals |
-  if ($gptvals | length) == 0 then empty else { usedPercent: ($gptvals | max) } end
+  (extract_windows |
+    map(select((is_spark | not) and (.usedPercent | type == "number")) |
+      . + {metric: gpt_metric}) |
+    map(select(.metric | type == "string"))) as $gptwins |
+  if ($gptwins | length) == 0 then empty
+  else ($gptwins | max_by(.usedPercent)) as $winner |
+    {usedPercent: $winner.usedPercent, metric: $winner.metric, semantics: "used"}
+  end
 ' 2>/dev/null || true)"
     spark_obj="$(printf '%s' "$out" | jq -c '
 def select_provider(p):
@@ -155,17 +178,31 @@ def select_provider(p):
 
 def extract_windows:
   [
-    .usage.primary,
-    .usage.secondary,
+    (if (.usage.primary | type) == "object" then .usage.primary + {_metric: "5h"} else empty end),
+    (if (.usage.secondary | type) == "object" then .usage.secondary + {_metric: "weekly"} else empty end),
     .usage.tertiary,
     (if .usage.extraRateWindows then .usage.extraRateWindows[] | (if type == "object" and .window then (.window + {id: .id}) else . end) else empty end)
   ] | map(select(type == "object" and . != null));
 
 def is_spark: ((.id // "") | test("^codex-spark"));
 
+def spark_metric:
+  if .id == "codex-spark-weekly" then "spark_weekly"
+  elif .id == "codex-spark" then "5h"
+  elif .windowMinutes == 10080 then "spark_weekly"
+  elif .windowMinutes == 300 then "5h"
+  else empty
+  end;
+
 select_provider("codex") |
-  (extract_windows | map(select(is_spark)) | map(.usedPercent | numbers)) as $sparkvals |
-  if ($sparkvals | length) == 0 then empty else { usedPercent: ($sparkvals | max) } end
+  (extract_windows |
+    map(select(is_spark and (.usedPercent | type == "number")) |
+      . + {metric: spark_metric}) |
+    map(select(.metric | type == "string"))) as $sparkwins |
+  if ($sparkwins | length) == 0 then empty
+  else ($sparkwins | max_by(.usedPercent)) as $winner |
+    {usedPercent: $winner.usedPercent, metric: $winner.metric, semantics: "used"}
+  end
 ' 2>/dev/null || true)"
 
     if [ -n "$route_obj" ] && [ "$route_obj" != "null" ]; then
