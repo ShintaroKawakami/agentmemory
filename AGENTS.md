@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `714c19f05330ffc7222330fcd7e29690c3b18f17ecdda0d0f3333b8e6222bf65`
+- effective hash: `138c63f2080d2f37ba53022751c6122304ec01166d84a117f29d3f0cb783acae`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -64,7 +64,7 @@ Codex 等は paths 条件が効かないため、常時ルールは「いつ／�
 
 ### CARD: ai-worker-watch — 委譲後は見張りを立てる
 - **いつ**: `delegate_impl` で AI worker へ委譲したとき／PR を作って CI を待つとき
-- **何を**: 委譲・PR 作成の直後に見張りを background で1本立てる。ポーリングだけで待たない
+- **何を**: 委譲・PR 作成の直後に見張りを background で1本立てる。ポーリングだけで待たない＋5分ごとに get_job_status を自分で呼び1行報告
 - **できた状態**: 終了・期限切れのどちらでも AI が自分で起きている（無言で待ち続けていない）
 - **詳細**: `.claude/rules/general/ai-worker-watch.md`
 - **ledger provenance** (asset_id=`ai-worker-watch` inheritance_id=`d0f860f95e9dce9c`)
