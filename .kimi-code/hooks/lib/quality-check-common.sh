@@ -208,6 +208,15 @@ resolve_project_dir() {
   printf '%s\n' "$inferred_dir"
 }
 
+# [2026-09-03][fix]
+# 背景:
+# - ユーザー依頼意図: Cursor Stop が品質チェック follow-up を無限に注入するループを止めたい。
+# - 守るべき業務ルール: Claude は stop_hook_active、Cursor は loop_count で再実行を表す。
+#   どちらか一方でも「2回目以降」なら approve し、チェックリストを再注入しない。
+# - 他案不採用理由: AI 応答で「承認します」と書かせる案は hook が読まないため無効。
+#   loop_count の int 判定だけ残す案は Cursor が文字列 "1" を送ると再発する。
+# 対応: stop_hook_active / stopHookActive の truthy 判定に加え、loop_count/loopCount > 0 も
+#   再実行として扱う。
 extract_stop_hook_active() {
   local input="$1"
 
@@ -217,9 +226,26 @@ import sys
 
 try:
     data = json.load(sys.stdin)
-    print(str(data.get('stop_hook_active', False)).lower())
 except Exception:
     print('error')
+    raise SystemExit(0)
+
+def is_truthy(value):
+    return value in (True, 'true', 'True', 1, '1')
+
+if is_truthy(data.get('stop_hook_active')) or is_truthy(data.get('stopHookActive')):
+    print('true')
+    raise SystemExit(0)
+
+raw_count = data.get('loop_count', data.get('loopCount', 0))
+try:
+    if int(raw_count) > 0:
+        print('true')
+        raise SystemExit(0)
+except (TypeError, ValueError):
+    pass
+
+print('false')
 " <<<"$input" 2>/dev/null || echo "error"
 }
 
@@ -232,7 +258,7 @@ import sys
 
 try:
     data = json.load(sys.stdin)
-    value = data.get('transcript_path', '')
+    value = data.get('transcript_path', data.get('transcriptPath', ''))
     print(value if isinstance(value, str) else '')
 except Exception:
     print('')
@@ -263,11 +289,71 @@ import sys
 
 try:
     data = json.load(sys.stdin)
-    value = data.get('agent_transcript_path', '')
+    value = data.get('agent_transcript_path', data.get('agentTranscriptPath', ''))
     print(value if isinstance(value, str) else '')
 except Exception:
     print('')
 " <<<"$input" 2>/dev/null || true
+}
+
+transcript_contains_quality_prompt() {
+  local transcript_path="$1"
+
+  if [ -z "$transcript_path" ] || [ ! -f "$transcript_path" ]; then
+    return 1
+  fi
+
+  BLOCK_PREFIX_ENV="$BLOCK_PREFIX" TRANSCRIPT_PATH="$transcript_path" python3 - <<'PY'
+import json
+import os
+import sys
+
+prefix = os.environ.get("BLOCK_PREFIX_ENV", "")
+path = os.environ.get("TRANSCRIPT_PATH", "")
+if not prefix:
+    sys.exit(1)
+
+def text_from_content(content):
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts = []
+    for item in content:
+        if isinstance(item, str):
+            parts.append(item)
+        elif isinstance(item, dict):
+            parts.append(str(item.get("text", "")))
+    return "\n".join(parts)
+
+found_user = False
+last_user = ""
+raw_tail = ""
+try:
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            raw_tail = (raw_tail + line)[-4096:]
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                obj = json.loads(stripped)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(obj, dict):
+                continue
+            role = str(obj.get("type") or obj.get("role") or "")
+            text = text_from_content(obj.get("content", obj.get("text", "")))
+            if role in ("user", "human") and text:
+                found_user = True
+                last_user = text
+except OSError:
+    sys.exit(1)
+
+if found_user:
+    sys.exit(0 if prefix in last_user else 1)
+sys.exit(0 if prefix in raw_tail else 1)
+PY
 }
 
 # [2026-03-17][fix]
@@ -916,6 +1002,21 @@ run_quality_check_hook() {
   if [ "$stop_hook_active" = "error" ]; then
     log "WARNING: failed to parse stop_hook_active from input JSON, approving as fallback"
     emit_approval_json "$hook_root" "Could not parse hook input JSON, approving as safety fallback."
+    return 0
+  fi
+
+  # [2026-09-03][fix]
+  # Cursor が decision:block を followup_message に変換できず loop_count が 0 のまま再注入する
+  # 経路がある。直近の user メッセージが BLOCK_PREFIX なら「今の follow-up ターン」なので
+  # approve する。JSONL の最後の user だけを見る（同一会話の古い品質チェックのあと新しい作業が
+  # 入った完了までスキップしない）。JSONL で user が取れない形式だけ末尾 4KB を見る。
+  transcript_path="$(extract_agent_transcript_path "$input")"
+  if [ -z "$transcript_path" ]; then
+    transcript_path="$(extract_transcript_path "$input")"
+  fi
+  if transcript_contains_quality_prompt "$transcript_path"; then
+    log "quality check prompt already in transcript, approving to prevent infinite loop"
+    emit_approval_json "$hook_root" "Quality check already requested in this session, approving to prevent infinite loop."
     return 0
   fi
 
