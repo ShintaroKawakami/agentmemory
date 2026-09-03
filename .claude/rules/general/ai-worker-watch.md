@@ -52,6 +52,8 @@ MCP は job 終端時に `~/.cache/agent-hub/ai-worker-mcp/jobs/<job_id>.termina
 
 Claude Code なら `run_in_background: true` で起動する。ポーリングだけで無言で待たない。
 
+`merge_pull_request`（または `create_pull_request(merge_after_pr=true)`）は内部で merge-pr.py を最大 15 分走らせる。呼び出しが background に回った場合も同じく 5 分ごとに状態を確認し、無言で待たない。
+
 ## 5 分ごとの能動確認（2026-09-03〜・義務）
 
 見張りスクリプトは「終了・期限切れで起こす」だけで、途中の停滞・暴走・テスト待ちは PM に見えない。

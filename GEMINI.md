@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `138c63f2080d2f37ba53022751c6122304ec01166d84a117f29d3f0cb783acae`
+- effective hash: `c04a67e7872d613a5371d1e32696da749b2d8a4f879640818c9d058d5839ac3c`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -250,6 +250,8 @@ MCP は job 終端時に `~/.cache/agent-hub/ai-worker-mcp/jobs/<job_id>.termina
 ```
 
 Claude Code なら `run_in_background: true` で起動する。ポーリングだけで無言で待たない。
+
+`merge_pull_request`（または `create_pull_request(merge_after_pr=true)`）は内部で merge-pr.py を最大 15 分走らせる。呼び出しが background に回った場合も同じく 5 分ごとに状態を確認し、無言で待たない。
 
 ## 5 分ごとの能動確認（2026-09-03〜・義務）
 
