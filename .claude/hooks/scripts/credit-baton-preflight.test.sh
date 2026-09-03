@@ -95,6 +95,8 @@ JSON
 out="$(bash "$TARGET_SCRIPT")"
 exit_code=$?
 [ "$exit_code" -eq 0 ] || fail "Test 3: exit 0 にならない（exit=$exit_code）"
+echo "$out" | grep -q "クレジット使用状況" || fail "Test 3: usedPercentを残量と誤読しない見出しが無い: $out"
+echo "$out" | grep -q "クレジット残量" && fail "Test 3: 使用率を残量と表示している: $out"
 echo "$out" | grep -q "Claude 週次" || fail "Test 3: Claude 週次表示が無い: $out"
 echo "$out" | grep -q "50%" || fail "Test 3: 50% 表示が無い: $out"
 # [2026-09-03][fix] Codex 表示名を "Codex(GPT)" へ変更（PR2407 GPT/Spark分離に追従）
@@ -260,7 +262,7 @@ JSON
 out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML" bash "$TARGET_SCRIPT")"
 exit_code=$?
 [ "$exit_code" -eq 0 ] || fail "Test 9: exit 0 にならない（exit=$exit_code）"
-echo "$out" | grep -q "⚠️ クレジット残量" || fail "Test 9: 2時間前の古いキャッシュで ⚠️ 表示にならない: $out"
+echo "$out" | grep -q "⚠️ クレジット使用状況" || fail "Test 9: 2時間前の古いキャッシュで ⚠️ 表示にならない: $out"
 echo "$out" | grep -q "最新の値ではない可能性があります" || fail "Test 9: 鮮度警告の説明文が出ていない: $out"
 
 # ===== [2026-09-01] Codexレビュー指摘対応: resetsAt（週次カウンタ世代）跨ぎテスト =====
@@ -436,7 +438,8 @@ rm -rf "$FALLBACK_TMP2"
 # 背景: 伸太郎殿指摘「Codex 96% は Spark、GPT は余裕がある」。routes.codex と
 # routes["codex-spark"] を両方持つキャッシュを与え、display_routes を明示せず
 # スクリプト既定（agents.yaml のデフォルト値と一致させた display_routes）を使わせた時、
-# "Codex(GPT) 74% / Spark 96%" のように2本別々に出ること。
+# "Codex(GPT) 週次 74% 使用 / Spark 週次 96% 使用" のように、
+# 期間と意味を付けて2本別々に出ること。
 TEST_AGENTS_YAML_SPARK="$TMP_DIR/agents-spark.yaml"
 cat > "$TEST_AGENTS_YAML_SPARK" <<'YAML'
 worker_delegation:
@@ -457,8 +460,8 @@ cat > "$TEST_CACHE_FILE" <<JSON
   "source": "codexbar CLI",
   "routes": {
     "claude": {"usedPercent": 30, "session": 5, "weekly": 30, "willLastToReset": true},
-    "codex": {"usedPercent": 74},
-    "codex-spark": {"usedPercent": 96}
+    "codex": {"usedPercent": 74, "metric": "weekly", "semantics": "used"},
+    "codex-spark": {"usedPercent": 96, "metric": "spark_weekly", "semantics": "used"}
   }
 }
 JSON
@@ -466,7 +469,39 @@ JSON
 spark_out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML_SPARK" bash "$TARGET_SCRIPT")"
 spark_exit=$?
 [ "$spark_exit" -eq 0 ] || fail "Test 15: exit 0 にならない（exit=$spark_exit）"
-echo "$spark_out" | grep -q "Codex(GPT) 74%" || fail "Test 15: Codex(GPT) 74% 表示が無い: $spark_out"
-echo "$spark_out" | grep -q "Spark 96%" || fail "Test 15: Spark 96% 表示が無い: $spark_out"
+echo "$spark_out" | grep -q "Codex(GPT) 週次 74% 使用" || fail "Test 15: Codex(GPT) の期間・使用表示が無い: $spark_out"
+echo "$spark_out" | grep -q "Spark 週次 96% 使用" || fail "Test 15: Spark の期間・使用表示が無い: $spark_out"
+
+# [2026-09-03][test] Test 16: 非used・未知semanticsは使用率として表示しない
+cat > "$TEST_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$NOW_ISO_SPARK",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 30, "session": 5, "weekly": 30, "willLastToReset": true},
+    "codex": {"usedPercent": 74, "metric": "weekly", "semantics": "shortfall"},
+    "codex-spark": {"usedPercent": 96, "metric": "spark_weekly", "semantics": "mystery"}
+  }
+}
+JSON
+invalid_semantics_out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML_SPARK" bash "$TARGET_SCRIPT")"
+echo "$invalid_semantics_out" | grep -q "Codex(GPT)" && fail "Test 16: shortfallをCodex使用率として表示した: $invalid_semantics_out"
+echo "$invalid_semantics_out" | grep -q "Spark" && fail "Test 16: 未知semanticsをSpark使用率として表示した: $invalid_semantics_out"
+
+# --- Test 17: metadata片欠けは使用率として表示しない ---
+cat > "$TEST_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$NOW_ISO_SPARK",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 30, "session": 5, "weekly": 30, "willLastToReset": true},
+    "codex": {"usedPercent": 74, "metric": "weekly"},
+    "codex-spark": {"usedPercent": 18, "semantics": "used"}
+  }
+}
+JSON
+partial_metadata_out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML_SPARK" bash "$TARGET_SCRIPT")"
+echo "$partial_metadata_out" | grep -q "Codex(GPT)" && fail "Test 17: metadata片欠けをCodex使用率として表示した: $partial_metadata_out"
+echo "$partial_metadata_out" | grep -q "Spark" && fail "Test 17: metadata片欠けをSpark使用率として表示した: $partial_metadata_out"
 
 echo "PASS: credit-baton-preflight"

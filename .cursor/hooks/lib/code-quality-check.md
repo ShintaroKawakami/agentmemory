@@ -1,6 +1,6 @@
 # Code Quality Checklist（SubagentStop / Stop hook用）
 
-<!-- hook-library v3.6.41 | profile: agentmemory -->
+<!-- hook-library v3.6.42 | profile: agentmemory -->
 
 サブエージェントの作業完了時に、以下の観点で品質チェックを実施する。
 対象: 直前のサブエージェントが**新規作成・変更した**ファイルのみ。

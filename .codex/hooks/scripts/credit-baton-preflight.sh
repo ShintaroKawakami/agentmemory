@@ -223,7 +223,12 @@ if updated_at_str:
 # ⚠️ を前置きし、古い値であることを明示する（古い値を新しい値のように見せない）。
 stale_warning = elapsed_sec is not None and elapsed_sec > max(cache_ttl * 2, 3600)
 header_prefix = "⚠️ " if stale_warning else "⚡ "
-header = f"{header_prefix}クレジット残量（{time_label}）" if time_label else f"{header_prefix}クレジット残量"
+# [2026-09-03][fix] routes.*.usedPercent を表示するため見出しも「使用状況」に合わせる。
+# 背景:
+#   - ユーザー依頼意図: 割合が使用率であることを、見出しだけでも誤読なく分かるようにする。
+#   - 守るべき業務ルール: credit-usage.json の semantics="used" と同じ向きの言葉を使う。
+#   - 他案不採用理由: 「残量」のままでは100%を「100%残っている」と逆向きに読める。
+header = f"{header_prefix}クレジット使用状況（{time_label}）" if time_label else f"{header_prefix}クレジット使用状況"
 lines = [header]
 if stale_warning:
     lines.append(f"（この値は{time_label}のものです。最新の値ではない可能性があります）")
@@ -273,19 +278,54 @@ ROUTE_DISPLAY_MAP = {
     "ocg": "OCG",
 }
 
+# [2026-09-03][fix] Codexの割合へ期間と「使用」を併記する（Issue #2375）
+# 背景:
+#   - ユーザー依頼意図: 同じ「74%」でも5時間/週次、使用率/残量で意味が逆になるため、
+#     キャッシュが明示したmetric/semanticsを表示へ反映する。
+#   - 守るべき業務ルール: metadata全欠落の旧キャッシュだけ従来表示を許す。片欠け、
+#     shortfall、未知値は使用率として表示しない。他providerの既存表示は変更しない。
+#   - 他案不採用理由: semanticsを見ずに全てへ「使用」を足す案は、将来のshortfallを
+#     使用率として逆表示するため不採用。
+CODEX_METRIC_LABELS = {
+    "codex": {"5h": "5時間", "weekly": "週次"},
+    "codex-spark": {"5h": "5時間", "spark_weekly": "週次"},
+}
+
+
+def worker_usage_label(route, route_info, display_name):
+    if not isinstance(route_info, dict):
+        return None
+    pct = route_info.get("usedPercent")
+    if not isinstance(pct, (int, float)):
+        return None
+    pct_val = int(round(float(pct)))
+    if route not in CODEX_METRIC_LABELS:
+        return f"{display_name} {pct_val}%"
+
+    has_metric = "metric" in route_info
+    has_semantics = "semantics" in route_info
+    if not has_metric and not has_semantics:
+        return f"{display_name} {pct_val}%"
+    metric = route_info.get("metric")
+    semantics = route_info.get("semantics")
+    metric_label = CODEX_METRIC_LABELS[route].get(metric)
+    if semantics != "used" or metric_label is None:
+        return None
+    return f"{display_name} {metric_label} {pct_val}% 使用"
+
 worker_items = []
 for r in display_routes:
     if r == "claude":
         continue
     if r in routes:
         r_info = routes[r]
-        if isinstance(r_info, dict) and "usedPercent" in r_info and r_info["usedPercent"] is not None:
-            try:
-                pct_val = int(round(float(r_info["usedPercent"])))
-                dname = ROUTE_DISPLAY_MAP.get(r, r.upper() if len(r) <= 3 else r.capitalize())
-                worker_items.append(f"{dname} {pct_val}%")
-            except Exception:
-                pass
+        try:
+            dname = ROUTE_DISPLAY_MAP.get(r, r.upper() if len(r) <= 3 else r.capitalize())
+            usage_label = worker_usage_label(r, r_info, dname)
+            if usage_label:
+                worker_items.append(usage_label)
+        except Exception:
+            pass
 
 if worker_items:
     lines.append(" / ".join(worker_items))

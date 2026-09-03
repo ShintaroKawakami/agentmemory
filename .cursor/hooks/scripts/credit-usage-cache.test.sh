@@ -135,6 +135,8 @@ jq -e '.routes.glm.usedPercent == 2' "$TEST_CACHE_FILE" >/dev/null || fail "Test
 jq -e '.routes.antigravity.usedPercent == 0' "$TEST_CACHE_FILE" >/dev/null || fail "Test 3: antigravity.usedPercent != 0"
 jq -e '.routes.kimi.usedPercent == 21' "$TEST_CACHE_FILE" >/dev/null || fail "Test 3: kimi.usedPercent != 21"
 jq -e '.routes.codex.usedPercent == 70' "$TEST_CACHE_FILE" >/dev/null || fail "Test 3: codex.usedPercent != 70"
+jq -e '.routes.codex.metric == "5h"' "$TEST_CACHE_FILE" >/dev/null || fail "Test 3: codex.metric != 5h"
+jq -e '.routes.codex.semantics == "used"' "$TEST_CACHE_FILE" >/dev/null || fail "Test 3: codex.semantics != used"
 jq -e '.routes.cursor.usedPercent == 79' "$TEST_CACHE_FILE" >/dev/null || fail "Test 3: cursor.usedPercent != 79"
 jq -e '.routes.ocg.usedPercent == 0' "$TEST_CACHE_FILE" >/dev/null || fail "Test 3: ocg.usedPercent != 0 (opencodego マッピング)"
 
@@ -310,7 +312,11 @@ rm -f "$TEST_CACHE_FILE"
 CODEXBAR_BIN="$STUB_BIN_DIR/codexbar" bash "$TARGET_SCRIPT"
 [ -f "$TEST_CACHE_FILE" ] || fail "Test 7: キャッシュファイルが生成されていない"
 jq -e '.routes.codex.usedPercent == 74' "$TEST_CACHE_FILE" >/dev/null || fail "Test 7: routes.codex.usedPercent != 74（Spark混入）"
+jq -e '.routes.codex.metric == "weekly"' "$TEST_CACHE_FILE" >/dev/null || fail "Test 7: routes.codex.metric != weekly"
+jq -e '.routes.codex.semantics == "used"' "$TEST_CACHE_FILE" >/dev/null || fail "Test 7: routes.codex.semantics != used"
 jq -e '.routes["codex-spark"].usedPercent == 96' "$TEST_CACHE_FILE" >/dev/null || fail "Test 7: routes.codex-spark.usedPercent != 96"
+jq -e '.routes["codex-spark"].metric == "spark_weekly"' "$TEST_CACHE_FILE" >/dev/null || fail "Test 7: routes.codex-spark.metric != spark_weekly"
+jq -e '.routes["codex-spark"].semantics == "used"' "$TEST_CACHE_FILE" >/dev/null || fail "Test 7: routes.codex-spark.semantics != used"
 
 # --- Test 8: Spark window が無い時、codex-spark キー自体を作らない（0%捏造禁止） ---
 cat > "$STUB_BIN_DIR/codexbar" <<'EOF'
@@ -335,6 +341,51 @@ chmod +x "$STUB_BIN_DIR/codexbar"
 rm -f "$TEST_CACHE_FILE"
 CODEXBAR_BIN="$STUB_BIN_DIR/codexbar" bash "$TARGET_SCRIPT"
 jq -e '.routes.codex.usedPercent == 50' "$TEST_CACHE_FILE" >/dev/null || fail "Test 8: routes.codex.usedPercent != 50"
+jq -e '.routes.codex.metric == "weekly" and .routes.codex.semantics == "used"' "$TEST_CACHE_FILE" >/dev/null || fail "Test 8: routes.codex metadata が不正"
 jq -e '(.routes | has("codex-spark")) | not' "$TEST_CACHE_FILE" >/dev/null || fail "Test 8: Spark window が無いのに codex-spark キーが作られている"
+
+# [2026-09-03][test] Test 9: 5時間枠が勝つ時も値とmetricが同じwindow由来になること
+# 背景:
+#   - ユーザー依頼意図: Test 7 の週次勝ちだけでは、実装がmetricを週次へ固定しても通るため、
+#     GPT/Sparkの両方で勝者を反転し、現行max選択を維持したことを固定する。
+#   - 守るべき業務ルール: usedPercentとmetricは別々に選ばず、同じwinnerから取得する。
+#   - 他案不採用理由: 1つのfixture内に全windowを置くだけでは勝者反転を証明できない。
+cat > "$STUB_BIN_DIR/codexbar" <<'EOF'
+#!/bin/sh
+provider=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --provider) provider="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+case "$provider" in
+  codex)
+    cat <<'JSON'
+[
+  {
+    "provider": "codex",
+    "usage": {
+      "primary": { "usedPercent": 82, "windowMinutes": 300 },
+      "secondary": { "usedPercent": 41, "windowMinutes": 10080 },
+      "extraRateWindows": [
+        { "id": "codex-spark", "usedPercent": 73, "windowMinutes": 300 },
+        { "id": "codex-spark-weekly", "usedPercent": 12, "windowMinutes": 10080 }
+      ]
+    }
+  }
+]
+JSON
+    ;;
+  *)
+    echo "[]"
+    ;;
+esac
+EOF
+chmod +x "$STUB_BIN_DIR/codexbar"
+rm -f "$TEST_CACHE_FILE"
+CODEXBAR_BIN="$STUB_BIN_DIR/codexbar" bash "$TARGET_SCRIPT"
+jq -e '.routes.codex == {"usedPercent":82,"metric":"5h","semantics":"used"}' "$TEST_CACHE_FILE" >/dev/null || fail "Test 9: GPT 5h winner の値とmetadataが不一致"
+jq -e '.routes["codex-spark"] == {"usedPercent":73,"metric":"5h","semantics":"used"}' "$TEST_CACHE_FILE" >/dev/null || fail "Test 9: Spark 5h winner の値とmetadataが不一致"
 
 echo "PASS: credit-usage-cache"
