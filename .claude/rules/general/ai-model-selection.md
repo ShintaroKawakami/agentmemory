@@ -59,11 +59,19 @@ paths:
 
 **境界（2026-08-08）**: 見積り10分未満の小実装とガバナンス領域（`.claude/` `hook` 等の worker 編集不可領域）は Claude サブエージェント内製、大タスク・並列・大量読みは worker（判定手順は `skills/agent-dispatch` が正本）。
 
-**三役の呼称（2026-08-31）**: 監督=Claude / Codex 5.6 / Cursor（PM クライアント）／参謀=Kimi K3／職人=CodeBar残量と task fit で配分する Codex 5.6 Luna/Terra・Kimi K3・GLM 5.3 系・Gemini Flash High。Codex Sol は難所限定、Spark と OpenCode Go は overflow。Antigravity が自動選定された時は High を基準にする。現行Gemini世代は `agents.yaml#model_catalog.model_families.gemini-flash` を参照する。
+**三役の呼称（2026-08-31、2026-09-03更新）**: 監督=Claude / Codex 5.6 / Cursor（PM クライアント）／参謀=Kimi K3／職人=CodeBar残量と task fit で配分する Codex 5.6 Luna/Terra・Kimi K3・GLM 5.3 系・Gemini Flash High。Codex Sol は難所限定、Spark はoverflow。OpenCode GoはHermes専用としてAI Worker候補から除外する。Antigravity が自動選定された時は High を基準にする。現行Gemini世代は `agents.yaml#model_catalog.model_families.gemini-flash` を参照する。正本: `agents.yaml` の `role_titles` と `worker_delegation`。
 
 **Fable 使用条件（2026-08-11・ctx-save）**: Fable は難所（設計・承認判断／原因不明バグの診断／ガバナンス領域編集）限定。調査・大量読み・軽作業は使わない。重い調査が主目的のセッションは、セッションモデル自体を Sonnet 既定で開始する（第二弾 2026-08-11）。正本・境界の全文は `agents.yaml` の `task_routing.fable_usage_policy`（`session_model_default` 含む）を参照（複製しない）。
 
-**調査系サブエージェント（Explore 等）へ委譲する時の規約**: `model:` に下位モデル（`sonnet` / `haiku`）を明示指定する。無指定のまま委譲すると親セッションのモデル（Fable 等）を継承し、大量読みが難所限定の原則から漏れる。
+<!-- [2026-09-03][feat]
+背景:
+  - ユーザー依頼意図: 調査・監査を含むサブエージェントの節約時切替を共通化する。
+  - 守るべき業務ルール: `agents.yaml#subagent_routing` を唯一の役割別正本とし、OpenCode GoはAI Workerで使わない。
+  - 他案不採用理由: 本ruleへ固定モデルやfallback順を重複記載する案は世代交代時にドリフトするため不採用。
+対応: role resolverを必須化し、固定モデル指定の旧規約を置き換える。
+-->
+
+**調査・監査系サブエージェントへ委譲する時の規約**: `scripts/resolve-subagent.py <role>` で `agents.yaml#subagent_routing` を解決する。候補順を本ruleへ複製しない。image / stitch はSonnet内製を維持し、AI Workerでは `ocg` / `opencode-go/*` を使わない。
 
 | タスク種別 | 第一候補 | 理由 |
 |-----------|---------|------|
@@ -71,12 +79,12 @@ paths:
 | 通常の実装 / DB・認証・本番・横断 | **CodeBar残量が多い高品質候補。難所は Codex Sol または Gemini High / GLM 5.3** | 明示の安全条件・難度条件を残量加点で覆さない |
 | 小〜中の明確な実装 | **Codex 5.6 Luna / Terra または残量に余裕のある Kimi K3 / GLM / Gemini High** | Codex は役割キーで解決。通常は Luna、標準は Terra。Kimi が選ばれた時は K3 |
 | 難所・広域変更 | **Codex 5.6 Sol xhigh** | 構造化された難所条件を満たす時だけ |
-| 複雑バックエンド・高品質候補の枯渇時 | **Kimi K2.7 Code / OpenCode Go**（予備） | 高品質 primary route が枯渇・利用不能な時だけ使う |
+| 複雑バックエンド・高品質候補の枯渇時 | **役割resolverが返す利用可能候補** | `agents.yaml#subagent_routing` の順序に従う |
 | 巨大 context の読み込み・リポ横断調査 | **Kimi K3**（参謀。実装で選ばれた場合も同じ高品質枠） | 1M context 対応。用途に応じて参謀と職人を分ける |
 
 ### CodeBar残量バランス（自動選定の共通ルール）
 
-`agents.yaml.worker_delegation.usage_balance` を正本とする。`get_worker_capabilities(include_usage: true)` で CodeBar の使用済み割合を確認し、残量が多い高品質 route（`codex-standard` / `kimi` / `glm` / `antigravity`）へ配分する。task fit、明示 provider、難所・安全条件、hard limit は残量加点より優先する。stale / future / unknown の計測値は自動バランスへ使わない。Kimi K3 と Antigravity High は、それぞれ自動選定された時の高品質モデル基準である。OpenCode Go と Codex Spark は overflow であり、primary route の残量ボーナス対象外とする。
+`agents.yaml.worker_delegation.usage_balance` を正本とする。`get_worker_capabilities(include_usage: true)` で CodeBar の使用済み割合を確認し、残量が多い高品質 routeへ配分する。task fit、明示 provider、難所・安全条件、hard limit は残量加点より優先する。stale / future / unknown の計測値は自動バランスへ使わない。OpenCode GoはAI Worker候補から除外する。
 
 ### Kimi 内モデル選択（決定論的）
 

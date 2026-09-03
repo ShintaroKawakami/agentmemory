@@ -269,4 +269,72 @@ jq -e '(.routes.claude | has("expectedUsedPercent")) | not' "$TEST_CACHE_FILE" >
 jq -e '(.routes.claude | has("deltaPercent")) | not' "$TEST_CACHE_FILE" >/dev/null || fail "Test 6: pace未提供時に deltaPercent を捏造してしまっている"
 jq -e '(.routes.claude | has("resetsAt")) | not' "$TEST_CACHE_FILE" >/dev/null || fail "Test 6: resetsAt未提供時に捏造してしまっている"
 
+# [2026-09-03][test] Test 7: Codex GPT と Codex Spark が別 route に分離されること
+# 背景: 伸太郎殿の実測（PR2407）通り、usage.secondary.usedPercent=74（GPT週次）と
+# extraRateWindows[] の id:"codex-spark"（0%）/ "codex-spark-weekly"（96%）を与えた時、
+# routes.codex は Spark を含めず74、routes["codex-spark"]は96になること（混同バグの再発防止）。
+cat > "$STUB_BIN_DIR/codexbar" <<'EOF'
+#!/bin/sh
+provider=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --provider) provider="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+case "$provider" in
+  codex)
+    cat <<'JSON'
+[
+  {
+    "provider": "codex",
+    "usage": {
+      "primary": { "usedPercent": 40, "windowMinutes": 300 },
+      "secondary": { "usedPercent": 74, "windowMinutes": 10080 },
+      "extraRateWindows": [
+        { "id": "codex-spark", "usedPercent": 0, "windowMinutes": 300 },
+        { "id": "codex-spark-weekly", "usedPercent": 96, "windowMinutes": 10080 }
+      ]
+    }
+  }
+]
+JSON
+    ;;
+  *)
+    echo "[]"
+    ;;
+esac
+EOF
+chmod +x "$STUB_BIN_DIR/codexbar"
+rm -f "$TEST_CACHE_FILE"
+CODEXBAR_BIN="$STUB_BIN_DIR/codexbar" bash "$TARGET_SCRIPT"
+[ -f "$TEST_CACHE_FILE" ] || fail "Test 7: キャッシュファイルが生成されていない"
+jq -e '.routes.codex.usedPercent == 74' "$TEST_CACHE_FILE" >/dev/null || fail "Test 7: routes.codex.usedPercent != 74（Spark混入）"
+jq -e '.routes["codex-spark"].usedPercent == 96' "$TEST_CACHE_FILE" >/dev/null || fail "Test 7: routes.codex-spark.usedPercent != 96"
+
+# --- Test 8: Spark window が無い時、codex-spark キー自体を作らない（0%捏造禁止） ---
+cat > "$STUB_BIN_DIR/codexbar" <<'EOF'
+#!/bin/sh
+provider=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --provider) provider="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+case "$provider" in
+  codex)
+    echo '[{"provider":"codex","usage":{"primary":{"usedPercent":30,"windowMinutes":300},"secondary":{"usedPercent":50,"windowMinutes":10080}}}]'
+    ;;
+  *)
+    echo "[]"
+    ;;
+esac
+EOF
+chmod +x "$STUB_BIN_DIR/codexbar"
+rm -f "$TEST_CACHE_FILE"
+CODEXBAR_BIN="$STUB_BIN_DIR/codexbar" bash "$TARGET_SCRIPT"
+jq -e '.routes.codex.usedPercent == 50' "$TEST_CACHE_FILE" >/dev/null || fail "Test 8: routes.codex.usedPercent != 50"
+jq -e '(.routes | has("codex-spark")) | not' "$TEST_CACHE_FILE" >/dev/null || fail "Test 8: Spark window が無いのに codex-spark キーが作られている"
+
 echo "PASS: credit-usage-cache"

@@ -115,6 +115,70 @@ for p in "${PROVIDERS[@]}"; do
     continue
   fi
 
+  # [2026-09-03][fix] Codex GPT と Codex Spark を別枠にする
+  # 背景:
+  #   - ユーザー依頼意図: 伸太郎殿の指摘（PR2407）「Codex 96% ✖ は Codex Spark の値。Codex GPT は
+  #     余裕がある。Codex は gpt と spark の 2 種類。混ぜているのはバグ」。実測
+  #     `codexbar usage --provider codex --format json` は usage.secondary.usedPercent=74（GPT週次）と
+  #     extraRateWindows[] に id: "codex-spark"（5h, 0%）/ "codex-spark-weekly"（96%）を返すが、
+  #     既存の max_used_percent は全 window（Spark 含む）の最大を取るため routes.codex が
+  #     96（Spark の値）になり、Codex Terra/Luna/Sol（GPT route を使う）が誤って枯渇扱いされ
+  #     skip されていた（scripts/resolve-subagent.py の CATALOG_ENTRY_TO_USAGE_ROUTE 参照）。
+  #   - 守るべき業務ルール: 他 provider の抽出ロジックは変更しない。Spark window が無い場合は
+  #     routes["codex-spark"] キー自体を作らない（0%で埋めない。既存の「取得不能 provider は
+  #     キーごと入れない」方針と同じ）。
+  #   - 他案不採用理由: resolve-subagent.py 側だけで補正する案は、hook 側の表示
+  #     （credit-baton-preflight.sh の「Codex 96%」表示）に残るバグを直さないため不採用。
+  #     cache 生成時点で GPT と Spark を分離するのが単一の直し所になる。
+  if [ "$p" = "codex" ]; then
+    route_obj="$(printf '%s' "$out" | jq -c '
+def select_provider(p):
+  (if type == "array" then .[] else . end) | select(.provider == p or (.provider | type == "string" and ascii_downcase == p));
+
+def extract_windows:
+  [
+    .usage.primary,
+    .usage.secondary,
+    .usage.tertiary,
+    (if .usage.extraRateWindows then .usage.extraRateWindows[] | (if type == "object" and .window then (.window + {id: .id}) else . end) else empty end)
+  ] | map(select(type == "object" and . != null));
+
+def is_spark: ((.id // "") | test("^codex-spark"));
+
+select_provider("codex") |
+  (extract_windows | map(select(is_spark | not)) | map(.usedPercent | numbers)) as $gptvals |
+  if ($gptvals | length) == 0 then empty else { usedPercent: ($gptvals | max) } end
+' 2>/dev/null || true)"
+    spark_obj="$(printf '%s' "$out" | jq -c '
+def select_provider(p):
+  (if type == "array" then .[] else . end) | select(.provider == p or (.provider | type == "string" and ascii_downcase == p));
+
+def extract_windows:
+  [
+    .usage.primary,
+    .usage.secondary,
+    .usage.tertiary,
+    (if .usage.extraRateWindows then .usage.extraRateWindows[] | (if type == "object" and .window then (.window + {id: .id}) else . end) else empty end)
+  ] | map(select(type == "object" and . != null));
+
+def is_spark: ((.id // "") | test("^codex-spark"));
+
+select_provider("codex") |
+  (extract_windows | map(select(is_spark)) | map(.usedPercent | numbers)) as $sparkvals |
+  if ($sparkvals | length) == 0 then empty else { usedPercent: ($sparkvals | max) } end
+' 2>/dev/null || true)"
+
+    if [ -n "$route_obj" ] && [ "$route_obj" != "null" ]; then
+      ROUTES_JSON="$(printf '%s' "$ROUTES_JSON" | jq -c --arg route "$route" --argjson obj "$route_obj" '.[$route] = $obj' 2>/dev/null || echo "$ROUTES_JSON")"
+      HAS_ANY_ROUTE=1
+    fi
+    if [ -n "$spark_obj" ] && [ "$spark_obj" != "null" ]; then
+      ROUTES_JSON="$(printf '%s' "$ROUTES_JSON" | jq -c --argjson obj "$spark_obj" '.["codex-spark"] = $obj' 2>/dev/null || echo "$ROUTES_JSON")"
+      HAS_ANY_ROUTE=1
+    fi
+    continue
+  fi
+
   if [ "$p" = "claude" ]; then
     # [2026-09-01][feat] pace フィールド（codexbar 実測ベース）を routes.claude へ追加
     # 背景:
