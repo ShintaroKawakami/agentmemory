@@ -148,7 +148,7 @@ cache_file = cache_file_override if cache_file_override else os.path.expanduser(
 cache_ttl = int(config.get("cache_ttl_seconds", 900))
 warn_pct = float(config.get("claude_weekly_warn_percent", 55))
 strong_pct = float(config.get("claude_weekly_strong_percent", 75))
-display_routes = config.get("display_routes", ["claude", "glm", "antigravity", "kimi", "codex", "cursor", "ocg"])
+display_routes = config.get("display_routes", ["claude", "glm", "antigravity", "kimi", "codex", "codex-spark", "cursor", "ocg"])
 
 # [2026-09-01][feat] 日次節約モード閾値 + pace 閾値（agents.yaml からライブ読み・ハードコード禁止）
 daily_warn_pct = config.get("claude_daily_warn_percent")
@@ -253,12 +253,22 @@ if isinstance(claude_data, dict):
         except Exception:
             pass
 
+# [2026-09-03][fix] Codex(GPT) と Spark を別表示にする
+# 背景:
+#   - ユーザー依頼意図（伸太郎殿 PR2407）: 「Codex 96% ✖ は Codex Spark の値。Codex GPT は
+#     余裕がある。Codex は gpt と spark の 2 種類。混ぜているのはバグ」。credit-usage-cache.sh
+#     側で routes.codex（GPT）と routes["codex-spark"]（Spark）を分離した（同PR同時修正）ため、
+#     表示側も "Codex" 1本の値ではなく "Codex(GPT)" / "Spark" の2本を出す。
+#   - 守るべき業務ルール: 判定ロジック（節約モード閾値・warn/strong）は変更しない。表示名だけ変える。
+#   - 他案不採用理由: "Codex" のまま max(GPT, Spark) を表示し続ける案は、今回の混同バグの
+#     再発そのものであり不採用。
 ROUTE_DISPLAY_MAP = {
     "claude": "Claude",
     "glm": "GLM",
     "antigravity": "Gemini",
     "kimi": "Kimi",
-    "codex": "Codex",
+    "codex": "Codex(GPT)",
+    "codex-spark": "Spark",
     "cursor": "Cursor",
     "ocg": "OCG",
 }

@@ -97,7 +97,8 @@ exit_code=$?
 [ "$exit_code" -eq 0 ] || fail "Test 3: exit 0 にならない（exit=$exit_code）"
 echo "$out" | grep -q "Claude 週次" || fail "Test 3: Claude 週次表示が無い: $out"
 echo "$out" | grep -q "50%" || fail "Test 3: 50% 表示が無い: $out"
-echo "$out" | grep -q "GLM 2% / Gemini 0% / Kimi 21% / Codex 70%" || fail "Test 3: worker 表示が無い: $out"
+# [2026-09-03][fix] Codex 表示名を "Codex(GPT)" へ変更（PR2407 GPT/Spark分離に追従）
+echo "$out" | grep -q "GLM 2% / Gemini 0% / Kimi 21% / Codex(GPT) 70%" || fail "Test 3: worker 表示が無い: $out"
 if echo "$out" | grep -q "委譲"; then
   fail "Test 3: warn閾値未満なのに委譲メッセージが表示されている: $out"
 fi
@@ -430,5 +431,42 @@ no_fallback_exit=$?
 [ "$no_fallback_exit" -eq 0 ] || fail "Test 14: agents.yaml が完全に無い時に exit 0 にならない（exit=$no_fallback_exit）"
 [ -z "$no_fallback_out" ] || fail "Test 14: agents.yaml が完全に無い時は無音であるべき: $no_fallback_out"
 rm -rf "$FALLBACK_TMP2"
+
+# [2026-09-03][test] Test 15: Codex(GPT) と Spark が別枠で表示されること（PR2407 再発防止）
+# 背景: 伸太郎殿指摘「Codex 96% は Spark、GPT は余裕がある」。routes.codex と
+# routes["codex-spark"] を両方持つキャッシュを与え、display_routes を明示せず
+# スクリプト既定（agents.yaml のデフォルト値と一致させた display_routes）を使わせた時、
+# "Codex(GPT) 74% / Spark 96%" のように2本別々に出ること。
+TEST_AGENTS_YAML_SPARK="$TMP_DIR/agents-spark.yaml"
+cat > "$TEST_AGENTS_YAML_SPARK" <<'YAML'
+worker_delegation:
+  credit_preflight:
+    as_of: "2026-08-27"
+    cache_path: "~/.cache/agent-hub/credit-usage.json"
+    cache_ttl_seconds: 900
+    display_routes: ["claude", "glm", "antigravity", "kimi", "codex", "codex-spark", "cursor", "ocg"]
+    claude_weekly_warn_percent: 55
+    claude_weekly_strong_percent: 75
+    rule: "テスト専用: codex-spark 分離表示の確認"
+YAML
+
+NOW_ISO_SPARK="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date +"%Y-%m-%dT%H:%M:%SZ")"
+cat > "$TEST_CACHE_FILE" <<JSON
+{
+  "updatedAt": "$NOW_ISO_SPARK",
+  "source": "codexbar CLI",
+  "routes": {
+    "claude": {"usedPercent": 30, "session": 5, "weekly": 30, "willLastToReset": true},
+    "codex": {"usedPercent": 74},
+    "codex-spark": {"usedPercent": 96}
+  }
+}
+JSON
+
+spark_out="$(AGENTS_YAML_PATH="$TEST_AGENTS_YAML_SPARK" bash "$TARGET_SCRIPT")"
+spark_exit=$?
+[ "$spark_exit" -eq 0 ] || fail "Test 15: exit 0 にならない（exit=$spark_exit）"
+echo "$spark_out" | grep -q "Codex(GPT) 74%" || fail "Test 15: Codex(GPT) 74% 表示が無い: $spark_out"
+echo "$spark_out" | grep -q "Spark 96%" || fail "Test 15: Spark 96% 表示が無い: $spark_out"
 
 echo "PASS: credit-baton-preflight"
