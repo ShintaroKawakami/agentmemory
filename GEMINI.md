@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `714c19f05330ffc7222330fcd7e29690c3b18f17ecdda0d0f3333b8e6222bf65`
+- effective hash: `138c63f2080d2f37ba53022751c6122304ec01166d84a117f29d3f0cb783acae`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -200,7 +200,7 @@ Hook scripts in `src/hooks/` are standalone Node.js scripts (no iii-sdk import).
 <!-- agents-md-card:start -->
 ### CARD: ai-worker-watch — 委譲後は見張りを立てる
 - **いつ**: `delegate_impl` で AI worker へ委譲したとき／PR を作って CI を待つとき
-- **何を**: 委譲・PR 作成の直後に見張りを background で1本立てる。ポーリングだけで待たない
+- **何を**: 委譲・PR 作成の直後に見張りを background で1本立てる。ポーリングだけで待たない＋5分ごとに get_job_status を自分で呼び1行報告
 - **できた状態**: 終了・期限切れのどちらでも AI が自分で起きている（無言で待ち続けていない）
 - **詳細**: `.claude/rules/general/ai-worker-watch.md`
 <!-- agents-md-card:end -->
@@ -250,6 +250,19 @@ MCP は job 終端時に `~/.cache/agent-hub/ai-worker-mcp/jobs/<job_id>.termina
 ```
 
 Claude Code なら `run_in_background: true` で起動する。ポーリングだけで無言で待たない。
+
+## 5 分ごとの能動確認（2026-09-03〜・義務）
+
+見張りスクリプトは「終了・期限切れで起こす」だけで、途中の停滞・暴走・テスト待ちは PM に見えない。
+委譲直後に見張りを立てるのに**加えて**、PM は **5 分ごとに `get_job_status` を自分で呼ぶ**。
+Claude Code では background の `sleep 300` を 1 本立て、終了通知で起きて確認する（ポーリングをサブエージェントに任せない）。
+
+各確認で「経過分・最終更新（何が）・変更ファイル数・テスト状況」を 1 行で報告する。利用者に
+「止まってない？」と聞かれる前に AI が把握している状態を保つ。MCP の `next_status_check`（120 秒）も
+同じ趣旨であり、無視しない。
+
+実測 2026-09-03: Kimi へ委譲後 21 分間 PM が一度も確認せず、利用者から指摘（`health_status: active` だったが
+PM は把握していなかった）。
 
 ## 禁止
 
