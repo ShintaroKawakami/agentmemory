@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `a947edb591238cf88f15368114a518b8060cda80a50f1ce2569ed7a7b3babf0f`
+- effective hash: `0a0d97a2cf3c55f8e818ed1a3317a8229481f3cd7a0596ab8dd01d5210942efd`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -805,11 +805,27 @@ memory と正本が矛盾する場合は、正本を優先する。G-Brain は�
 
 ### general/plan-approval-gate.md
 
+<!-- [2026-09-04][feat] v4 テンプレ（レーン図・出どころ必須・ヒアリング記録）の義務化
+背景:
+  - ユーザー依頼意図: v3.1 のプラン HTML は AI 向けの文章に寄りすぎ、非エンジニアのオーナーが読めない。
+    2026-09-04 に v4 モック2枚を提示し「これでいい」と承認を得た。合わせて「理由を憶測で書くな。
+    本人から聞いたことか G-Brain 出典かを示せ。ずれていたら必ず聞け」という指示を受けた。
+  - 守るべき業務ルール: 本ルールは義務とトリガーだけを持ち、手順の全文は skills/plan-approval/SKILL.md
+    へ置く二段構えを維持する（ui-stitch-mandatory と同じ形）。
+  - 他案不採用理由:
+    1) v4 を新ファイル名で足し v3 と併存させる案は、どちらを使うか毎回迷い古い方が残るため不採用。
+       正本テンプレのファイル名を変えず中身を差し替える。
+    2) 出どころの明示を努力目標にする案は、まさに「未確認のまま承認に出す」ことを止められないため不採用。
+       未確認が1行でも残れば承認に出さない、を機械的な停止条件にする。
+対応: v4 の義務（図がメイン／出どころ3種と未確認なら承認不可／ヒアリング記録／承認は3択／AI層は閉じる）
+      を必須手順と「HTMLプランの中身」へ追記する。
+-->
+
 <!-- agents-md-card:start -->
 ### CARD: plan-approval-gate — 中規模はHTML承認
 - **いつ**: 新機能・画面・データ形変更・複数ファイル実装の着手前
-- **何を**: 固定HTMLプランをWriteで作り open。明示承認前に実装しない。承認後は台帳を全件タスク化
-- **できた状態**: 「この実装でいい」相当の承認があり、台帳タスク化済み
+- **何を**: 固定HTMLプラン(v4)をWriteで作り open。図がメイン・理由に出どころ必須。明示承認前に実装しない。承認後は台帳を全件タスク化
+- **できた状態**: 未確認・未確定がゼロで「進めて」の承認があり、台帳タスク化済み
 - **詳細**: `.claude/rules/general/plan-approval-gate.md`
 <!-- agents-md-card:end -->
 
@@ -829,14 +845,24 @@ memory と正本が矛盾する場合は、正本を優先する。G-Brain は�
 
 1. **プラン作成基準をライブ読み**: `skills/plan-approval` が `resolve-pj-prompt.py --phase plan` を実行し、PJ 別のプラン基準（`snippet-prompts/Typinator/plan/`。専用未作成 PJ は汎用 `dev-plan`）を読む。
 2. **HTML プランを作る（固定テンプレを必ず使う・独自デザイン禁止）**: 正本テンプレをコピーし中身だけ差し替える（通常=`plan-template.html`、AI worker 委譲時=`plan-template-aiworker.html`）。必須のビジュアル要素は下記「中身」節を参照。
-3. **提示して承認を待つ（両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 `open <file>` で PC ブラウザにも表示する。**タップ用ファイルカード作成と open による PC ブラウザ表示の両方を毎回必須とする**。末尾に「この実装でいいですか？（進めて / 直す / やめる）」を置き、**承認なしに実装へ進まない**。保存規約（gitignore済み一時パス・短い slug・共有 URL は1行）と短い同意時の再確認は `skills/plan-approval/SKILL.md` を参照。
+3. **提示して承認を待つ（両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 `open <file>` で PC ブラウザにも表示する。**タップ用ファイルカード作成と open による PC ブラウザ表示の両方を毎回必須とする**。末尾に「この実装でいいですか？（進めて / 直す / やらない）」を置き、**承認なしに実装へ進まない**。未確認・未確定が残る間は承認欄に赤で理由を出し、承認を求めない。保存規約（gitignore済み一時パス・短い slug・共有 URL は1行）と短い同意時の再確認は `skills/plan-approval/SKILL.md` を参照。
 4. **承認直後に 📋 コミットメント台帳を全件タスク化する**: HTML プランの台帳の各行を、着手前に `TaskCreate` で 1 行 = 1 タスク化してから実装へ進む。台帳が全消化（実施済み or 明示保留）になるまで「完了」と宣言しない。詳細は `.claude/rules/general/plan-commitment-tracking.md`。
    - **AI worker を 1 度でも使う計画は必須**: 「AI worker 摩擦時は該当正本を worktree→PR→merge→fetch-only / detached 確認→cleanup で修正」の条項を台帳に必ず入れ、タスク化する（テンプレに既定行として焼き込み済み・消さない）。
 5. **承認後は標準パイプラインを通す**: 実装（dev-guardrails）→ codexレビュー → 実装監査 → CI → SSOT 同期確認 → マージ。本番投入は人間ゲート。
 
-## HTMLプランの中身
+## HTMLプランの中身（v4・2026-09-04〜）
 
-構成部品一覧は `references/plan-template.html` の `parts` マニフェストと `skills/plan-approval/SKILL.md` が正本。複製しない。
+構成部品一覧は `references/plan-template.html` の `parts` マニフェストと `skills/plan-approval/SKILL.md` が正本。複製しない。v4 で守る義務だけを次に置く。
+
+1. **図がメインで文字は補助**。文字版は `<details>` に畳む。「誰が」が2者以上いて順序がある節はレーン図（列＝人／システムの静的インライン SVG）を第一候補にする。
+2. **理由に出どころを付ける（憶測禁止）**。「今困っていること」「なぜ変えるか」の各行は `伸太郎さん発言 YYYY-MM-DD「要約」` / `G-Brain <slug>` / `未確認` の3種のいずれかを持つ。**AI の推測で理由を書かない。**
+3. **未確認が1行でも残るプランは承認に出さない**。先に1問ずつのヒアリングで埋める。本番に出る文字列（通知文面・ファイル名）の**未確定**も同じ扱いで承認を止める。
+4. **冒頭にヒアリング記録を置く**。聞いた質問／本人の答え／G-Brain とのずれ／そもそも要るか、の4行。G-Brain 由来の理由は「G-Brain ではこう。今も同じ？」の確認行を必ず持つ。
+5. **承認の選択肢は「進めて／直す／やらない」**。理由を突き詰めた結果やらなくてよい、を正規の出口として常に残す。
+6. **AI 層（変更一覧・台帳・リスク等）は `<details>` で既定は閉じる**。利用者が読むのは人間層だけでよい状態にする。
+7. **提示前に AI 自身が描画を確認する**。ブラウザで開いて崩れ・見切れ・折り返しが無いことを見てから出す。
+
+部品は「部品箱」であり、そのプランに無い節は**節ごと省略する**（「該当なし」の空節を残さない）。採否は AI 層に記録する。
 
 ## 適用トリガー
 
