@@ -1,9 +1,9 @@
+import { selectLatestProjectHandoff } from "../src/jtt/stored-envelope.js";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import {
   GatewayError,
-  selectLatestProjectHandoff,
   RestAgentMemoryBackend,
   ScopedMemoryService,
   createScopedMcpServer,
@@ -104,8 +104,6 @@ describe("resolveRequestScope", () => {
   it("rejects missing auth and unknown projects", () => {
     expect(() => resolveRequestScope(new Headers({ "x-agentmemory-project": "agent-hub" }), config)).toThrow(
       GatewayError,
-  selectLatestProjectHandoff,
-  RestAgentMemoryBackend,
     );
     expect(() => resolveRequestScope(headers("other-project"), config)).toThrow(/not enabled/);
   });

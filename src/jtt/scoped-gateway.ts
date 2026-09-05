@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { STORED_SCHEMA, encodeEnvelope, decodeEnvelope, type StoredEnvelope, type MemoryCategory } from "./stored-envelope.js";
+
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
@@ -7,14 +9,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 
-const STORED_SCHEMA = "jtt-agentmemory/v1" as const;
 const GLOBAL_REFERENCE_PROJECT = "global/reference";
 const PROJECT_PATTERN = /^[a-z0-9][a-z0-9._/-]{0,127}$/;
 const AGENT_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const MAX_BODY_BYTES = 256 * 1024;
 const DEFAULT_TIMEOUT_MS = 4_000;
 
-type MemoryCategory = "reference" | "decision" | "fact" | "implementation_handoff";
 
 export interface GatewayConfig {
   host: string;
@@ -32,21 +32,6 @@ export interface RequestScope {
   agent: string;
 }
 
-interface StoredEnvelope {
-  schema: typeof STORED_SCHEMA;
-  project: string;
-  category: MemoryCategory;
-  sourceAgent: string;
-  content: string;
-  files: string[];
-  createdAt: string;
-  handoff?: {
-    summary: string;
-    nextStep: string;
-    openQuestions: string[];
-    gitRef?: string;
-  };
-}
 
 interface SearchHit {
   observation?: {
@@ -265,51 +250,6 @@ export class RestAgentMemoryBackend implements AgentMemoryBackend {
   }
 }
 
-function encodeEnvelope(envelope: StoredEnvelope): string {
-  return `JTT_AGENTMEMORY ${envelope.category} ${envelope.project}\n${JSON.stringify(envelope)}`;
-}
-
-function decodeEnvelope(value: string | undefined): StoredEnvelope | null {
-  if (!value?.startsWith("JTT_AGENTMEMORY ")) return null;
-  const separator = value.indexOf("\n");
-  if (separator < 0) return null;
-  try {
-    const parsed = JSON.parse(value.slice(separator + 1)) as Partial<StoredEnvelope>;
-    if (
-      parsed.schema !== STORED_SCHEMA ||
-      typeof parsed.project !== "string" ||
-      typeof parsed.category !== "string" ||
-      typeof parsed.sourceAgent !== "string" ||
-      typeof parsed.content !== "string" ||
-      !Array.isArray(parsed.files) ||
-      typeof parsed.createdAt !== "string"
-    ) {
-      return null;
-    }
-    return parsed as StoredEnvelope;
-  } catch {
-    return null;
-  }
-}
-
-// [2026-09-05][fix] Project latest is chronological over the stored corpus,
-// not a relevance window. Filter at the REST boundary before returning any row.
-// Equal instants use ID descending so concurrent saves have a stable winner.
-export function selectLatestProjectHandoff<T extends { id: string; project?: string; content: string }>(
-  memories: readonly T[], project: string,
-): T | null {
-  let newest: { memory: T; timestamp: number } | undefined;
-  for (const memory of memories) {
-    if (memory.project !== project) continue;
-    const envelope = decodeEnvelope(memory.content);
-    if (!envelope || envelope.project !== project || envelope.category !== "implementation_handoff" || !envelope.handoff) continue;
-    const timestamp = Date.parse(envelope.createdAt);
-    if (!Number.isFinite(timestamp)) continue;
-    if (!newest || timestamp > newest.timestamp ||
-        (timestamp === newest.timestamp && memory.id > newest.memory.id)) newest = { memory, timestamp };
-  }
-  return newest?.memory ?? null;
-}
 
 function memoryType(category: MemoryCategory): "workflow" | "architecture" | "fact" {
   if (category === "implementation_handoff") return "workflow";
