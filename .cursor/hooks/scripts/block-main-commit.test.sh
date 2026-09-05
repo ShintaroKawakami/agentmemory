@@ -667,6 +667,39 @@ expect_main_branch_deny \
   "$main_repo" \
   "git push origin main"
 
+# [2026-09-05][test] Claude Code on the web（クラウド）で `git config --global
+# github.user` が存在しない状態でも fork の feature branch へ通常 push できることを
+# 固定する回帰テスト。third-party push 拒否と main 直 push 拒否は緩めない。
+# 背景:
+#   - 依頼意図: jtt-system spike/cloud-hub-probe の実測（2026-09-05・
+#     docs/spike-cloud-hub-probe.md「push経路の追加実測」）で、クラウドコンテナに
+#     github.user が無く、同一セッション内で設定変更も拒否されるため、fork内の
+#     feature branch push まで恒久的に fail-close していた（AIはGitHub API
+#     経由のfallbackで push した）。
+#   - 守るべき業務ルール: フォールバックは CLAUDE_CODE_REMOTE=true の時だけ。
+#     third-party owner・main直pushの拒否は緩めない。
+cloud_test_home="$HOME"
+export HOME="$tmp/empty-home"
+export CLAUDE_CODE_REMOTE=true
+expect_allow \
+  "クラウドでgithub.user未設定でもorigin ownerへのfeature pushは許可" \
+  "$feature_repo" \
+  "git push origin feature/test"
+expect_block \
+  "クラウドでgithub.user未設定でもthird-party upstream pushは拒否" \
+  "$feature_repo" \
+  "git push upstream feature/test"
+expect_main_branch_deny \
+  "クラウドでgithub.user未設定でもmain直pushは main 文言のまま拒否" \
+  "$main_repo" \
+  "git push origin main"
+unset CLAUDE_CODE_REMOTE
+expect_block \
+  "CLAUDE_CODE_REMOTE未設定・github.user未設定ならfeature pushも従来どおり拒否" \
+  "$feature_repo" \
+  "git push origin feature/test"
+export HOME="$cloud_test_home"
+
 expect_block \
   "先頭 cd でも対象が main なら commit 拒否" \
   "$main_repo" \
@@ -1001,6 +1034,38 @@ expect_allow \
   "fork ownerのREST writeは許可" \
   "$feature_repo" \
   "gh api --method=PATCH repos/TestOwner/feature/issues/1 -f state=closed"
+
+# [2026-09-05][test] クラウド(CLAUDE_CODE_REMOTE=true)でgithub.user未設定でも、
+# origin owner一致のREST writeは許可し、third-party REST writeは拒否のままにする回帰テスト。
+# 背景・守るべき業務ルールは直前の git push 回帰テスト（本ファイル同日コメント）と同じ。
+cloud_api_test_home="$HOME"
+export HOME="$tmp/empty-home"
+export CLAUDE_CODE_REMOTE=true
+expect_allow \
+  "クラウドでgithub.user未設定でもfork owner一致のREST writeは許可" \
+  "$feature_repo" \
+  "gh api --method=PATCH repos/TestOwner/feature/issues/1 -f state=closed"
+expect_block \
+  "クラウドでgithub.user未設定でもthird-party REST writeは拒否" \
+  "$feature_repo" \
+  "gh api -X POST repos/ThirdParty/feature/pulls -f head=TestOwner:feature/test -f base=main"
+
+# [2026-09-05][test] Codex 🟡: gh api REST write分岐だけ current_cwd を直接使い、
+# segment内の `cd <dir> &&` を反映する effective_cwd を経由していなかった非対称を固定する。
+expect_allow \
+  "クラウドでgithub.user未設定でもcd越しのfork owner一致REST writeは許可" \
+  "$main_repo" \
+  "cd $feature_repo && gh api --method PATCH repos/TestOwner/feature/issues/1 -f state=closed"
+expect_block \
+  "クラウドでgithub.user未設定でもcd越しのthird-party REST writeは拒否" \
+  "$main_repo" \
+  "cd $feature_repo && gh api --method PATCH repos/ThirdParty/feature/issues/1 -f state=closed"
+unset CLAUDE_CODE_REMOTE
+expect_block \
+  "CLAUDE_CODE_REMOTE未設定・github.user未設定ならREST writeも従来どおり拒否" \
+  "$feature_repo" \
+  "gh api --method=PATCH repos/TestOwner/feature/issues/1 -f state=closed"
+export HOME="$cloud_api_test_home"
 
 # [2026-08-27][test] issue: push-delete-main-order
 # 背景:
