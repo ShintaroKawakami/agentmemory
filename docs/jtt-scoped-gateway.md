@@ -26,6 +26,26 @@ gateway only enforces project binding and exposes four tools:
   not create a second local memory store. The calling agent can continue its
   normal work without memory.
 
+## Latest project handoff lookup
+
+`agentmemory_handoff_get` selects the latest saved handoff for the bound project,
+not a particular thread. It reads stored memories without a relevance limit.
+The envelope `createdAt` instant determines order; equal timestamps use memory
+ID descending. Empty projects return `handoff: null` and `fallbackUsed: false`.
+
+The authenticated upstream `GET /agentmemory/memories?handoffProject=<project>`
+returns `{ "handoff": <stored memory or null> }`. The opt-in filters both the
+stored row project and envelope project, requires category
+`implementation_handoff`, and chooses the newest valid timestamp before list
+pagination. Existing agent isolation and authentication remain in force.
+The project must match the gateway canonical project syntax (1–128 lowercase
+letters, digits, `.`, `_`, `/`, `-`, starting with a letter or digit), excluding
+`global/reference`. Invalid input returns 400; failed authentication returns 401.
+The gateway rejects legacy/unscoped or mismatched backend responses as 502.
+
+Deploy the core and gateway build together. The query/codec module is pure;
+importing it from the core must not start the standalone gateway.
+
 ## Private deployment
 
 The AgentMemory core stays on `127.0.0.1:3111`. The JTT gateway may listen on a

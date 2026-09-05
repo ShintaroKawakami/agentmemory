@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { STORED_SCHEMA, encodeEnvelope, decodeEnvelope, type StoredEnvelope, type MemoryCategory } from "./stored-envelope.js";
+
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
@@ -7,15 +9,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 
-const STORED_SCHEMA = "jtt-agentmemory/v1" as const;
 const GLOBAL_REFERENCE_PROJECT = "global/reference";
 const PROJECT_PATTERN = /^[a-z0-9][a-z0-9._/-]{0,127}$/;
 const AGENT_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const MAX_BODY_BYTES = 256 * 1024;
 const DEFAULT_TIMEOUT_MS = 4_000;
-const HANDOFF_LOOKUP_LIMIT = 60;
 
-type MemoryCategory = "reference" | "decision" | "fact" | "implementation_handoff";
 
 export interface GatewayConfig {
   host: string;
@@ -33,21 +32,6 @@ export interface RequestScope {
   agent: string;
 }
 
-interface StoredEnvelope {
-  schema: typeof STORED_SCHEMA;
-  project: string;
-  category: MemoryCategory;
-  sourceAgent: string;
-  content: string;
-  files: string[];
-  createdAt: string;
-  handoff?: {
-    summary: string;
-    nextStep: string;
-    openQuestions: string[];
-    gitRef?: string;
-  };
-}
 
 interface SearchHit {
   observation?: {
@@ -64,6 +48,7 @@ interface SearchResponse {
 }
 
 export interface AgentMemoryBackend {
+  latestHandoff(input: { project: string }): Promise<SearchHit | null>;
   remember(input: {
     content: string;
     type: "workflow" | "architecture" | "fact";
@@ -229,6 +214,27 @@ export class RestAgentMemoryBackend implements AgentMemoryBackend {
     return response.json();
   }
 
+  async latestHandoff(input: { project: string }): Promise<SearchHit | null> {
+    const query = new URLSearchParams({ handoffProject: input.project });
+    const response = await fetch(`${this.config.upstreamUrl}/agentmemory/memories?${query}`, {
+      headers: this.config.upstreamSecret
+        ? { authorization: `Bearer ${this.config.upstreamSecret}` } : {},
+      signal: AbortSignal.timeout(this.config.requestTimeoutMs),
+    });
+    if (!response.ok) throw new GatewayError("AgentMemory backend is unavailable", 502, "backend_error");
+    const result = await response.json() as { handoff?: { id?: string; project?: string; content?: string } | null };
+    // An old backend returning its unscoped list must fail closed, never look empty.
+    if (!result || typeof result !== "object" || Array.isArray(result) || !("handoff" in result)) {
+      throw new GatewayError("AgentMemory handoff lookup is unavailable", 502, "backend_error");
+    }
+    if (result.handoff === null) return null;
+    const row = result.handoff;
+    if (!row || row.project !== input.project || typeof row.id !== "string" || typeof row.content !== "string") {
+      throw new GatewayError("AgentMemory handoff response is invalid", 502, "backend_error");
+    }
+    return { observation: { id: row.id, project: row.project, narrative: row.content }, score: 0 };
+  }
+
   remember(input: Parameters<AgentMemoryBackend["remember"]>[0]): Promise<unknown> {
     return this.post("remember", input);
   }
@@ -244,32 +250,6 @@ export class RestAgentMemoryBackend implements AgentMemoryBackend {
   }
 }
 
-function encodeEnvelope(envelope: StoredEnvelope): string {
-  return `JTT_AGENTMEMORY ${envelope.category} ${envelope.project}\n${JSON.stringify(envelope)}`;
-}
-
-function decodeEnvelope(value: string | undefined): StoredEnvelope | null {
-  if (!value?.startsWith("JTT_AGENTMEMORY ")) return null;
-  const separator = value.indexOf("\n");
-  if (separator < 0) return null;
-  try {
-    const parsed = JSON.parse(value.slice(separator + 1)) as Partial<StoredEnvelope>;
-    if (
-      parsed.schema !== STORED_SCHEMA ||
-      typeof parsed.project !== "string" ||
-      typeof parsed.category !== "string" ||
-      typeof parsed.sourceAgent !== "string" ||
-      typeof parsed.content !== "string" ||
-      !Array.isArray(parsed.files) ||
-      typeof parsed.createdAt !== "string"
-    ) {
-      return null;
-    }
-    return parsed as StoredEnvelope;
-  } catch {
-    return null;
-  }
-}
 
 function memoryType(category: MemoryCategory): "workflow" | "architecture" | "fact" {
   if (category === "implementation_handoff") return "workflow";
@@ -415,21 +395,21 @@ export class ScopedMemoryService {
         "handoff_project_required",
       );
     }
-    const result = await this.search(scope, {
-      query: `implementation_handoff ${scope.project}`,
-      // Search returns relevance-ranked results before applying this limit.
-      // Handoff reads must inspect the full per-project window so a newly saved
-      // low-relevance record cannot be hidden behind an older handoff.
-      limit: HANDOFF_LOOKUP_LIMIT,
-    });
-    const handoffs = Array.isArray(result["results"])
-      ? (result["results"] as Array<Record<string, unknown>>).filter(
-          (item) => item["category"] === "implementation_handoff" && item["project"] === scope.project,
-        ).sort((a, b) => String(b["createdAt"] ?? "").localeCompare(String(a["createdAt"] ?? "")))
-      : [];
+    const hit = await this.backend.latestHandoff({ project: scope.project });
+    const envelope = decodeEnvelope(hit?.observation?.narrative);
+    if (hit && (!envelope || envelope.project !== scope.project ||
+        hit.observation?.project !== scope.project || envelope.category !== "implementation_handoff" ||
+        !Number.isFinite(Date.parse(envelope.createdAt)) || !envelope.handoff)) {
+      throw new GatewayError("AgentMemory handoff response is invalid", 502, "backend_error");
+    }
     return {
       project: scope.project,
-      handoff: handoffs[0] ?? null,
+      handoff: envelope ? {
+        id: hit?.observation?.id, project: scope.project, source: "current_project",
+        category: envelope.category, content: envelope.content, files: envelope.files,
+        sourceAgent: envelope.sourceAgent, createdAt: envelope.createdAt, score: 0,
+        handoff: envelope.handoff,
+      } : null,
       fallbackUsed: false,
     };
   }
