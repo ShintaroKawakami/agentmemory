@@ -13,7 +13,6 @@ const PROJECT_PATTERN = /^[a-z0-9][a-z0-9._/-]{0,127}$/;
 const AGENT_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const MAX_BODY_BYTES = 256 * 1024;
 const DEFAULT_TIMEOUT_MS = 4_000;
-const HANDOFF_LOOKUP_LIMIT = 60;
 
 type MemoryCategory = "reference" | "decision" | "fact" | "implementation_handoff";
 
@@ -64,6 +63,7 @@ interface SearchResponse {
 }
 
 export interface AgentMemoryBackend {
+  latestHandoff(input: { project: string }): Promise<SearchHit | null>;
   remember(input: {
     content: string;
     type: "workflow" | "architecture" | "fact";
@@ -229,6 +229,27 @@ export class RestAgentMemoryBackend implements AgentMemoryBackend {
     return response.json();
   }
 
+  async latestHandoff(input: { project: string }): Promise<SearchHit | null> {
+    const query = new URLSearchParams({ handoffProject: input.project });
+    const response = await fetch(`${this.config.upstreamUrl}/agentmemory/memories?${query}`, {
+      headers: this.config.upstreamSecret
+        ? { authorization: `Bearer ${this.config.upstreamSecret}` } : {},
+      signal: AbortSignal.timeout(this.config.requestTimeoutMs),
+    });
+    if (!response.ok) throw new GatewayError("AgentMemory backend is unavailable", 502, "backend_error");
+    const result = await response.json() as { handoff?: { id?: string; project?: string; content?: string } | null };
+    // An old backend returning its unscoped list must fail closed, never look empty.
+    if (!result || typeof result !== "object" || Array.isArray(result) || !("handoff" in result)) {
+      throw new GatewayError("AgentMemory handoff lookup is unavailable", 502, "backend_error");
+    }
+    if (result.handoff === null) return null;
+    const row = result.handoff;
+    if (!row || row.project !== input.project || typeof row.id !== "string" || typeof row.content !== "string") {
+      throw new GatewayError("AgentMemory handoff response is invalid", 502, "backend_error");
+    }
+    return { observation: { id: row.id, project: row.project, narrative: row.content }, score: 0 };
+  }
+
   remember(input: Parameters<AgentMemoryBackend["remember"]>[0]): Promise<unknown> {
     return this.post("remember", input);
   }
@@ -269,6 +290,25 @@ function decodeEnvelope(value: string | undefined): StoredEnvelope | null {
   } catch {
     return null;
   }
+}
+
+// [2026-09-05][fix] Project latest is chronological over the stored corpus,
+// not a relevance window. Filter at the REST boundary before returning any row.
+// Equal instants use ID descending so concurrent saves have a stable winner.
+export function selectLatestProjectHandoff<T extends { id: string; project?: string; content: string }>(
+  memories: readonly T[], project: string,
+): T | null {
+  let newest: { memory: T; timestamp: number } | undefined;
+  for (const memory of memories) {
+    if (memory.project !== project) continue;
+    const envelope = decodeEnvelope(memory.content);
+    if (!envelope || envelope.project !== project || envelope.category !== "implementation_handoff" || !envelope.handoff) continue;
+    const timestamp = Date.parse(envelope.createdAt);
+    if (!Number.isFinite(timestamp)) continue;
+    if (!newest || timestamp > newest.timestamp ||
+        (timestamp === newest.timestamp && memory.id > newest.memory.id)) newest = { memory, timestamp };
+  }
+  return newest?.memory ?? null;
 }
 
 function memoryType(category: MemoryCategory): "workflow" | "architecture" | "fact" {
@@ -415,21 +455,21 @@ export class ScopedMemoryService {
         "handoff_project_required",
       );
     }
-    const result = await this.search(scope, {
-      query: `implementation_handoff ${scope.project}`,
-      // Search returns relevance-ranked results before applying this limit.
-      // Handoff reads must inspect the full per-project window so a newly saved
-      // low-relevance record cannot be hidden behind an older handoff.
-      limit: HANDOFF_LOOKUP_LIMIT,
-    });
-    const handoffs = Array.isArray(result["results"])
-      ? (result["results"] as Array<Record<string, unknown>>).filter(
-          (item) => item["category"] === "implementation_handoff" && item["project"] === scope.project,
-        ).sort((a, b) => String(b["createdAt"] ?? "").localeCompare(String(a["createdAt"] ?? "")))
-      : [];
+    const hit = await this.backend.latestHandoff({ project: scope.project });
+    const envelope = decodeEnvelope(hit?.observation?.narrative);
+    if (hit && (!envelope || envelope.project !== scope.project ||
+        hit.observation?.project !== scope.project || envelope.category !== "implementation_handoff" ||
+        !Number.isFinite(Date.parse(envelope.createdAt)) || !envelope.handoff)) {
+      throw new GatewayError("AgentMemory handoff response is invalid", 502, "backend_error");
+    }
     return {
       project: scope.project,
-      handoff: handoffs[0] ?? null,
+      handoff: envelope ? {
+        id: hit?.observation?.id, project: scope.project, source: "current_project",
+        category: envelope.category, content: envelope.content, files: envelope.files,
+        sourceAgent: envelope.sourceAgent, createdAt: envelope.createdAt, score: 0,
+        handoff: envelope.handoff,
+      } : null,
       fallbackUsed: false,
     };
   }

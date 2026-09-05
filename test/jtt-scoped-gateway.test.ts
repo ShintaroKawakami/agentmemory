@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import {
   GatewayError,
+  selectLatestProjectHandoff,
+  RestAgentMemoryBackend,
   ScopedMemoryService,
   createScopedMcpServer,
   loadGatewayConfig,
@@ -15,6 +17,17 @@ class FakeBackend implements AgentMemoryBackend {
   readonly remembers: Array<Parameters<AgentMemoryBackend["remember"]>[0]> = [];
   readonly searches: Array<Parameters<AgentMemoryBackend["search"]>[0]> = [];
   searchResponse: Awaited<ReturnType<AgentMemoryBackend["search"]>> = { results: [] };
+
+  readonly latestCalls: string[] = [];
+  async latestHandoff(input: { project: string }) {
+    this.latestCalls.push(input.project);
+    const memories = (this.searchResponse.results ?? []).map(hit => ({
+      id: hit.observation?.id ?? "", content: hit.observation?.narrative ?? "",
+      project: hit.observation?.project ?? JSON.parse(hit.observation!.narrative!.split("\n")[1]!).project,
+    }));
+    const row = selectLatestProjectHandoff(memories, input.project);
+    return row ? { observation: { id: row.id, narrative: row.content, project: row.project } } : null;
+  }
 
   async remember(input: Parameters<AgentMemoryBackend["remember"]>[0]): Promise<unknown> {
     this.remembers.push(input);
@@ -91,6 +104,8 @@ describe("resolveRequestScope", () => {
   it("rejects missing auth and unknown projects", () => {
     expect(() => resolveRequestScope(new Headers({ "x-agentmemory-project": "agent-hub" }), config)).toThrow(
       GatewayError,
+  selectLatestProjectHandoff,
+  RestAgentMemoryBackend,
     );
     expect(() => resolveRequestScope(headers("other-project"), config)).toThrow(/not enabled/);
   });
@@ -282,14 +297,14 @@ describe("ScopedMemoryService", () => {
     const backend = new FakeBackend();
     backend.searchResponse = {
       results: [
-        ...Array.from({ length: 20 }, (_, index) => ({
+        ...Array.from({ length: 80 }, (_, index) => ({
           observation: {
             id: `older-${index}`,
             narrative: encoded(
               "agent-hub",
               "implementation_handoff",
               `Older handoff ${index}`,
-              `2026-08-03T${String(index).padStart(2, "0")}:00:00Z`,
+              new Date(Date.UTC(2026, 7, 3, 0, index)).toISOString(),
             ),
           },
           score: 1 - index / 100,
@@ -307,10 +322,8 @@ describe("ScopedMemoryService", () => {
 
     const result = await service.getHandoff({ project: "agent-hub", agent: "claude-code" });
 
-    expect(backend.searches[0]).toMatchObject({
-      project: "agent-hub",
-      limit: 60,
-    });
+    expect(backend.searches).toHaveLength(0);
+    expect(backend.latestCalls).toEqual(["agent-hub"]);
     expect(result).toMatchObject({
       project: "agent-hub",
       fallbackUsed: false,
@@ -346,5 +359,48 @@ describe("JTT scoped MCP surface", () => {
       await client.close();
       await server.close();
     }
+  });
+});
+
+
+describe("chronological project handoff boundary", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const row = (id: string, project: string, at: string, category = "implementation_handoff") => ({
+    id, project, content: encoded(project, category, id, at),
+  });
+  it("uses timestamp instants and a deterministic ID tie break", () => {
+    const records = [row("a", "agent-hub", "2026-09-05T09:00:00+09:00"),
+      row("z", "agent-hub", "2026-09-05T00:00:00Z"),
+      row("later-text-but-older", "agent-hub", "2026-09-05T08:59:59+09:00")];
+    expect(selectLatestProjectHandoff(records, "agent-hub")?.id).toBe("z");
+    expect(selectLatestProjectHandoff(records.reverse(), "agent-hub")?.id).toBe("z");
+  });
+  it("excludes other projects, categories, invalid dates and forged envelope scope", () => {
+    expect(selectLatestProjectHandoff([
+      row("other", "jtt-cms", "2026-09-06T00:00:00Z"),
+      row("fact", "agent-hub", "2026-09-06T00:00:00Z", "fact"),
+      row("invalid", "agent-hub", "invalid"),
+      { ...row("forged", "jtt-cms", "2026-09-06T00:00:00Z"), project: "agent-hub" },
+    ], "agent-hub")).toBeNull();
+  });
+  it("returns explicit null for an empty project and never performs relevance search", async () => {
+    const backend = new FakeBackend();
+    expect(await new ScopedMemoryService(backend, config.allowedProjects).getHandoff({project: "agent-hub", agent: "codex"}))
+      .toEqual({project: "agent-hub", handoff: null, fallbackUsed: false});
+    expect(backend.searches).toHaveLength(0);
+  });
+  it("uses the scoped REST opt-in and rejects a legacy unscoped response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({handoff: row("latest", "agent-hub", "2026-09-05T00:00:00Z")})));
+    vi.stubGlobal("fetch", fetchMock);
+    const backend = new RestAgentMemoryBackend(config);
+    expect((await backend.latestHandoff({project: "agent-hub"}))?.observation?.id).toBe("latest");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("http://127.0.0.1:3111/agentmemory/memories?handoffProject=agent-hub");
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({memories: [], total: 0})));
+    await expect(backend.latestHandoff({project: "agent-hub"})).rejects.toThrow(/unavailable/);
+  });
+  it("rejects a backend returning another project", async () => {
+    const backend = new FakeBackend();
+    backend.latestHandoff = async () => ({observation: {id: "wrong", project: "jtt-cms", narrative: encoded("jtt-cms", "implementation_handoff", "wrong", "2026-09-05T00:00:00Z")}});
+    await expect(new ScopedMemoryService(backend, config.allowedProjects).getHandoff({project: "agent-hub", agent: "codex"})).rejects.toThrow(/invalid/);
   });
 });

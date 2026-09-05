@@ -6,6 +6,7 @@ import { StateKV } from "../state/kv.js";
 import { getLatestHealth } from "../health/monitor.js";
 import type { MetricsStore } from "../eval/metrics-store.js";
 import type { ResilientProvider } from "../providers/resilient.js";
+import { selectLatestProjectHandoff } from "../jtt/scoped-gateway.js";
 import { VERSION } from "../version.js";
 import { timingSafeCompare } from "../auth.js";
 import { isSlotsEnabled, isReflectEnabled } from "../functions/slots.js";
@@ -1930,6 +1931,16 @@ export function registerApiTriggers(
             m.agentId === filterAgentId ||
             (includeOrphans && m.agentId === undefined),
         );
+      }
+
+      // Scoped gateway opt-in: select across storage before list pagination.
+      // Keep agent isolation above, and never emit rows from other projects.
+      const handoffProject = req.query_params?.["handoffProject"];
+      if (handoffProject !== undefined) {
+        if (typeof handoffProject !== "string" || !/^[a-z0-9][a-z0-9._/-]{0,127}$/.test(handoffProject) || handoffProject === "global/reference") {
+          return { status_code: 400, body: { error: "exact handoff project required" } };
+        }
+        return { status_code: 200, body: { handoff: selectLatestProjectHandoff(filtered, handoffProject) } };
       }
 
       // viewer + `agentmemory status` were hitting this endpoint to
