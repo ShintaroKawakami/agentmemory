@@ -39,6 +39,54 @@ def github_owner(url: str) -> str | None:
     return match.group(1) if match else None
 
 
+# [2026-09-05][fix] Claude Code on the web（クラウド）の feature branch push が
+# 恒久的に fail-close していた問題への対応。
+# 背景:
+#   - 依頼意図: クラウドコンテナには `git config --global github.user` が存在せず、
+#     同一セッション内でその設定を書き込もうとしても本ガードが拒否するため、
+#     third-party upstream ではない自分の fork の feature branch への通常
+#     `git push` まで恒久的に fail-close していた（jtt-system
+#     `spike/cloud-hub-probe` ブランチの docs/spike-cloud-hub-probe.md「push
+#     経路の追加実測」2026-09-05・`gh api` で読める。AI は GitHub API 経由の
+#     fallback で push した実測あり）。
+#   - 守るべき業務ルール: third-party upstream への書込み禁止という本来の目的は
+#     緩めない。origin 以外の owner とは一致させない。main への直接
+#     commit/push 禁止もクラウドで緩めない（本ファイルの対象外＝
+#     block-main-commit.sh 側の別チェックが引き続き担当する）。
+#   - 他案不採用理由:
+#     1) クラウド判定時に本ガード自体を無効化する案 → third-party upstream
+#        だけでなく main 直 push まで無検査で通ってしまうため不採用。
+#     2) セットアップスクリプトで `git config --global github.user` を
+#        書き込む案 → クラウドコンテナの生成経路は UI 依存で全経路を
+#        カバーできず、書けたとしても実測どおり同一セッション内の変更が
+#        本ガードに拒否される場合がありうるため不採用。
+# 対応: `CLAUDE_CODE_REMOTE=true` のときだけ、`github.user` 未設定時に
+#   cwd リポの `origin` remote owner を「自分の owner」とみなすフォールバックを
+#   追加する。クラウドの credential はセッションに添付した repo に限定される
+#   ため、その repo の origin owner ＝ 自分の owner とみなせる（この repo
+#   以外には書けない以上、origin 以外を騙る余地がない）。origin が無い・
+#   owner を抽出できない場合は None/空文字を返し、呼び出し側は従来どおり
+#   fail-close する。
+def cloud_environment() -> bool:
+    return os.environ.get("CLAUDE_CODE_REMOTE", "").strip().lower() == "true"
+
+
+def origin_owner(cwd: Path) -> str | None:
+    try:
+        url = git(cwd, "remote", "get-url", "--push", "origin")
+    except subprocess.CalledProcessError:
+        return None
+    return github_owner(url)
+
+
+def resolve_owner(cwd: Path, configured: str) -> str:
+    if configured:
+        return configured
+    if cloud_environment():
+        return origin_owner(cwd) or ""
+    return ""
+
+
 def effective_cwd(base: Path, segment: str, tokens: list[str], git_index: int | None = None) -> Path:
     lead = re.match(r"^\s*cd\s+([^;&|]+?)\s*&&", segment)
     cwd = base
@@ -462,8 +510,6 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
                 ):
                     return False, "Git URL rewrite configuration cannot be changed through repository commands"
             if executable == "git" and "push" in tokens[index + 1 :]:
-                if not owner:
-                    return False, "git config --global github.user is required before repository writes"
                 if not cwd_known:
                     return False, "cannot prove Git push working directory"
                 if has_git_target_environment(tokens, index):
@@ -479,14 +525,17 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
                 ):
                     return False, "cannot prove Git push target with target-overriding global options"
                 cwd = effective_cwd(current_cwd, segment, tokens, index)
+                effective_owner = resolve_owner(cwd, owner)
+                if not effective_owner:
+                    return False, "git config --global github.user is required before repository writes"
                 remote = first_positional_after(tokens, push_index + 1)
                 try:
                     target_owners = [github_owner(url) for url in resolve_remote_urls(cwd, remote)]
                 except (subprocess.CalledProcessError, ValueError):
                     return False, "cannot prove Git push target is the user's fork"
-                if not target_owners or any(target_owner is None or target_owner.casefold() != owner.casefold() for target_owner in target_owners):
+                if not target_owners or any(target_owner is None or target_owner.casefold() != effective_owner.casefold() for target_owner in target_owners):
                     rendered = ",".join(target_owner or "unknown" for target_owner in target_owners) or "unknown"
-                    return False, f"Git push target owner {rendered} is not fork owner {owner}"
+                    return False, f"Git push target owner {rendered} is not fork owner {effective_owner}"
             if executable == "gh":
                 args = tokens[index + 1 :]
                 group, action = gh_command(args)
@@ -499,28 +548,34 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
                     except ValueError:
                         return False, "cannot prove REST write target"
                     if method not in {"GET", "HEAD"}:
-                        if not owner:
+                        # [2026-09-05][fix] Codex 🟡: 通常の gh 書込み分岐と異なり、この REST
+                        # 書込み分岐だけ current_cwd を直接 resolve_owner へ渡していた
+                        # （segment 内の `cd <dir> &&` を反映する effective_cwd を経由しない）。
+                        # `cd <repo> && gh api ...` の cwd 解決を他分岐と揃える。
+                        effective_owner = resolve_owner(effective_cwd(current_cwd, segment, tokens), owner) if cwd_known else owner
+                        if not effective_owner:
                             return False, "git config --global github.user is required before repository writes"
                         target_owner = repository_api_owner(endpoint)
-                        if target_owner is None or target_owner.casefold() != owner.casefold():
-                            return False, f"REST write target owner {target_owner or 'unknown'} is not fork owner {owner}"
+                        if target_owner is None or target_owner.casefold() != effective_owner.casefold():
+                            return False, f"REST write target owner {target_owner or 'unknown'} is not fork owner {effective_owner}"
                     continue
                 if gh_is_read_only(group, action):
                     continue
-                if not owner:
-                    return False, "git config --global github.user is required before repository writes"
                 if not cwd_known:
                     return False, "cannot prove GitHub command working directory"
                 cwd = effective_cwd(current_cwd, segment, tokens)
+                effective_owner = resolve_owner(cwd, owner)
+                if not effective_owner:
+                    return False, "git config --global github.user is required before repository writes"
                 env_repo = environment_repo(tokens, index) or os.environ.get("GH_REPO")
                 try:
                     target_owner = github_owner_from_args(args, group, action)
                 except ValueError:
                     return False, "cannot prove GitHub write target with duplicate repository selectors"
                 if group == "repo" and action == "fork":
-                    destination_owner = option_value(args, {"--org"}) or owner
-                    if destination_owner.casefold() != owner.casefold():
-                        return False, f"fork destination owner {destination_owner} is not fork owner {owner}"
+                    destination_owner = option_value(args, {"--org"}) or effective_owner
+                    if destination_owner.casefold() != effective_owner.casefold():
+                        return False, f"fork destination owner {destination_owner} is not fork owner {effective_owner}"
                     continue
                 if target_owner is None and env_repo:
                     target_owner = env_repo.split("/", 1)[0] if "/" in env_repo else None
@@ -531,8 +586,8 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
                         target_owner = owners[0] if len(owners) == 1 else None
                     except subprocess.CalledProcessError:
                         return False, "cannot prove GitHub write target is the user's fork"
-                if target_owner is None or target_owner.casefold() != owner.casefold():
-                    return False, f"GitHub write target owner {target_owner or 'unknown'} is not fork owner {owner}"
+                if target_owner is None or target_owner.casefold() != effective_owner.casefold():
+                    return False, f"GitHub write target owner {target_owner or 'unknown'} is not fork owner {effective_owner}"
     return True, ""
 
 
