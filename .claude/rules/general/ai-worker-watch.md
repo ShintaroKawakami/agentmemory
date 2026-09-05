@@ -50,6 +50,16 @@ MCP は job 終端時に `~/.cache/agent-hub/ai-worker-mcp/jobs/<job_id>.termina
 ~/business/AGENT-HUB/scripts/watch-pr-checks.sh <pr_number> <owner/repo> [deadline] [interval]
 ```
 
+PR の監視開始時の head SHA を固定し、取得前後に一致を確認する。別途開始した
+`workflow_dispatch` なども完了条件に含む場合は、最初の4引数に続けて
+`--run <run_id>@<head_sha>` を必要な run ごとに指定する。指定した run の ID と head も照合する。
+対象外の run を一括で待たない。head が更新された場合は新しい変更内容と監視対象を確認してから起動し直す。
+
+`NO_CHECKS` は未検証、`NOT_STARTED` は指定 run の開始待ち、`RUNNING` は実行中、
+`PASS` は固定 head のチェックと指定 run がすべて成功した状態。`FAILED` と
+`UNKNOWN_STATE` は成功として扱わない。チェック無しで追加 run だけ成功しても未検証のままとする。
+明示指定 run の `skipped` は、要求した検証が実行されていないため成功に含めない。
+
 Claude Code なら `run_in_background: true` で起動する。ポーリングだけで無言で待たない。
 
 `merge_pull_request`（または `create_pull_request(merge_after_pr=true)`）は内部で merge-pr.py を最大 15 分走らせる。呼び出しが background に回った場合も同じく 5 分ごとに状態を確認し、無言で待たない。
@@ -85,7 +95,7 @@ PM は把握していなかった）。
 | スクリプト | 終了コード |
 |-----------|-----------|
 | `watch-worker-job.sh` | 0=終端検知 / 2=期限切れ（未終端・状態確認へ） |
-| `watch-pr-checks.sh` | 0=全チェック成功 / 1=失敗あり / 2=期限切れ / 3=状態を読めなかった |
+| `watch-pr-checks.sh` | 0=固定 head の全チェックと指定 run が成功 / 1=失敗あり / 2=期限切れ / 3=状態を読めなかった / 4=チェック無し・未検証 / 5=head または run ID 不一致 / 64=引数不正 |
 
 ## セッションが死んだ場合
 
