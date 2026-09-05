@@ -72,6 +72,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/cloud-hub-bootstrap.sh\"",
+            "timeout": 180
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/credit-baton-preflight.sh\"",
             "timeout": 5
           }

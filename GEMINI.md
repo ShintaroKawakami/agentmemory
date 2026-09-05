@@ -58,12 +58,16 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `b9b1bde265a39f8fdbf516019c370cc13561ad6dcc769216920031ba838cc75f`
+- effective hash: `a6ffe06a45ab58c129b37097f4aeb8d5451dd8697978e4eb99a4cdc4c6167b7b`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
   - `gbrain-md` (selected_by=`global`, inheritance_id=`de26219fcac2c60c`)
   - `gemini-md` (selected_by=`global`, inheritance_id=`d2fe0f94dbdf9274`)
+
+### Claude Code on the web（クラウド起動指示）
+
+Claude Code on the web（`CLAUDE_CODE_REMOTE=true`）で、`.claude/skills` に AGENT-HUB の skill（例: plan-approval）が無ければ、セッション開始直後に `cd <このCLAUDE.mdがあるPJのルート> && bash .claude/hooks/scripts/cloud-hub-bootstrap.sh` を実行し、終わったら元のcwdへ戻ってから作業を始める（複数PJを添付しているなら、hookを持つPJごとに1回ずつ）。AGENT-HUB を他リポと同時添付したセッションはcwdが親ディレクトリになり hook が自動発火しないため（実測2026-09-05）。取得できないと案内が出る場合は、作成画面の「＋」で ShintaroKawakami/AGENT-HUB を添付し直す。
 <!-- AGENT-HUB MANAGED: harness-inheritance END -->
 
 ## Project-specific instructions

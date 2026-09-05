@@ -82,6 +82,8 @@ alwaysApply: true
 - `.claude/hooks/scripts/block-skill-reverse-edit.test.sh`
 - `.claude/hooks/scripts/block-unauthorized-docs-file.sh`
 - `.claude/hooks/scripts/block-unauthorized-docs-file.test.sh`
+- `.claude/hooks/scripts/cloud-hub-bootstrap.sh`
+- `.claude/hooks/scripts/cloud-hub-bootstrap.test.sh`
 - `.claude/hooks/scripts/credit-baton-preflight.sh`
 - `.claude/hooks/scripts/credit-baton-preflight.test.sh`
 - `.claude/hooks/scripts/credit-usage-cache.sh`
@@ -162,6 +164,8 @@ alwaysApply: true
 - `.cursor/hooks/scripts/block-skill-reverse-edit.test.sh`
 - `.cursor/hooks/scripts/block-unauthorized-docs-file.sh`
 - `.cursor/hooks/scripts/block-unauthorized-docs-file.test.sh`
+- `.cursor/hooks/scripts/cloud-hub-bootstrap.sh`
+- `.cursor/hooks/scripts/cloud-hub-bootstrap.test.sh`
 - `.cursor/hooks/scripts/credit-baton-preflight.sh`
 - `.cursor/hooks/scripts/credit-baton-preflight.test.sh`
 - `.cursor/hooks/scripts/credit-usage-cache.sh`
