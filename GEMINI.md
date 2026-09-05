@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `5fc2dd83f115743c5d403498db14cf94e9b50de749b714ef6ca2a12174bbf2a9`
+- effective hash: `c04c18df38c1b5a08d8b508c1240930d50e090e1d99dba7762a89de08283bcdf`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -249,6 +249,16 @@ MCP は job 終端時に `~/.cache/agent-hub/ai-worker-mcp/jobs/<job_id>.termina
 ~/business/AGENT-HUB/scripts/watch-pr-checks.sh <pr_number> <owner/repo> [deadline] [interval]
 ```
 
+PR の監視開始時の head SHA を固定し、取得前後に一致を確認する。別途開始した
+`workflow_dispatch` なども完了条件に含む場合は、最初の4引数に続けて
+`--run <run_id>@<head_sha>` を必要な run ごとに指定する。指定した run の ID と head も照合する。
+対象外の run を一括で待たない。head が更新された場合は新しい変更内容と監視対象を確認してから起動し直す。
+
+`NO_CHECKS` は未検証、`NOT_STARTED` は指定 run の開始待ち、`RUNNING` は実行中、
+`PASS` は固定 head のチェックと指定 run がすべて成功した状態。`FAILED` と
+`UNKNOWN_STATE` は成功として扱わない。チェック無しで追加 run だけ成功しても未検証のままとする。
+明示指定 run の `skipped` は、要求した検証が実行されていないため成功に含めない。
+
 Claude Code なら `run_in_background: true` で起動する。ポーリングだけで無言で待たない。
 
 `merge_pull_request`（または `create_pull_request(merge_after_pr=true)`）は内部で merge-pr.py を最大 15 分走らせる。呼び出しが background に回った場合も同じく 5 分ごとに状態を確認し、無言で待たない。
@@ -284,7 +294,7 @@ PM は把握していなかった）。
 | スクリプト | 終了コード |
 |-----------|-----------|
 | `watch-worker-job.sh` | 0=終端検知 / 2=期限切れ（未終端・状態確認へ） |
-| `watch-pr-checks.sh` | 0=全チェック成功 / 1=失敗あり / 2=期限切れ / 3=状態を読めなかった |
+| `watch-pr-checks.sh` | 0=固定 head の全チェックと指定 run が成功 / 1=失敗あり / 2=期限切れ / 3=状態を読めなかった / 4=チェック無し・未検証 / 5=head または run ID 不一致 / 64=引数不正 |
 
 ## セッションが死んだ場合
 
@@ -438,7 +448,7 @@ AI は**言いなりにならない**。ユーザー指示が現実・制約・�
 - **根拠必須**: 「良くない」だけでなく、なぜ無理か・何が起きるかを平易語で 1〜2 文。
 - **平易語 + 選択肢**: visual-progress-map §5 に従い、技術用語だけで問わない。速さ・安全・見た目への影響など、ユーザーが判断できる軸に翻訳する。
 - **推奨を添える**: 2〜3 択のうち推奨を明示（「（推奨）」+ 理由 1 行）。
-- **短い同意への再確認**: ユーザーが「お願い」「はい」だけ返したとき、次の一手を 1 文で要約してから進める（response-style と整合）。
+- **同意の扱い**: 共通ルール CARD 01「承認の有効範囲」（正本: `dotfiles/shared/global-agent-behavior.md`）に従う。
 
 ## 個人開発スケールと例外
 
@@ -845,7 +855,7 @@ memory と正本が矛盾する場合は、正本を優先する。G-Brain は�
 
 1. **プラン作成基準をライブ読み**: `skills/plan-approval` が `resolve-pj-prompt.py --phase plan` を実行し、PJ 別のプラン基準（`snippet-prompts/Typinator/plan/`。専用未作成 PJ は汎用 `dev-plan`）を読む。
 2. **HTML プランを作る（固定テンプレを必ず使う・独自デザイン禁止）**: 正本テンプレをコピーし中身だけ差し替える（通常=`plan-template.html`、AI worker 委譲時=`plan-template-aiworker.html`）。必須のビジュアル要素は下記「中身」節を参照。
-3. **提示して承認を待つ（両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 `open <file>` で PC ブラウザにも表示する。**タップ用ファイルカード作成と open による PC ブラウザ表示の両方を毎回必須とする**。末尾に「この実装でいいですか？（進めて / 直す / やらない）」を置き、**承認なしに実装へ進まない**。未確認・未確定が残る間は承認欄に赤で理由を出し、承認を求めない。保存規約（gitignore済み一時パス・短い slug・共有 URL は1行）と短い同意時の再確認は `skills/plan-approval/SKILL.md` を参照。
+3. **提示して承認を待つ（両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 `open <file>` で PC ブラウザにも表示する。**タップ用ファイルカード作成と open による PC ブラウザ表示の両方を毎回必須とする**。末尾に「この実装でいいですか？（進めて / 直す / やらない）」を置き、**承認なしに実装へ進まない**。未確認・未確定が残る間は承認欄に赤で理由を出し、承認を求めない。保存規約（gitignore済み一時パス・短い slug・共有 URL は1行）は `skills/plan-approval/SKILL.md` を参照。同意の扱いは共通ルール CARD 01「承認の有効範囲」（正本: `dotfiles/shared/global-agent-behavior.md`）に従う。
 4. **承認直後に 📋 コミットメント台帳を全件タスク化する**: HTML プランの台帳の各行を、着手前に `TaskCreate` で 1 行 = 1 タスク化してから実装へ進む。台帳が全消化（実施済み or 明示保留）になるまで「完了」と宣言しない。詳細は `.claude/rules/general/plan-commitment-tracking.md`。
    - **AI worker を 1 度でも使う計画は必須**: 「AI worker 摩擦時は該当正本を worktree→PR→merge→fetch-only / detached 確認→cleanup で修正」の条項を台帳に必ず入れ、タスク化する（テンプレに既定行として焼き込み済み・消さない）。
 5. **承認後は標準パイプラインを通す**: 実装（dev-guardrails）→ codexレビュー → 実装監査 → CI → SSOT 同期確認 → マージ。本番投入は人間ゲート。
@@ -1212,13 +1222,13 @@ skill 非起動時でも、以下のいずれかに該当したら L1 ASCII 図�
 ### 原則
 
 - 技術用語は**初回登場時のみ**括弧で平易語を併記、以降はそのまま使う（完全置換はしない）
-- 短い同意（「お願い」「はい」）だけで進めない
+- 同意の扱いは下の共通正本を参照する
 
 代表例（全 12 語は references 参照）: PR=変更提案 / merge=本番に取り込む / migration=DB 構造変更 / staging=テスト環境 / worktree=別フォルダ作業領域。
 
 ### 短い同意への応答
 
-「お願い」「はい」「OK」だけ返った時は**次の一手を 1 文で要約してから**再確認する。
+共通ルール CARD 01「承認の有効範囲」（正本: `dotfiles/shared/global-agent-behavior.md`）に従う。
 
 ### 技術判断を仰ぐ時（平易語 + 選択肢で聞く）
 
