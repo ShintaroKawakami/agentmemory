@@ -20,12 +20,16 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `a0d0be2bc269c04bf15aa814de94b6950bc2e75cf73fa4d8775ddf8ad08ca62b`
+- effective hash: `a6ffe06a45ab58c129b37097f4aeb8d5451dd8697978e4eb99a4cdc4c6167b7b`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
   - `gbrain-md` (selected_by=`global`, inheritance_id=`de26219fcac2c60c`)
   - `gemini-md` (selected_by=`global`, inheritance_id=`d2fe0f94dbdf9274`)
+
+### Claude Code on the web（クラウド起動指示）
+
+Claude Code on the web（`CLAUDE_CODE_REMOTE=true`）で、`.claude/skills` に AGENT-HUB の skill（例: plan-approval）が無ければ、セッション開始直後に `cd <このCLAUDE.mdがあるPJのルート> && bash .claude/hooks/scripts/cloud-hub-bootstrap.sh` を実行し、終わったら元のcwdへ戻ってから作業を始める（複数PJを添付しているなら、hookを持つPJごとに1回ずつ）。AGENT-HUB を他リポと同時添付したセッションはcwdが親ディレクトリになり hook が自動発火しないため（実測2026-09-05）。取得できないと案内が出る場合は、作成画面の「＋」で ShintaroKawakami/AGENT-HUB を添付し直す。
 <!-- AGENT-HUB MANAGED: harness-inheritance END -->
 
 ## Project-specific instructions
@@ -35,10 +39,6 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 ## Architecture
 
 agentmemory is a persistent memory system for AI coding agents, built on iii-engine's three primitives (Worker/Function/Trigger). Everything goes through `registerFunction`/`registerTrigger`/`sdk.trigger()` — never bypass iii-engine with standalone SQLite or in-process alternatives.
-
-- **Engine**: iii-sdk (WebSocket to iii-engine on port 49134)
-- **State**: File-based SQLite via iii-engine's StateModule (`./data/state_store.db`)
-- **Build**: TypeScript → ESM via tsdown, output to `dist/`
 
 > Codex 向け要約: 全文は `CLAUDE.md` を Read。常時義務は下の CARD 地図を正とする。
 
