@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-09-04T14:00:27.793051+00:00",
-  "source_commit": "3aeb6b0584e3331d0ebb975889b01b831f473f72",
+  "generated_at": "2026-09-05T08:35:29.272153+00:00",
+  "source_commit": "592d6f4f24d2a7d8c2c7762b56d7ab8e149f77a7",
   "source_rule_files": [
     ".claude/rules/general/ai-model-selection.md",
     ".claude/rules/general/ai-worker-watch.md",
@@ -42,6 +42,8 @@
     ".claude/hooks/scripts/block-skill-reverse-edit.test.sh",
     ".claude/hooks/scripts/block-unauthorized-docs-file.sh",
     ".claude/hooks/scripts/block-unauthorized-docs-file.test.sh",
+    ".claude/hooks/scripts/cloud-hub-bootstrap.sh",
+    ".claude/hooks/scripts/cloud-hub-bootstrap.test.sh",
     ".claude/hooks/scripts/credit-baton-preflight.sh",
     ".claude/hooks/scripts/credit-baton-preflight.test.sh",
     ".claude/hooks/scripts/credit-usage-cache.sh",
@@ -126,6 +128,8 @@
     ".cursor/hooks/scripts/block-skill-reverse-edit.test.sh",
     ".cursor/hooks/scripts/block-unauthorized-docs-file.sh",
     ".cursor/hooks/scripts/block-unauthorized-docs-file.test.sh",
+    ".cursor/hooks/scripts/cloud-hub-bootstrap.sh",
+    ".cursor/hooks/scripts/cloud-hub-bootstrap.test.sh",
     ".cursor/hooks/scripts/credit-baton-preflight.sh",
     ".cursor/hooks/scripts/credit-baton-preflight.test.sh",
     ".cursor/hooks/scripts/credit-usage-cache.sh",

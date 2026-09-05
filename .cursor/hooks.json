@@ -45,6 +45,11 @@
     "sessionStart": [
       {
         "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/cloud-hub-bootstrap.sh\"'",
+        "timeout": 180
+      },
+      {
+        "type": "command",
         "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/credit-baton-preflight.sh\"'",
         "timeout": 5
       },
