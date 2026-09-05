@@ -36,6 +36,11 @@
 
 委譲先が作業完了を報告する前に実行する検証を指定する。
 
+AI worker の sandbox で Git が実行できない場合は、実行不能と報告する。
+変更範囲は host completion の `evidence.scopeVerification` で確認する。
+`status=passed`、`headCommit=local_commit`、`allowedFiles` が依頼範囲と一致する場合、そのコミットのファイル一覧照合を手で繰り返さない。
+証拠が無い旧jobや対象コミットが変わった場合は親が確認する。コード内容のレビューとテスト結果の確認は別に行う。
+
 例:
 - `git diff --name-only で編集ファイル一覧が allowed_files と一致することを確認`
 - `lint / typecheck を実行してエラーが出ないことを確認`

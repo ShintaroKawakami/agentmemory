@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `c04c18df38c1b5a08d8b508c1240930d50e090e1d99dba7762a89de08283bcdf`
+- effective hash: `a79c2834229879d25f50b980dece33f0eec088bdc88503ba9c450c15a478c7c9`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -989,6 +989,11 @@ AI が URL やファイルパスを出力するとき、**URL の直後に全角
 ## 3. verify before return（返却前の検証手順）
 
 委譲先が作業完了を報告する前に実行する検証を指定する。
+
+AI worker の sandbox で Git が実行できない場合は、実行不能と報告する。
+変更範囲は host completion の `evidence.scopeVerification` で確認する。
+`status=passed`、`headCommit=local_commit`、`allowedFiles` が依頼範囲と一致する場合、そのコミットのファイル一覧照合を手で繰り返さない。
+証拠が無い旧jobや対象コミットが変わった場合は親が確認する。コード内容のレビューとテスト結果の確認は別に行う。
 
 例:
 - `git diff --name-only で編集ファイル一覧が allowed_files と一致することを確認`
