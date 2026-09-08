@@ -20,7 +20,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `60d27bf42ae7a372b17e3e3e73c17e97bbaa235d84a445b2c4512f1e29528da2`
+- effective hash: `eeca9f10f2a461260f38943306c45fe32e09a760afc0d2e236c1c8996981a355`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -105,7 +105,7 @@ Codex 等は paths 条件が効かないため、常時ルールは「いつ／�
 - **ledger provenance** (asset_id=`mcp-key-management` inheritance_id=`a56034441d19874e`)
 
 ### CARD: memory-lookups — 人名/用語はmemory先
-- **いつ**: 人名略称・PJ用語・「あの〜」指示語・過去不採用を覆すとき。**イラストマニュアル**と言われたときも含む
+- **いつ**: 人名略称・PJ用語・「あの〜」指示語・過去不採用を覆すとき。**イラストマニュアル**・**ChatGPT壁打ち／お金の稼ぎ方**と言われたときも含む
 - **何を**: `~/.claude/projects/*/memory/` を先に検索。正本と矛盾したら正本優先。**イラストマニュアル**は長文手順書ではなく壁掲示イラストセット（正本 `docs/reference/illust-manual-vocabulary.md` → `cafe-image-assistant`）
 - **できた状態**: 推測補完せず、memoryまたは確認に基づいて応答している。イラストマニュアルを長文 Docs に取り違えていない
 - **詳細**: `.claude/rules/general/memory-lookups.md`
