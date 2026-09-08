@@ -51,9 +51,9 @@ JTT 関連の MCP（asana-mcp / jtt-smaregi-mcp / smaregi-docs / google-chat-mcp
 2. **`~/.zshrc.local` に `_mcp_load_key_from_env` のような分散ロード関数を新設禁止**。AGENT-HUB SSOT の bootstrap フロー（`set -a; source ~/.config/agent-hub/.env; set +a`）を使う
 3. **git 管理対象ファイルに API キー実値を平文で書かない**。ドキュメント（README / SKILL.md / 設計書）では `<API_KEY_PLACEHOLDER>` または env 変数名 `${ASANA_MCP_API_KEY}` で表記する
 4. **ローカル生成物へ手作業で API キー実値を書かない**。`.mcp.json` / `~/.claude.json` は gitignore 済みであることを前提に、sync スクリプトだけが `~/.config/agent-hub/.env` から実値展開して書き込む
-5. **管理対象ファイルでの URL クエリパラメータ方式（`?api_key=...`）禁止**。Cloud Run の監査ログに URL ごとキーが残るため、`.mcp.json` / `~/.claude.json` / `.codex/config.toml` など AGENT-HUB が生成する設定は `headers: {"X-API-Key": "${...}"}` のヘッダー方式に統一する
+5. **管理対象ファイルでの URL クエリパラメータ方式（`?api_key=...`）禁止**。サーバー・プロキシのアクセスログに URL ごとキーが残るため、`.mcp.json` / `~/.claude.json` / `.codex/config.toml` など AGENT-HUB が生成する設定は `headers: {"X-API-Key": "${...}"}` のヘッダー方式に統一する
 
-**Claude.ai 例外**: Claude.ai コネクタで `X-API-Key` ヘッダーを設定できない場合のみ、asana-mcp は `https://asana-mcp-vaibinqqva-an.a.run.app/mcp?api_key=<ASANA_MCP_API_KEY>` 形式を使ってよい。この例外は Claude.ai 手動登録専用で、AGENT-HUB の生成物には書かない。
+**Claude.ai 例外**: Claude.ai コネクタで `X-API-Key` ヘッダーを設定できない場合のみ、asana-mcp は `https://asana-mcp.jtt.cafe/mcp?api_key=<ASANA_MCP_API_KEY>` 形式を使ってよい。この例外は Claude.ai 手動登録専用で、AGENT-HUB の生成物には書かない。
 
 ## PJ 横断の第三者個人情報（PII）の退避規範（2026-08-14〜）
 
