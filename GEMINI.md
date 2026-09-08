@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `60d27bf42ae7a372b17e3e3e73c17e97bbaa235d84a445b2c4512f1e29528da2`
+- effective hash: `eeca9f10f2a461260f38943306c45fe32e09a760afc0d2e236c1c8996981a355`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -742,7 +742,7 @@ User scope MCP (`~/.<tool>/...`) の SSOT 一元管理は **user-mcp スキル**
 
 <!-- agents-md-card:start -->
 ### CARD: memory-lookups — 人名/用語はmemory先
-- **いつ**: 人名略称・PJ用語・「あの〜」指示語・過去不採用を覆すとき。**イラストマニュアル**と言われたときも含む
+- **いつ**: 人名略称・PJ用語・「あの〜」指示語・過去不採用を覆すとき。**イラストマニュアル**・**ChatGPT壁打ち／お金の稼ぎ方**と言われたときも含む
 - **何を**: `~/.claude/projects/*/memory/` を先に検索。正本と矛盾したら正本優先。**イラストマニュアル**は長文手順書ではなく壁掲示イラストセット（正本 `docs/reference/illust-manual-vocabulary.md` → `cafe-image-assistant`）
 - **できた状態**: 推測補完せず、memoryまたは確認に基づいて応答している。イラストマニュアルを長文 Docs に取り違えていない
 - **詳細**: `.claude/rules/general/memory-lookups.md`
@@ -770,10 +770,12 @@ memory は、前回までの作業状態・人物名・用語・過去の判断�
 |------|--------------|------|
 | **イラストマニュアル** | 従業員が絵を見て数秒で直感理解するための**掲示セット**（物理オペ・キャラ必須）。A4 は紙の単位（場面 N → だいたい N 枚）。長文手順書・Google Doc ではない | `docs/reference/illust-manual-vocabulary.md` |
 | **モバイル操作マニュアル** | アプリ操作の案内。**UIモック／スクショ・キャラ禁止**（物理オペのイラスト掲示とは別） | `docs/reference/illust-manual-vocabulary.md` |
+| **ChatGPT壁打ち**／**お金の稼ぎ方** | 経営・個人の稼ぎ・施策の対話（ChatGPT「お金の稼ぎ方」「施策壁打ち」「困りごと相談」）とその続き。**対象 PJ = jtt-cafe-pj**。AgentMemory は jtt-cafe-pj、判断軸は shintaro-gbrain、会社の事実は jtt-gbrain。`brainstorm`（実装前の要件整理）とは別物 | `docs/reference/kabeuchi-vocabulary.md` |
 
 「イラストマニュアル」と言われたら長文 Docs を書かず、上記正本 → `cafe-image-assistant` / `chatgpt-image-creator` 経路へ進む。
 「モバイル操作マニュアル」／アプリの使い方なら `app-manual-creator`（キャラ生成へ進まない）。
 bare「マニュアル」だけなら「長文手順書か、イラスト掲示（物理）か、アプリ操作か」を確認する。
+「ChatGPT壁打ち」「お金の稼ぎ方をみてみたい」と言われたら、対象 PJ を jtt-cafe-pj と確定して AgentMemory（jtt-cafe-pj）→ shintaro-gbrain → jtt-gbrain の順に続きを読む。PJ を聞き直さず、`brainstorm` も発火させない。
 
 ## 検索手順
 
