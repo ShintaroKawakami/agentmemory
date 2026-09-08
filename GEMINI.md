@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `eeca9f10f2a461260f38943306c45fe32e09a760afc0d2e236c1c8996981a355`
+- effective hash: `d0d10eabb8b4149f26950ebfcb07e667cf052ecf9bf9512b342bb5ae39067a2f`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -517,6 +517,8 @@ codex-review のレビュー観点にも同校正が内蔵されている（プ�
 | 経営相談・戦略・クレーム対応・売上・オペレーション改善（上記に当たらない） | `shintaro-gbrain`（判断軸）＋ `jtt-gbrain`（会社の事実）が `AVAILABLE` なら両方 | 「この施策の戦略は」「クレームにどう対応すべきか」「売上を改善したい」 |
 | 会社そのものの事実（誰が・どの取引先・何が動いているか） | `jtt-gbrain`（`mcp__jtt-gbrain__search` / `recall`） | 「この件は誰の担当だっけ」「あの取引先との経緯は」「今どのPJが動いてる」 |
 | 作業再開・引き継ぎ・「あの続き」 | `agentmemory`（continuation） | 「〇〇の続き」「前回どこまでやったか」 |
+
+上表の「例」は説明用。hook（gbrain-recall-preflight）が実際に照合する発火語の正本は AGENT-HUB `hook-library/lib/gbrain-recall-policy.json` で、語の追加・変更はそこへ行う（本ファイルとスクリプトへ複製しない。2026-09-08 Policy as Code）。
 
 3つの脳の切り分けは「その記述は誰／何がいなくなったら成立しなくなるか」で決める。
 

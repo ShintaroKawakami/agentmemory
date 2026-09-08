@@ -23,7 +23,8 @@ set -euo pipefail
 
 RAW_INPUT="$(cat || true)"
 
-HOOK_INPUT="$RAW_INPUT" command python3 - <<'PY'
+HOOK_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" 2>/dev/null && pwd || true)"
+HOOK_INPUT="$RAW_INPUT" HOOK_LIB_DIR="$HOOK_LIB_DIR" command python3 - <<'PY'
 import json
 import os
 import re
@@ -52,18 +53,29 @@ def prompt_from_payload(text: str) -> str:
     return ""
 
 
-# .claude/rules/general/gbrain-recall.md §1 の発火条件表と同じキーワード群。
-# 語の追加・変更はルール本体と同一 PR で行う（二重管理防止）。
-# [2026-08-14][feat] 相談・直し・判断は両方リマインド（片方だけにしない）
-CONSULT_BOTH_KEYWORDS = [
-    "どう思う", "直して", "修正", "修正して", "どうすれば", "どういう風に", "相談", "判断",
-]
-TECH_ONLY_KEYWORDS = [
-    "バグ", "不具合", "障害", "エラー", "直らない", "原因", "回帰",
-]
-BUSINESS_ONLY_KEYWORDS = [
-    "戦略", "クレーム", "オペレーション改善", "施策", "売上",
-]
+# [2026-09-08][feat] 発火語は hook-library/lib/gbrain-recall-policy.json（正本）から読む。
+# 背景: 以前は本スクリプトの3配列・registries/gbrain-recall-policy.yaml・rule §1 の3か所に散り、
+#   人間の注意書き（「同一 PR で直す」）だけで揃えていた。tests/test_hook_policy_registry.py が
+#   ハードコード配列の残存と registry⊆lib のずれを赤にする。
+_POLICY_PATH = os.environ.get("GBRAIN_RECALL_POLICY_PATH") or os.path.join(
+    os.environ.get("HOOK_LIB_DIR", ""), "gbrain-recall-policy.json"
+)
+try:
+    with open(_POLICY_PATH, encoding="utf-8") as _f:
+        _PATTERNS = json.load(_f).get("patterns", {})
+except Exception as _exc:  # fail-open だが黙らない
+    print("gbrain-recall preflight:")
+    print(f"- 台帳 gbrain-recall-policy.json が読めません（{_exc}）。詳細: .claude/rules/general/gbrain-recall.md")
+    raise SystemExit(0)
+
+
+def _words(key: str):
+    return [w for w in _PATTERNS.get(key, {}).get("keywords", []) if isinstance(w, str) and w]
+
+
+CONSULT_BOTH_KEYWORDS = _words("consult_both")
+TECH_ONLY_KEYWORDS = _words("tech_only")
+BUSINESS_ONLY_KEYWORDS = _words("business_only")
 
 CONSULT_BOTH_RE = re.compile("|".join(re.escape(w) for w in CONSULT_BOTH_KEYWORDS))
 TECH_ONLY_RE = re.compile("|".join(re.escape(w) for w in TECH_ONLY_KEYWORDS))
