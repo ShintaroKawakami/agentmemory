@@ -20,7 +20,8 @@ set -euo pipefail
 RAW_INPUT="$(cat || true)"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 
-HOOK_INPUT="$RAW_INPUT" command python3 - "$PROJECT_DIR" <<'PY'
+HOOK_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" 2>/dev/null && pwd || true)"
+HOOK_INPUT="$RAW_INPUT" HOOK_LIB_DIR="$HOOK_LIB_DIR" command python3 - "$PROJECT_DIR" <<'PY'
 import json
 import os
 import re
@@ -133,33 +134,35 @@ def find_aliases_path() -> Path | None:
     return None
 
 
+# [2026-09-08][feat] 発火語・否定判定語は hook-library/lib/handover-preflight-policy.json（正本）から読む。
+# 背景: スクリプト内ハードコードは tests/test_hook_policy_registry.py の allowlist 例外だった。
+#   台帳化して例外を消す。語の意味・順序は従来と同じ（trigger_words は正規表現の選択肢として順に結合）。
+_POLICY_PATH = os.environ.get("HANDOVER_PREFLIGHT_POLICY_PATH") or os.path.join(
+    os.environ.get("HOOK_LIB_DIR", ""), "handover-preflight-policy.json"
+)
+try:
+    with open(_POLICY_PATH, encoding="utf-8") as _f:
+        _POLICY = json.load(_f)
+except Exception as _exc:  # fail-open だが黙らない
+    print("handover preflight:")
+    print(f"- 台帳 handover-preflight-policy.json が読めません（{_exc}）。manual: skills/handover-manual/references/handover.md")
+    raise SystemExit(0)
+
+
+def _policy_words(key: str) -> tuple:
+    return tuple(w for w in _POLICY.get(key, []) if isinstance(w, str) and w)
+
+
 TRIGGER_RE = re.compile(
-    r"(続き|終了整理|Closeout整理|ふり返り|振り返り|ふりかえり|引継ぎ書つくって|引き継ぎ|作業終了|handover|takeover|continuation|continuation-closeout)",
+    "(" + "|".join(re.escape(w) for w in _policy_words("trigger_words")) + ")",
     re.IGNORECASE,
 )
 NEGATED_CONTINUATION_RE = re.compile(
     r"続き\s*(?:ではなくて|ではなく|ではない|でなく|でない|じゃなくて|じゃなく|じゃない|"
     r"はなく|はない|は不要|不要|はいらない|いらない|なく|ない)"
 )
-NEGATED_CLOSEOUT_KEYWORDS = ("終了整理", "Closeout整理", "ふり返り", "振り返り", "ふりかえり", "作業終了")
-NEGATED_CLOSEOUT_SUFFIXES = (
-    "ではない",
-    "ではないです",
-    "ではなく",
-    "ではなくて",
-    "でない",
-    "でないです",
-    "じゃない",
-    "じゃないです",
-    "はない",
-    "はいらない",
-    "は不要",
-    "必要ない",
-    "不要",
-    "要らない",
-    "いらない",
-    "ない",
-)
+NEGATED_CLOSEOUT_KEYWORDS = _policy_words("negated_closeout_keywords")
+NEGATED_CLOSEOUT_SUFFIXES = _policy_words("negated_closeout_suffixes")
 NEGATED_PUNCTUATION = re.compile(r"[\s、。.!?！？ー−‐\\-]")
 MAX_ALIAS_TRIGGER_DISTANCE = 32
 
