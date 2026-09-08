@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-09-08T06:19:01.225009+00:00",
-  "source_commit": "ab9edf1edb917d66eb085633590efb0783dfffeb",
+  "generated_at": "2026-09-08T07:59:12.374739+00:00",
+  "source_commit": "85378d3fd0f9e413219eb872ed18e84fef362268",
   "source_rule_files": [
     ".claude/rules/general/ai-model-selection.md",
     ".claude/rules/general/ai-worker-watch.md",
@@ -29,6 +29,7 @@
     ".claude/hooks/lib/code-quality-check.md",
     ".claude/hooks/lib/delegation-reminder-cache.sh",
     ".claude/hooks/lib/gbrain-recall-policy.json",
+    ".claude/hooks/lib/handover-preflight-policy.json",
     ".claude/hooks/lib/hook-io.sh",
     ".claude/hooks/lib/quality-check-common.sh",
     ".claude/hooks/lib/staff-message-policy.json",
@@ -117,6 +118,7 @@
     ".cursor/hooks/lib/code-quality-check.md",
     ".cursor/hooks/lib/delegation-reminder-cache.sh",
     ".cursor/hooks/lib/gbrain-recall-policy.json",
+    ".cursor/hooks/lib/handover-preflight-policy.json",
     ".cursor/hooks/lib/hook-io.sh",
     ".cursor/hooks/lib/quality-check-common.sh",
     ".cursor/hooks/lib/staff-message-policy.json",
