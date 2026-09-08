@@ -68,8 +68,10 @@ alwaysApply: true
 - `.claude/hooks/.hook-library-version`
 - `.claude/hooks/lib/code-quality-check.md`
 - `.claude/hooks/lib/delegation-reminder-cache.sh`
+- `.claude/hooks/lib/gbrain-recall-policy.json`
 - `.claude/hooks/lib/hook-io.sh`
 - `.claude/hooks/lib/quality-check-common.sh`
+- `.claude/hooks/lib/staff-message-policy.json`
 - `.claude/hooks/lib/storage-url-common.py`
 - `.claude/hooks/lib/upstream-write-guard.py`
 - `.claude/hooks/scripts/ai-worker-watch-enforce.sh`
@@ -150,8 +152,10 @@ alwaysApply: true
 - `.cursor/hooks/.hook-library-version`
 - `.cursor/hooks/lib/code-quality-check.md`
 - `.cursor/hooks/lib/delegation-reminder-cache.sh`
+- `.cursor/hooks/lib/gbrain-recall-policy.json`
 - `.cursor/hooks/lib/hook-io.sh`
 - `.cursor/hooks/lib/quality-check-common.sh`
+- `.cursor/hooks/lib/staff-message-policy.json`
 - `.cursor/hooks/lib/storage-url-common.py`
 - `.cursor/hooks/lib/upstream-write-guard.py`
 - `.cursor/hooks/scripts/ai-worker-watch-enforce.sh`

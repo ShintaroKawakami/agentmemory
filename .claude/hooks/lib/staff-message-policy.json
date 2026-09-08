@@ -1,0 +1,46 @@
+{
+  "_comment": "[2026-09-08][feat] 従業員向け文面ルール（jtt-team-messages）の hook 台帳・正本。発火語・対象 MCP ツール・必読パス・Write 監視の目印語をここ1か所で持つ。asana-team-messages-preflight.sh はこのファイルを読む（スクリプト内ハードコード禁止・tests/test_hook_policy_registry.py が赤にする）。JSON 構文で書くのは hook 実行時に PyYAML へ依存しないため（JSON は YAML の部分集合）。settings の PreToolUse matcher は mcp.servers × mcp.tool_suffixes × mcp.alias_prefixes から組み立てた正規表現と一致していなければ検査で赤。",
+  "version": 1,
+  "skill": "jtt-team-messages",
+  "required_read_suffixes": [
+    "skills/jtt-team-messages/SKILL.md",
+    "skills/jtt-team-messages/references/tone-guide.md"
+  ],
+  "prompt_keywords": [
+    "Asana",
+    "asana",
+    "タスクコメント",
+    "コメント投稿",
+    "タスクにコメント",
+    "コメント欄",
+    "メンション",
+    "改善台帳",
+    "改善PJ",
+    "自動投稿",
+    "通知文",
+    "文面",
+    "create_task_story",
+    "update_task_story",
+    "create_task_comment",
+    "スタッフ向け",
+    "従業員向けメッセージ"
+  ],
+  "mcp": {
+    "servers": ["asana-mcp"],
+    "alias_prefixes": ["claude_ai_"],
+    "tool_suffixes": [
+      "asana_create_task_story",
+      "asana_update_task_story",
+      "asana_create_task_comment"
+    ]
+  },
+  "write_markers": {
+    "staff_mention_names": ["久野", "古賀", "江井", "古川", "齊藤", "佐藤"],
+    "phrases": ["お疲れ様です", "リーダーズ", "よろしくお願いします🙌", "時間帯責任者（リーダー）"]
+  },
+  "read_gate": {
+    "mode": "deny",
+    "flag_ttl_hours": 24,
+    "cache_subdir": "staff-message-read"
+  }
+}

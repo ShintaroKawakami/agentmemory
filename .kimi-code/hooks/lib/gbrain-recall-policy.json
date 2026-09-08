@@ -1,0 +1,18 @@
+{
+  "_comment": "[2026-09-08][feat] gbrain-recall-preflight.sh の発火語の正本。以前はスクリプト内ハードコード（3配列）と registries/gbrain-recall-policy.yaml（書き込みゲート用・default off）と .claude/rules/general/gbrain-recall.md §1 の3か所に散っていた。hook はこのファイルだけを読む。registries/gbrain-recall-policy.yaml の keywords は同じ id のここへの部分集合であることを tests/test_hook_policy_registry.py が検査する（書き込みゲートは厳密な語だけ、リマインドは広めの語、という役割差は維持）。",
+  "version": 1,
+  "patterns": {
+    "consult_both": {
+      "registry_id": "consult-both",
+      "keywords": ["どう思う", "直して", "修正", "修正して", "どうすれば", "どういう風に", "相談", "判断"]
+    },
+    "tech_only": {
+      "registry_id": "bug-tech",
+      "keywords": ["バグ", "不具合", "障害", "エラー", "直らない", "原因", "回帰", "このエラー", "似た不具合"]
+    },
+    "business_only": {
+      "registry_id": "business-shintaro",
+      "keywords": ["戦略", "クレーム", "オペレーション改善", "施策", "売上", "この施策の戦略", "クレームにどう対応", "売上を改善"]
+    }
+  }
+}

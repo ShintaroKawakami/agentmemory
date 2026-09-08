@@ -36,6 +36,8 @@
 | 会社そのものの事実（誰が・どの取引先・何が動いているか） | `jtt-gbrain`（`mcp__jtt-gbrain__search` / `recall`） | 「この件は誰の担当だっけ」「あの取引先との経緯は」「今どのPJが動いてる」 |
 | 作業再開・引き継ぎ・「あの続き」 | `agentmemory`（continuation） | 「〇〇の続き」「前回どこまでやったか」 |
 
+上表の「例」は説明用。hook（gbrain-recall-preflight）が実際に照合する発火語の正本は AGENT-HUB `hook-library/lib/gbrain-recall-policy.json` で、語の追加・変更はそこへ行う（本ファイルとスクリプトへ複製しない。2026-09-08 Policy as Code）。
+
 3つの脳の切り分けは「その記述は誰／何がいなくなったら成立しなくなるか」で決める。
 
 - `shintaro-gbrain` — 伸太郎さんが**別の会社を経営していても**まだ正しい（判断軸・好み）
