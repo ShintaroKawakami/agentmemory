@@ -257,6 +257,46 @@ function memoryType(category: MemoryCategory): "workflow" | "architecture" | "fa
   return "fact";
 }
 
+/**
+ * Save project memory with category=implementation_handoff is the documented path for
+ * Cloud / Claude.ai / ChatGPT. Prefer explicit nextStep; otherwise parse labeled lines;
+ * never downgrade to reference/decision/fact.
+ */
+export function parseHandoffSaveInput(input: {
+  content: string;
+  files?: string[];
+  nextStep?: string;
+  openQuestions?: string[];
+  gitRef?: string;
+}): {
+  summary: string;
+  nextStep: string;
+  openQuestions?: string[];
+  files?: string[];
+  gitRef?: string;
+} {
+  const content = input.content.trim();
+  const labeledNext = content.match(
+    /(?:^|\n)\s*(?:nextStep|next_step|次の一手|次)\s*[:：]\s*(.+?)(?:\n|$)/i,
+  );
+  const labeledSummary = content.match(
+    /(?:^|\n)\s*(?:summary|要約)\s*[:：]\s*(.+?)(?:\n(?=\s*(?:nextStep|next_step|次の一手|次|openQuestions|files|gitRef)\s*[:：])|\n*$)/is,
+  );
+  const summary = (labeledSummary?.[1]?.trim() || content).slice(0, 12_000);
+  const nextStep = (
+    input.nextStep?.trim() ||
+    labeledNext?.[1]?.trim() ||
+    "終了報告を確認して続きから再開する"
+  ).slice(0, 4_000);
+  return {
+    summary: summary.length > 0 ? summary : content.slice(0, 12_000),
+    nextStep,
+    ...(input.openQuestions ? { openQuestions: input.openQuestions } : {}),
+    ...(input.files ? { files: input.files } : {}),
+    ...(input.gitRef?.trim() ? { gitRef: input.gitRef.trim() } : {}),
+  };
+}
+
 function textResult(value: unknown, isError = false) {
   return {
     isError,
@@ -273,8 +313,21 @@ export class ScopedMemoryService {
 
   async save(
     scope: RequestScope,
-    input: { content: string; category: Exclude<MemoryCategory, "implementation_handoff">; files?: string[] },
+    input: {
+      content: string;
+      category: MemoryCategory;
+      files?: string[];
+      nextStep?: string;
+      openQuestions?: string[];
+      gitRef?: string;
+    },
   ): Promise<Record<string, unknown>> {
+    // Cloud / Claude.ai / ChatGPT の終了手順は Save project memory に
+    // category=implementation_handoff を渡す。別カテゴリへ迂回せず handoff へ正規化する。
+    if (input.category === "implementation_handoff") {
+      const handoff = parseHandoffSaveInput(input);
+      return this.saveHandoff(scope, handoff);
+    }
     const envelope: StoredEnvelope = {
       schema: STORED_SCHEMA,
       project: scope.project,
@@ -422,11 +475,17 @@ export function createScopedMcpServer(service: ScopedMemoryService, scope: Reque
     "agentmemory_save",
     {
       title: "Save project memory",
-      description: "Save a concise project-bound reference, decision, or fact. The project is fixed by the MCP connection.",
+      description:
+        "Save a concise project-bound reference, decision, fact, or implementation_handoff. " +
+        "When category is implementation_handoff, content is stored as a handoff (optional nextStep/openQuestions/gitRef). " +
+        "Do not downgrade a handoff to another category. The project is fixed by the MCP connection.",
       inputSchema: {
         content: z.string().min(1).max(20_000),
-        category: z.enum(["reference", "decision", "fact"]).default("reference"),
+        category: z.enum(["reference", "decision", "fact", "implementation_handoff"]).default("reference"),
         files: z.array(z.string().min(1).max(500)).max(50).optional(),
+        nextStep: z.string().min(1).max(4_000).optional(),
+        openQuestions: z.array(z.string().min(1).max(2_000)).max(20).optional(),
+        gitRef: z.string().min(1).max(200).optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
