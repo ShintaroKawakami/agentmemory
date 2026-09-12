@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `349dd0cd2fa347afd68f905698cd180d0f67d022f72067e72548b425788f1ba4`
+- effective hash: `947ed71e777d4ca211a4aeba8bb5ca225bc5e0e7629e6fd70b7d9c766f948b73`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -998,7 +998,10 @@ AI が URL やファイルパスを出力するとき、**URL の直後に全角
 
 委譲先が作業完了を報告する前に実行する検証を指定する。
 
-AI worker の sandbox で Git が実行できない場合は、実行不能と報告する。
+AI Worker 委譲では worker に `git diff` 等の scope 照合を要求しない。worker の sandbox は git deny で、
+scope 照合は harness が host で実施する（`evidence.scopeVerification`・#2160）。
+worker へ渡す検証要求も同じ前提で書き、sandbox/環境要因で走らなかった場合は「未実行」と理由付き報告を求める
+（成功と偽らせない）。worker 側には既定プロンプトで同旨が注入される（providers.ts の sharedQualityRules）。
 変更範囲は host completion の `evidence.scopeVerification` で確認する。
 `status=passed`、`headCommit=local_commit`、`allowedFiles` が依頼範囲と一致する場合、そのコミットのファイル一覧照合を手で繰り返さない。
 証拠が無い旧jobや対象コミットが変わった場合は親が確認する。コード内容のレビューとテスト結果の確認は別に行う。
