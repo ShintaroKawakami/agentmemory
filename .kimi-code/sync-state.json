@@ -1,8 +1,8 @@
 {
   "tool": "kimi-sync",
   "target": "kimi-code-cli",
-  "generated_at": "2026-09-08T07:59:21.155209+00:00",
-  "source_commit": "85378d3",
+  "generated_at": "2026-09-09T12:13:36.711761+00:00",
+  "source_commit": "d6a39c3",
   "project_root": ".",
   "project_agents_md": ".kimi-code/AGENTS.md",
   "skills_link": "managed by sync-runtime-skills.py (manifest v2)",
@@ -61,7 +61,7 @@
   "mcp_server_count": 9,
   "user_config_path": "${KIMI_CODE_HOME:-~/.kimi-code}/config.toml",
   "trusted_projects_path": "${KIMI_CODE_HOME:-~/.kimi-code}/trusted-projects.json",
-  "default_thinking": true,
+  "thinking_enabled": true,
   "machine_scope": "not-run",
   "legacy_kimi_dir_cleanup": "separate-proof-gated-migration-only",
   "warnings": [

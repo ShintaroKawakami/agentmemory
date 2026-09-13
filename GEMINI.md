@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `8a5db927de9d0b47a96cea5a4f93150762bfe7b69d0a80354532bc2e63fba0aa`
+- effective hash: `0f02ebc93ff1611fbacdb6c91df77d90b15fd41fd07541d9c4570ece164214eb`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -452,7 +452,7 @@ AI は**言いなりにならない**。ユーザー指示が現実・制約・�
 - **根拠必須**: 「良くない」だけでなく、なぜ無理か・何が起きるかを平易語で 1〜2 文。
 - **平易語 + 選択肢**: visual-progress-map §5 に従い、技術用語だけで問わない。速さ・安全・見た目への影響など、ユーザーが判断できる軸に翻訳する。
 - **推奨を添える**: 2〜3 択のうち推奨を明示（「（推奨）」+ 理由 1 行）。
-- **同意の扱い**: 共通ルール CARD 01「承認の有効範囲」（正本: `dotfiles/shared/global-agent-behavior.md`）に従う。
+- **同意の扱い**: 共通ルール CARD 01「承認の有効範囲」（正本: `dotfiles/global/shared/SHARED_AGENTS.md` の `global-agent-behavior` ブロック）に従う。
 
 ## 個人開発スケールと例外
 
@@ -863,7 +863,7 @@ memory と正本が矛盾する場合は、正本を優先する。G-Brain は�
 
 1. **プラン作成基準をライブ読み**: `skills/plan-approval` が `resolve-pj-prompt.py --phase plan` を実行し、PJ 別のプラン基準（`snippet-prompts/Typinator/plan/`。専用未作成 PJ は汎用 `dev-plan`）を読む。
 2. **HTML プランを作る（固定テンプレを必ず使う・独自デザイン禁止）**: 正本テンプレをコピーし中身だけ差し替える（通常=`plan-template.html`、AI worker 委譲時=`plan-template-aiworker.html`）。必須のビジュアル要素は下記「中身」節を参照。
-3. **提示して承認を待つ（両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 `open <file>` で PC ブラウザにも表示する。**タップ用ファイルカード作成と open による PC ブラウザ表示の両方を毎回必須とする**。末尾に「この実装でいいですか？（進めて / 直す / やらない）」を置き、**承認なしに実装へ進まない**。未確認・未確定が残る間は承認欄に赤で理由を出し、承認を求めない。保存規約（gitignore済み一時パス・短い slug・共有 URL は1行）は `skills/plan-approval/SKILL.md` を参照。同意の扱いは共通ルール CARD 01「承認の有効範囲」（正本: `dotfiles/shared/global-agent-behavior.md`）に従う。
+3. **提示して承認を待つ（両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 `open <file>` で PC ブラウザにも表示する。**タップ用ファイルカード作成と open による PC ブラウザ表示の両方を毎回必須とする**。末尾に「この実装でいいですか？（進めて / 直す / やらない）」を置き、**承認なしに実装へ進まない**。未確認・未確定が残る間は承認欄に赤で理由を出し、承認を求めない。保存規約（gitignore済み一時パス・短い slug・共有 URL は1行）は `skills/plan-approval/SKILL.md` を参照。同意の扱いは共通ルール CARD 01「承認の有効範囲」（正本: `dotfiles/global/shared/SHARED_AGENTS.md` の `global-agent-behavior` ブロック）に従う。
 4. **承認直後に 📋 コミットメント台帳を全件タスク化する**: HTML プランの台帳の各行を、着手前に `TaskCreate` で 1 行 = 1 タスク化してから実装へ進む。台帳が全消化（実施済み or 明示保留）になるまで「完了」と宣言しない。詳細は `.claude/rules/general/plan-commitment-tracking.md`。
    - **AI worker を 1 度でも使う計画は必須**: 「AI worker 摩擦時は該当正本を worktree→PR→merge→fetch-only / detached 確認→cleanup で修正」の条項を台帳に必ず入れ、タスク化する（テンプレに既定行として焼き込み済み・消さない）。
 5. **承認後は標準パイプラインを通す**: 実装（dev-guardrails）→ codexレビュー → 実装監査 → CI → SSOT 同期確認 → マージ。本番投入は人間ゲート。
@@ -998,7 +998,10 @@ AI が URL やファイルパスを出力するとき、**URL の直後に全角
 
 委譲先が作業完了を報告する前に実行する検証を指定する。
 
-AI worker の sandbox で Git が実行できない場合は、実行不能と報告する。
+AI Worker 委譲では worker に `git diff` 等の scope 照合を要求しない。worker の sandbox は git deny で、
+scope 照合は harness が host で実施する（`evidence.scopeVerification`・#2160）。
+worker へ渡す検証要求も同じ前提で書き、sandbox/環境要因で走らなかった場合は「未実行」と理由付き報告を求める
+（成功と偽らせない）。worker 側には既定プロンプトで同旨が注入される（providers.ts の sharedQualityRules）。
 変更範囲は host completion の `evidence.scopeVerification` で確認する。
 `status=passed`、`headCommit=local_commit`、`allowedFiles` が依頼範囲と一致する場合、そのコミットのファイル一覧照合を手で繰り返さない。
 証拠が無い旧jobや対象コミットが変わった場合は親が確認する。コード内容のレビューとテスト結果の確認は別に行う。
@@ -1241,7 +1244,7 @@ skill 非起動時でも、以下のいずれかに該当したら L1 ASCII 図�
 
 ### 短い同意への応答
 
-共通ルール CARD 01「承認の有効範囲」（正本: `dotfiles/shared/global-agent-behavior.md`）に従う。
+共通ルール CARD 01「承認の有効範囲」（正本: `dotfiles/global/shared/SHARED_AGENTS.md` の `global-agent-behavior` ブロック）に従う。
 
 ### 技術判断を仰ぐ時（平易語 + 選択肢で聞く）
 
