@@ -6,7 +6,7 @@
 対応: 判断理由だけを CaD に残し、詳細な実測ログは agent-dispatch references を正本とする。
 -->
 
-# AI モデル選定指標（CodeBar残量バランス / Codex 5.6 / GLM 5.3 / Kimi K3）
+# AI モデル選定指標（CodeBar残量バランス / Codex 5.6 / GLM 5.3 / Kimi K2.8 Preview）
 
 全 PJ 共通。コード実装をAIエージェントに任せる際の初期ヒューリスティック。
 
@@ -34,7 +34,8 @@
 背景:
   - ユーザー依頼意図: $200 プラン上限対策として Claude 本体のトークン消費を抑えるため、実装・大量読みを
     AI worker へ寄せる運用を既定化する（ctx-slim プラン承認済み・2026-08-08）。大量読みの第一候補は
-    伸太郎殿の指名により Kimi K3 とする（長大 context が根拠。「Fable の蒸留」説は未確認情報のため根拠にしない）。
+    伸太郎殿の指名により Kimi 長大 context 系とする（2026-09-11 時点の現行は K2.8 Preview。
+    「Fable の蒸留」説は未確認情報のため根拠にしない）。
   - 守るべき業務ルール: モデル実名・context 上限値をここへハードコードしない（agents.yaml の
     kimi_model_routing を実行時参照）。ガバナンス領域（.claude/ hook 等）は worker が編集できないため
     従来どおり Claude が担う。
@@ -45,11 +46,11 @@
   が正本（ここへ複製しない）。専用ルール新設は ctx-slim に反するため不採用。
 -->
 
-**既定（2026-08-08 ctx-slim）**: 実装・大量読み（リポ横断の読み込み・大規模ファイル調査）は AI worker への委譲を既定とし、Claude（PM）は設計・検証・統括に徹する。大量読みの第一候補は **Kimi K3**（長大 context 対応。選択条件・上限は `agents.yaml` の `kimi_model_routing` を正本とする）。目的: Claude 本体のクレジット消費を抑える（ガバナンス領域 `.claude/` `hook` 等は worker 編集不可のため従来どおり Claude が担う）。
+**既定（2026-08-08 ctx-slim）**: 実装・大量読み（リポ横断の読み込み・大規模ファイル調査）は AI worker への委譲を既定とし、Claude（PM）は設計・検証・統括に徹する。大量読みの第一候補は **Kimi（現行 K2.8 Preview・1M）**（長大 context 対応。選択条件・上限は `agents.yaml` の `kimi_model_routing` を正本とする）。目的: Claude 本体のクレジット消費を抑える（ガバナンス領域 `.claude/` `hook` 等は worker 編集不可のため従来どおり Claude が担う）。
 
 **境界（2026-08-08）**: 見積り10分未満の小実装とガバナンス領域（`.claude/` `hook` 等の worker 編集不可領域）は Claude サブエージェント内製、大タスク・並列・大量読みは worker（判定手順は `skills/agent-dispatch` が正本）。
 
-**三役の呼称（2026-08-31、2026-09-03更新）**: 監督=Claude / Codex 5.6 / Cursor（PM クライアント）／参謀=Kimi K3／職人=CodeBar残量と task fit で配分する Codex 5.6 Luna/Terra・Kimi K3・GLM 5.3 系・Gemini Flash High。Codex Sol は難所限定、Spark はoverflow。OpenCode GoはHermes専用としてAI Worker候補から除外する。Antigravity が自動選定された時は High を基準にする。現行Gemini世代は `agents.yaml#model_catalog.model_families.gemini-flash` を参照する。正本: `agents.yaml` の `role_titles` と `worker_delegation`。
+**三役の呼称（2026-08-31、2026-09-11更新）**: 監督=Claude / Codex 5.6 / Cursor（PM クライアント）／参謀=Kimi（現行 K2.8 Preview）／職人=CodeBar残量と task fit で配分する Codex 5.6 Luna/Terra・Kimi K2.8 Preview・GLM 5.3 系・Gemini Flash High。Codex Sol は難所限定、Spark はoverflow。OpenCode GoはHermes専用としてAI Worker候補から除外する。Antigravity が自動選定された時は High を基準にする。現行Gemini世代は `agents.yaml#model_catalog.model_families.gemini-flash` を参照する。正本: `agents.yaml` の `role_titles` と `worker_delegation`。
 
 **Fable 使用条件（2026-08-11・ctx-save）**: Fable は難所（設計・承認判断／原因不明バグの診断／ガバナンス領域編集）限定。調査・大量読み・軽作業は使わない。重い調査が主目的のセッションは、セッションモデル自体を Sonnet 既定で開始する（第二弾 2026-08-11）。正本・境界の全文は `agents.yaml` の `task_routing.fable_usage_policy`（`session_model_default` 含む）を参照（複製しない）。
 
@@ -65,12 +66,12 @@
 
 | タスク種別 | 第一候補 | 理由 |
 |-----------|---------|------|
-| 仕様が明確・クリーンさ重視・UI/結線・お手本コード | **CodeBar残量が多い高品質候補（GLM / Codex Luna・Terra / Kimi K3 / Gemini High）** | 固定 provider に寄せず、残量と task fit の同じ品質帯から選ぶ |
+| 仕様が明確・クリーンさ重視・UI/結線・お手本コード | **CodeBar残量が多い高品質候補（GLM / Codex Luna・Terra / Kimi K2.8 / Gemini High）** | 固定 provider に寄せず、残量と task fit の同じ品質帯から選ぶ |
 | 通常の実装 / DB・認証・本番・横断 | **CodeBar残量が多い高品質候補。難所は Codex Sol または Gemini High / GLM 5.3** | 明示の安全条件・難度条件を残量加点で覆さない |
-| 小〜中の明確な実装 | **Codex 5.6 Luna / Terra または残量に余裕のある Kimi K3 / GLM / Gemini High** | Codex は役割キーで解決。通常は Luna、標準は Terra。Kimi が選ばれた時は K3 |
+| 小〜中の明確な実装 | **Codex 5.6 Luna / Terra または残量に余裕のある Kimi K2.8 / GLM / Gemini High** | Codex は役割キーで解決。通常は Luna、標準は Terra。Kimi が選ばれた時は K2.8 Preview |
 | 難所・広域変更 | **Codex 5.6 Sol xhigh** | 構造化された難所条件を満たす時だけ |
 | 複雑バックエンド・高品質候補の枯渇時 | **役割resolverが返す利用可能候補** | `agents.yaml#subagent_routing` の順序に従う |
-| 巨大 context の読み込み・リポ横断調査 | **Kimi K3**（参謀。実装で選ばれた場合も同じ高品質枠） | 1M context 対応。用途に応じて参謀と職人を分ける |
+| 巨大 context の読み込み・リポ横断調査 | **Kimi K2.8 Preview**（参謀。実装で選ばれた場合も同じ高品質枠） | 1M context 対応。用途に応じて参謀と職人を分ける |
 
 ### CodeBar残量バランス（自動選定の共通ルール）
 
@@ -78,11 +79,12 @@
 
 ### Kimi 内モデル選択（決定論的）
 
-`agents.yaml.worker_delegation.kimi_model_routing` を正本とし、明示 `provider_model` → 直接 `kimi` 指定時の `KIMI_CODE_MODEL` → long-context ガードの `k3` → 自動選定で Kimi が選ばれた時の `auto_worker_model`（現行 `k3`）→ 明示的な速度優先かつ3倍quota許容時の `kimi-for-coding-highspeed` → 通常の `kimi-for-coding` の順で扱う。自動選定では long-context 条件を `auto_worker_model` より優先し、マシン全体の `KIMI_CODE_MODEL` は auto 経路へ渡さない。
+`agents.yaml.worker_delegation.kimi_model_routing` を正本とし、明示 `provider_model` → 直接 `kimi` 指定時の `KIMI_CODE_MODEL` → long-context ガードの `opencode_long_context_model` → 自動選定で Kimi が選ばれた時の `auto_worker_model`（現行 `kimi-for-coding` = K2.8 Preview）→ 明示的な速度優先かつ3倍quota許容時の `kimi-for-coding-highspeed` → 既定の `opencode_default_model`（現行 `kimi-for-coding`）の順で扱う。自動選定では long-context 条件を `auto_worker_model` より優先し、マシン全体の `KIMI_CODE_MODEL` は auto 経路へ渡さない。K3（`kimi-for-coding/k3`・`kimi-for-coding/k3-256k`）は明示指定の互換経路として残る。
 
-- K3条件: `requires_long_context=true`、推定contextが212,992 token超、または推定不能かつraw UTF-8が512KiB超。`max`、上限1,048,576 token。
+- 長大 context 条件: `requires_long_context=true`、推定contextが既定モデルの13/16（1Mなら約852K token）超、または推定不能かつraw UTF-8が既定モデルcontextの2倍超。閾値は catalog `context_window` から計算する（`agents.yaml` が正本）。
+- K2.8 Preview: 上限1,048,576 token、effort `low` / `high` / `max` を `kimi_variant` で指定可（既定 `high`）。
 - 選定結果: `reason_code` / `selected_model` / `estimated_context` / `fallback_reason` を必ず残す。
-- K3切替: 新sessionを開始し、必要情報の要約だけを渡す。履歴を丸ごと移送しない。
+- モデル切替: 新sessionを開始し、必要情報の要約だけを渡す。履歴を丸ごと移送しない。
 
 GLM 5.3 の reasoning_effort は low / high / max（thinking 無効化は不可。コーディング既定は max。low / high は明示指定時のみ。他の値はルーティングのバリデーションで拒否される）。母数は n=4 の初期観測であり法則ではない（冒頭⚠️参照）。
 
@@ -100,7 +102,7 @@ GLM 5.3 の reasoning_effort は low / high / max（thinking 無効化は不可�
 
 ## 6. 候補提案とディスパッチ
 
-実装委譲・並列実装の話題が出たら §4 を根拠に「GLM 5.3 向き / Kimi向き」を 1 行理由つきで先に提案し、Kimi内のK2.7/K3は上記契約で選ぶ。ディスパッチ実行は `agent-dispatch` スキルへ（未導入環境では §4・§5 のみ使う）。役割分担: 方針選定・委譲・進捗確認・結果回収 = Claude / Codex。実行は `agents.yaml` の有効 provider だけを AI Worker MCP 経由で行う。プロンプトには §5 の必須ガードを必ず織り込む。
+実装委譲・並列実装の話題が出たら §4 を根拠に「GLM 5.3 向き / Kimi向き」を 1 行理由つきで先に提案し、Kimi内の K2.8/K3 は上記契約で選ぶ。ディスパッチ実行は `agent-dispatch` スキルへ（未導入環境では §4・§5 のみ使う）。役割分担: 方針選定・委譲・進捗確認・結果回収 = Claude / Codex。実行は `agents.yaml` の有効 provider だけを AI Worker MCP 経由で行う。プロンプトには §5 の必須ガードを必ず織り込む。
 
 詳細手順は `skills/agent-dispatch/` を参照（本ルールは方針、skill は手順＝DRY）。
 
