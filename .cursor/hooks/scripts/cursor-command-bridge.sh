@@ -125,7 +125,21 @@ def resolve_event(payload):
         return "subagentStop" if has_subagent else "stop"
     return normalized
 
-event = resolve_event(data)
+# [2026-09-09][fix] Cursor shell input is command/cwd at the top level.
+# Pass the same command to existing Claude guards without executing its contents;
+# restrict normalization to the declared shell event, preserving Stop inference.
+shell_event = os.environ.get("CURSOR_BRIDGE_EVENT") or data.get("hook_event_name") or data.get("hookEventName")
+if shell_event == "beforeShellExecution":
+    command = data.get("command")
+    if isinstance(command, str):
+        tool_input = data.get("tool_input")
+        tool_input = dict(tool_input) if isinstance(tool_input, dict) else {}
+        tool_input["command"] = command
+        data["tool_input"] = tool_input
+    data["tool_name"] = "Bash"
+    event = "PreToolUse"
+else:
+    event = resolve_event(data)
 if event:
     data["hook_event_name"] = event
 
@@ -186,7 +200,10 @@ if event in ("stop", "subagentStop"):
         print(json.dumps({"followup_message": reason}, ensure_ascii=False), end="")
     else:
         print("{}", end="")
-elif event in ("preToolUse",):
+elif event in ("preToolUse", "beforeShellExecution"):
+    if event == "beforeShellExecution" and data.get("permission") in ("deny", "ask", "allow"):
+        print(json.dumps(data, ensure_ascii=False), end="")
+        raise SystemExit(0)
     if permission_decision == "deny" or decision == "block":
         perm = "deny"
     elif permission_decision == "allow" or decision == "approve" or data.get("continue") is True:
@@ -235,12 +252,18 @@ fi
 
 # 入力変換を適用してからフックスクリプトに渡し、出力変換を適用。
 # hook_event_name は変換後 JSON（推論・正規化済み）から取る。欠落 payload でも stop 変換する。
+HOOK_EVENT="${CURSOR_BRIDGE_EVENT:-}"
+if [ -z "$HOOK_EVENT" ] && [ "$(extract_field hook_event_name)" = "beforeShellExecution" ]; then
+  HOOK_EVENT="beforeShellExecution"
+fi
 TRANSFORMED_INPUT="$(transform_input "$RAW_INPUT")"
 _BRIDGE_RAW_SAVE="$RAW_INPUT"
 if [ -n "$TRANSFORMED_INPUT" ]; then
   RAW_INPUT="$TRANSFORMED_INPUT"
 fi
-HOOK_EVENT="$(extract_field hook_event_name)"
+if [ -z "$HOOK_EVENT" ]; then
+  HOOK_EVENT="$(extract_field hook_event_name)"
+fi
 RAW_INPUT="$_BRIDGE_RAW_SAVE"
 unset _BRIDGE_RAW_SAVE
 

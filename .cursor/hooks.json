@@ -4,27 +4,27 @@
     "beforeShellExecution": [
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; bash \"$PROJECT_DIR/.cursor/hooks/scripts/block-destructive-git.sh\"'",
+        "command": "CURSOR_BRIDGE_EVENT=beforeShellExecution bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; bash \"$PROJECT_DIR/.cursor/hooks/scripts/block-destructive-git.sh\"'",
         "timeout": 10
       },
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/block-main-commit.sh\"'",
+        "command": "CURSOR_BRIDGE_EVENT=beforeShellExecution bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/block-main-commit.sh\"'",
         "timeout": 10
       },
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/storage-url-pr-gate.sh\"'",
+        "command": "CURSOR_BRIDGE_EVENT=beforeShellExecution bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/storage-url-pr-gate.sh\"'",
         "timeout": 15
       },
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/block-unauthorized-docs-file.sh\"'",
+        "command": "CURSOR_BRIDGE_EVENT=beforeShellExecution bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/block-unauthorized-docs-file.sh\"'",
         "timeout": 10
       },
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/post-merge-gate.sh\"'",
+        "command": "CURSOR_BRIDGE_EVENT=beforeShellExecution bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/post-merge-gate.sh\"'",
         "timeout": 10
       }
     ],

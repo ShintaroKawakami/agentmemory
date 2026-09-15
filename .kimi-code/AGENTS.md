@@ -17,7 +17,7 @@
 - 直近セッション再開: `kimi --continue`
 - セッション選択: `kimi --session`
 
-`default_thinking = true` を `~/.kimi-code/config.toml` で管理します。Thinking 用 CLI flag は現在の
+`[thinking] enabled = true` を `~/.kimi-code/config.toml` で管理します（旧 `default_thinking` は CLI 0.21.0 で廃止）。Thinking 用 CLI flag は現在の
 Kimi Code CLI help に出ていないため、起動案内には使いません。
 `--continue` / `--session` は `--plan` / `--yolo` と併用しません。
 
