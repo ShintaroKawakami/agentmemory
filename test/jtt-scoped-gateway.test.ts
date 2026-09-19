@@ -358,6 +358,28 @@ describe("JTT scoped MCP surface", () => {
       await server.close();
     }
   });
+
+  it("routes Save project memory implementation_handoff into handoff storage without category downgrade", async () => {
+    const backend = new FakeBackend();
+    const service = new ScopedMemoryService(backend, config.allowedProjects);
+    const result = await service.save(
+      { project: "agent-hub", agent: "chatgpt-business" },
+      {
+        content: "summary: manga prompt bookbind\nnextStep: merge PRs and deploy gateway",
+        category: "implementation_handoff",
+        files: ["運用/ツール/chatgpt-instructions/manga-manual.md"],
+      },
+    );
+    expect(result.success).toBe(true);
+    expect(result.project).toBe("agent-hub");
+    expect(result.handoff).toMatchObject({
+      summary: "manga prompt bookbind",
+      nextStep: "merge PRs and deploy gateway",
+    });
+    expect(backend.remembers).toHaveLength(1);
+    expect(backend.remembers[0]?.concepts).toContain("implementation_handoff");
+    expect(backend.remembers[0]?.content).toContain('"category":"implementation_handoff"');
+  });
 });
 
 
