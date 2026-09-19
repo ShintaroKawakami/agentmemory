@@ -958,6 +958,28 @@ run_quality_check_hook() {
     is_codex_hook="true"
   fi
 
+  # [2026-09-19][fix] issue #2891
+  # 背景:
+  # - ユーザー依頼意図: non-pj の Stop hook が毎回 block し、reason に
+  #   `チェックリスト: <PJ>/.claude/hooks/scripts/../lib/code-quality-check.md` という
+  #   `scripts/../` を含む未正規化パスを出すため、AI がこれを `.claude/lib/code-quality-check.md`
+  #   へ誤って正規化して Read し「File does not exist」になる事故を止めたい。
+  #   実体 `.claude/hooks/lib/code-quality-check.md` は配布済みで存在する（誤検知した
+  #   `.claude/settings.local.json` の差分が block 自体の引金になっている別件は #2129 / #1498 系）。
+  # - 守るべき業務ルール: ファイル参照型 reason（dev-guardrails SKILL.md 発火フロー）の
+  #   チェックリストパスは、AI がそのまま Read できる canonical な絶対パスであること。
+  #   checklist の `lib/` 配置規約（hooks-structure-rule）と品質ゲート自体は正しく維持する。
+  # - 他案不採用理由:
+  #   1) checklist 未配置 PJ を block 対象から外す案 → 本件は checklist が実在するのに
+  #      提示パスだけが壊れている状態であり、素通し判定では直らず品質ゲートも弱めるため不採用。
+  #   2) 呼び出し側 wrapper（`"$SCRIPT_DIR/.."`）を個別に正規化する案 → 本 lib は
+  #      stop/subagent の全 caller 共通 SSOT であり、将来の新規 caller で同じ `..` 漏れが
+  #      再発するため不採用。
+  # 対応: run_quality_check_hook 入口で hook_root を `cd && pwd` で正規化し、
+  #   block reason の checklist_path / security_checklist_path とログ出力から `..` を排除する。
+  #   cd 失敗時は従来パスのまま続行する（is_codex_hook_root と同じ fail-open フォールバック）。
+  hook_root="$(cd "$hook_root" 2>/dev/null && pwd || printf '%s\n' "$hook_root")"
+
   # [2026-04-26][fix]
   # 背景:
   # - ユーザー依頼意図: Codex Stop hook の stdout/stderr 混在で JSON パース失敗を疑う状態をなくしたい。
