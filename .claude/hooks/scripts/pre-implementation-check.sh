@@ -33,10 +33,14 @@ if [ "${AGENT_HUB_SHOW_PRE_IMPL_REMINDER:-0}" != "1" ]; then
 fi
 
 if [ -d "$PROJECT_DIR/docs/business" ]; then
+  INSTRUCTION_FILE="AGENTS.md"
+  if [ ! -f "$PROJECT_DIR/AGENTS.md" ] && [ -f "$PROJECT_DIR/CLAUDE.md" ]; then
+    INSTRUCTION_FILE="CLAUDE.md"
+  fi
   # docs/business/ が存在する場合: 3層読み込み戦略リマインダー
-  cat <<'REMINDER'
+  cat <<REMINDER
 ⚠️ SSOT 3層読み込み戦略を実行せよ:
-Layer 1: CLAUDE.md + rules + prd-active Context Summary
+Layer 1: $INSTRUCTION_FILE + rules + prd-active Context Summary
 Layer 2: business-design.md / BUSINESS_RULES.md の目次→関係セクション特定
 Layer 3: 変更スコープに応じたSSOTの該当セクションだけ全文読み
 + CaD不採用パターンをブロックリスト化 → サブエージェントに引き渡し

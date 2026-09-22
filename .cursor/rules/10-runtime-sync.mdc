@@ -41,7 +41,7 @@ alwaysApply: true
 
 - warnings: `11`
 - source_files:
-- `CLAUDE.md`
+- `AGENTS.md`
 - `.claude/rules/general/ai-model-selection.md`
 - `.claude/rules/general/ai-worker-watch.md`
 - `.claude/rules/general/branch-rule.md`
@@ -63,7 +63,6 @@ alwaysApply: true
 - `.claude/rules/general/ui-stitch-mandatory.md`
 - `.claude/rules/general/visual-progress-map.md`
 - `.claude/rules/general/worktree-rule.md`
-- `AGENTS.md`
 - `.claude/settings.json`
 - `.claude/hooks/.hook-library-version`
 - `.claude/hooks/lib/code-quality-check.md`
@@ -219,6 +218,7 @@ alwaysApply: true
 - `.cursor/skills/agent-dispatch`
 - `.cursor/skills/agentmemory-routing`
 - `.cursor/skills/ai-project-rules`
+- `.cursor/skills/aside-ops`
 - `.cursor/skills/avoid-ai-writing`
 - `.cursor/skills/avoid-ai-writing-ja`
 - `.cursor/skills/brainstorm`

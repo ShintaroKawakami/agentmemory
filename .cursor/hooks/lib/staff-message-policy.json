@@ -4,7 +4,9 @@
   "skill": "jtt-team-messages",
   "required_read_suffixes": [
     "skills/jtt-team-messages/SKILL.md",
-    "skills/jtt-team-messages/references/tone-guide.md"
+    "skills/jtt-team-messages/references/tone-guide.md",
+    "skills/asana-project-guardrails/SKILL.md",
+    "skills/asana-project-guardrails/references/html-notes-format.md"
   ],
   "prompt_keywords": [
     "Asana",
@@ -23,20 +25,43 @@
     "update_task_story",
     "create_task_comment",
     "スタッフ向け",
-    "従業員向けメッセージ"
+    "従業員向けメッセージ",
+    "Asanaにタスク",
+    "タスクを作成",
+    "タスクを更新",
+    "サブタスク"
   ],
   "mcp": {
-    "servers": ["asana-mcp"],
-    "alias_prefixes": ["claude_ai_"],
+    "servers": [
+      "asana-mcp"
+    ],
+    "alias_prefixes": [
+      "claude_ai_"
+    ],
     "tool_suffixes": [
       "asana_create_task_story",
       "asana_update_task_story",
-      "asana_create_task_comment"
+      "asana_create_task_comment",
+      "asana_create_task",
+      "asana_update_task",
+      "asana_create_subtask"
     ]
   },
   "write_markers": {
-    "staff_mention_names": ["久野", "古賀", "江井", "古川", "齊藤", "佐藤"],
-    "phrases": ["お疲れ様です", "リーダーズ", "よろしくお願いします🙌", "時間帯責任者（リーダー）"]
+    "staff_mention_names": [
+      "久野",
+      "古賀",
+      "江井",
+      "古川",
+      "齊藤",
+      "佐藤"
+    ],
+    "phrases": [
+      "お疲れ様です",
+      "リーダーズ",
+      "よろしくお願いします🙌",
+      "時間帯責任者（リーダー）"
+    ]
   },
   "read_gate": {
     "mode": "deny",

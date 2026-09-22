@@ -1,13 +1,12 @@
-<!-- AUTO-GENERATED from CLAUDE.md + .claude/rules/**/*.md — DO NOT EDIT DIRECTLY -->
 # AgentMemory
 
 AgentMemory is the project-scoped MCP memory service used by the JTT agent
 harness. Keep the TypeScript MCP server, its tests, and the Mac mini runtime
 configuration consistent when changing this repository.
 
-Read `AGENTS.md` for architecture and change-surface requirements before
-editing implementation code. Generated agent-harness files are managed by
-AGENT-HUB; do not hand-edit them.
+The architecture and change-surface requirements below are the project source
+of truth. AGENT-HUB manages the marked inheritance block and generated rule
+cards; edit project-specific instructions outside those generated sections.
 
 <!-- AGENT-HUB MANAGED: harness-inheritance START -->
 ## Harness inheritance (generated)
@@ -20,16 +19,39 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `01ca55b245908cea359c1c6ecda548820aa52272009efcc888371839dfbc11cf`
+- effective hash: `464d9c5ecbc60caa3c61397303f33dfff6b49c370f7f576213c4a5ce31ef8f04`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
-  - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
   - `gbrain-md` (selected_by=`global`, inheritance_id=`de26219fcac2c60c`)
-  - `gemini-md` (selected_by=`global`, inheritance_id=`d2fe0f94dbdf9274`)
 
 ### Claude Code on the web（クラウド起動指示）
 
-Claude Code on the web（`CLAUDE_CODE_REMOTE=true`）で、`.claude/skills` に AGENT-HUB の skill（例: plan-approval）が無ければ、セッション開始直後に `cd <このCLAUDE.mdがあるPJのルート> && bash .claude/hooks/scripts/cloud-hub-bootstrap.sh` を実行し、終わったら元のcwdへ戻ってから作業を始める（複数PJを添付しているなら、hookを持つPJごとに1回ずつ）。AGENT-HUB を他リポと同時添付したセッションはcwdが親ディレクトリになり hook が自動発火しないため（実測2026-09-05）。取得できないと案内が出る場合は、作成画面の「＋」で ShintaroKawakami/AGENT-HUB を添付し直す。
+Claude Code on the web（`CLAUDE_CODE_REMOTE=true`）で、`.claude/skills` に AGENT-HUB の skill（例: plan-approval）が無ければ、セッション開始直後に `cd <このAGENTS.mdがあるPJのルート> && bash .claude/hooks/scripts/cloud-hub-bootstrap.sh` を実行し、終わったら元のcwdへ戻ってから作業を始める（複数PJを添付しているなら、hookを持つPJごとに1回ずつ）。AGENT-HUB を他リポと同時添付したセッションはcwdが親ディレクトリになり hook が自動発火しないため（実測2026-09-05）。取得できないと案内が出る場合は、作成画面の「＋」で ShintaroKawakami/AGENT-HUB を添付し直す。
+### 適用するハーネスルール
+
+以下は本文を読むための索引です。条件付きルールの適用範囲は参照先のfrontmatterに従います。
+
+- `.claude/rules/general/ai-model-selection.md` — 条件に該当する時だけ参照 (asset_id=`ai-model-selection` inheritance_id=`9466aa8cd58fb611`)
+- `.claude/rules/general/ai-worker-watch.md` — 常時参照 (asset_id=`ai-worker-watch` inheritance_id=`d0f860f95e9dce9c`)
+- `.claude/rules/general/branch-rule.md` — 常時参照 (asset_id=`branch-rule` inheritance_id=`f64b20f06e6b71f6`)
+- `.claude/rules/general/constructive-dissent.md` — 常時参照 (asset_id=`constructive-dissent` inheritance_id=`4922d83b15c142d6`)
+- `.claude/rules/general/gbrain-recall.md` — 常時参照 (asset_id=`gbrain-recall` inheritance_id=`d76b0c994a8ef7f4`)
+- `.claude/rules/general/hooks-structure-rule.md` — 条件に該当する時だけ参照 (asset_id=`hooks-structure-rule` inheritance_id=`47d7849e1bc9d609`)
+- `.claude/rules/general/latest-stack-context7.md` — 条件に該当する時だけ参照 (asset_id=`latest-stack-context7` inheritance_id=`6cbb121d4707f75f`)
+- `.claude/rules/general/mandate-registry.md` — 常時参照 (asset_id=`mandate-registry` inheritance_id=`373f1e4126f00846`)
+- `.claude/rules/general/mcp-key-management.md` — 常時参照 (asset_id=`mcp-key-management` inheritance_id=`a56034441d19874e`)
+- `.claude/rules/general/memory-lookups.md` — 常時参照 (asset_id=`memory-lookups` inheritance_id=`0d5b4aa7828a34bb`)
+- `.claude/rules/general/plan-approval-gate.md` — 常時参照 (asset_id=`plan-approval-gate` inheritance_id=`57a7362c64d21737`)
+- `.claude/rules/general/plan-commitment-tracking.md` — 条件に該当する時だけ参照 (asset_id=`plan-commitment-tracking` inheritance_id=`8f72268d42864cdc`)
+- `.claude/rules/general/reference-over-hardcode.md` — 条件に該当する時だけ参照 (asset_id=`reference-over-hardcode` inheritance_id=`c11ada1d33cda872`)
+- `.claude/rules/general/response-style.md` — 常時参照 (asset_id=`response-style` inheritance_id=`5a08beee858fd97d`)
+- `.claude/rules/general/responsive-both-viewports.md` — 条件に該当する時だけ参照 (asset_id=`responsive-both-viewports` inheritance_id=`f1de976176e1cfe6`)
+- `.claude/rules/general/settings-protection-coexistence.md` — 条件に該当する時だけ参照 (asset_id=`settings-protection-coexistence` inheritance_id=`b2c20a61aba97c16`)
+- `.claude/rules/general/sub-agent-scope-contract.md` — 常時参照 (asset_id=`sub-agent-scope-contract` inheritance_id=`2df0dc7f3e0e83f2`)
+- `.claude/rules/general/tool-availability-resolution.md` — 常時参照 (asset_id=`tool-availability-resolution` inheritance_id=`24858e26fca6d353`)
+- `.claude/rules/general/ui-stitch-mandatory.md` — 条件に該当する時だけ参照 (asset_id=`ui-stitch-mandatory` inheritance_id=`7c625ee9b414e7b8`)
+- `.claude/rules/general/visual-progress-map.md` — 常時参照 (asset_id=`visual-progress-map` inheritance_id=`60f192120744a171`)
+- `.claude/rules/general/worktree-rule.md` — 常時参照 (asset_id=`worktree-rule` inheritance_id=`3ac270c246d5b02e`)
 <!-- AGENT-HUB MANAGED: harness-inheritance END -->
 
 ## Project-specific instructions
@@ -40,10 +62,127 @@ Claude Code on the web（`CLAUDE_CODE_REMOTE=true`）で、`.claude/skills` に 
 
 agentmemory is a persistent memory system for AI coding agents, built on iii-engine's three primitives (Worker/Function/Trigger). Everything goes through `registerFunction`/`registerTrigger`/`sdk.trigger()` — never bypass iii-engine with standalone SQLite or in-process alternatives.
 
-> Codex 向け要約: 全文は `CLAUDE.md` を Read。常時義務は下の CARD 地図を正とする。
+- **Engine**: iii-sdk (WebSocket to iii-engine on port 49134)
+- **State**: File-based SQLite via iii-engine's StateModule (`./data/state_store.db`)
+- **Build**: TypeScript → ESM via tsdown, output to `dist/`
+- **Test**: vitest (`npm test` excludes integration tests)
+
+## Consistency Rules
+
+**When adding or removing MCP tools, you MUST update ALL of the following:**
+1. `src/mcp/tools-registry.ts` — tool definition + `getAllTools()` array
+2. `src/mcp/server.ts` — handler case in the `mcp::tools::call` switch
+3. `src/triggers/api.ts` — REST endpoint registration
+4. `src/index.ts` — function registration + endpoint count in the log line
+5. `test/mcp-standalone.test.ts` — tool count assertion
+6. `README.md` — tool counts (search for "MCP tools")
+7. `plugin/.claude-plugin/plugin.json` — tool count in description
+8. `plugin/plugin.json` and `plugin/.mcp.copilot.json` (when present) — tool count or MCP exposure
+
+**When adding REST endpoints, you MUST update:**
+1. `src/triggers/api.ts` — endpoint registration
+2. `src/index.ts` — endpoint count in the log line
+3. `README.md` — endpoint count (search for "REST endpoints" and "endpoints on port")
+
+**When bumping version, you MUST update ALL of the following:**
+1. `package.json` — version field
+2. `src/version.ts` — VERSION constant and type union
+3. `src/types.ts` — ExportData version union
+4. `src/functions/export-import.ts` — supportedVersions set
+5. `test/export-import.test.ts` — version assertion
+6. `plugin/.claude-plugin/plugin.json` — version field
+7. `plugin/plugin.json` (when present) — version field
+
+**When adding new KV scopes:**
+1. `src/state/schema.ts` — add to the KV object
+2. `src/types.ts` — add the corresponding interface
+
+**When adding new audit operations:**
+1. `src/types.ts` — add to AuditEntry.operation union type
+
+## Code Patterns
+
+### Function Registration
+```typescript
+sdk.registerFunction(
+  "mem::your-function",
+  async (data: { ... }) => {
+    // validate inputs
+    // do work via kv.get/kv.set/kv.list
+    // record audit via recordAudit()
+    return { success: true, ... };
+  },
+);
+```
+
+### REST Endpoint Registration
+```typescript
+sdk.registerFunction("api::your-endpoint", async (req: ApiRequest) => {
+  const denied = checkAuth(req, secret);
+  if (denied) return denied;
+  const body = req.body as Record<string, unknown>;
+  // validate + whitelist fields (never pass raw body to sdk.trigger)
+  const result = await sdk.trigger({
+    function_id: "mem::your-function",
+    payload: { ... },
+  });
+  return { status_code: 200, body: result };
+});
+sdk.registerTrigger({
+  type: "http",
+  function_id: "api::your-endpoint",
+  config: { api_path: "/agentmemory/your-path", http_method: "POST" },
+});
+```
+
+### MCP Tool Handler
+```typescript
+case "memory_your_tool": {
+  // validate args with typeof checks
+  // parse CSV args: args.field.split(",").map(t => t.trim()).filter(Boolean)
+  const result = await sdk.trigger({
+    function_id: "mem::your-function",
+    payload: { ... },
+  });
+  return { status_code: 200, body: { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] } };
+}
+```
+
+### Hook Scripts
+Hook scripts in `src/hooks/` are standalone Node.js scripts (no iii-sdk import). They read JSON from stdin, make HTTP calls to the REST API, and exit. There are two patterns depending on whether Claude Code consumes the script's stdout:
+
+- **Context-injecting hooks** (`pre-tool-use`, `pre-compact`, `session-start`) write recalled context to stdout for Claude Code to inject. These MUST use `try/catch` with `await fetch(..., { signal: AbortSignal.timeout(N) })` — the script has to wait for the response before exiting, and the timeout is the only bound on hang time.
+- **Telemetry-only hooks** (`notification`, `post-tool-failure`, `post-tool-use`, `prompt-submit`, `stop`, `session-end`, `subagent-start`, `subagent-stop`, `task-completed`) write nothing to stdout. These MUST use fire-and-forget `fetch(..., { signal: AbortSignal.timeout(N) }).catch(() => {})` paired with `setTimeout(() => process.exit(0), 500).unref()`. The unawaited fetch dispatches the request; the unref'd `setTimeout` force-exits the process after the request has been flushed to the local daemon's socket buffer (~500ms is enough for single-request hooks; use 1500ms for multi-request hooks like `stop` and `session-end` so all fetches have time to start, especially when `AGENTMEMORY_URL` points to a remote daemon). Without the `setTimeout` Node keeps the event loop alive waiting for any in-flight fetch to settle, which means the hook still blocks Claude Code's next-prompt boundary for up to the AbortSignal duration — exactly the bug fire-and-forget is meant to fix.
+
+## Coding Standards
+
+- TypeScript, ESM only (`"type": "module"`)
+- No code comments explaining WHAT — use clear naming instead
+- Use `fingerprintId()` for content-addressable dedup, `generateId()` for unique IDs
+- Parallel operations where possible (`Promise.all` for independent kv writes/reads)
+- Input validation at system boundaries (MCP handlers, REST endpoints)
+- REST endpoints must whitelist fields — never pass raw request body to `sdk.trigger()`
+- Use `recordAudit()` for state-changing operations
+- Timestamps: capture once with `new Date().toISOString()` and reuse
+
+## Testing
+
+- All tests must pass before PR: `npm test` (1,428+ tests)
+- Mock pattern: `vi.mock("iii-sdk")` with mock `sdk.trigger`, `kv.get/set/list`
+- Test files go in `test/` with `.test.ts` extension
+- Follow existing patterns in `test/crystallize.test.ts` for function tests
+
+## Current Stats (v0.9.28)
+
+- 54 MCP tools (8 visible by default, `AGENTMEMORY_TOOLS=all` for all)
+- 130 REST endpoints
+- 6 MCP resources, 3 MCP prompts
+- 12 hooks, 15 skills
+- 260+ iii functions
+- 1,428+ tests
 
 ## 詳細ルール（CARD）
-Codex 等は paths 条件が効かないため、常時ルールは「いつ／何を／できた状態」の CARD だけを載せる。手順の全文は各 CARD 末尾のパスを Read する。編集元は PJ の `CLAUDE.md` + AGENT-HUB manifest v2 が選ぶ canonical rules。条件付き（frontmatter `paths:`）ルールは索引のみ。手動編集ではなく再生成で同期する。
+Codex 等は paths 条件が効かないため、常時ルールは「いつ／何を／できた状態」の CARD だけを載せる。手順の全文は各 CARD 末尾のパスを Read する。編集元は PJ の `AGENTS.md` + AGENT-HUB manifest v2 が選ぶ canonical rules。条件付き（frontmatter `paths:`）ルールは索引のみ。手動編集ではなく再生成で同期する。
 
 ## CARD 地図（常時義務）
 セッション開始時はここを先に見る。詳細手順は下の各 CARD → 元ルールを Read。

@@ -5,7 +5,7 @@
 
 ## 正本
 
-- ルールの正本はルートの `CLAUDE.md` / `.claude/rules/` です。
+- ルールの正本はルートの `AGENTS.md` / `.claude/rules/` です。
 - Kimi はプロジェクトの `AGENTS.md` も読むため、ここでは Kimi 固有の差分だけを補足します。
 - 旧 `.kimi/agent.yaml` / `.kimi/agents/` は使いません。
 
