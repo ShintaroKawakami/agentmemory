@@ -23,6 +23,15 @@ AI が変更を加える通常作業では、git worktree を作成して別デ�
 
 worktree 作成コマンドの例は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
 
+## Worktree path
+
+Owner 2026-09-22: do not create a git worktree as a direct child of $HOME.
+
+- `git worktree add` is required for AI edits.
+- The new worktree path must not be a direct child of $HOME (forbidden example: /Users/shintaro/jtt-system-interview-document).
+- Use only the parent directory the doc already specifies. Do not invent a new parent.
+- Do not block the existing primary checkouts (~/jtt-system, ~/business/AGENT-HUB, and the other registered project roots). Block only `git worktree add` when the destination's parent is $HOME.
+
 ## いつ新規 worktree を作らなくてよいか
 
 以下は新規 worktree なしでよい:
