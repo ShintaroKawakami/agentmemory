@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `74867da0f894dd34dc65e216ef53c413681f2495da43cd0cf06162dc80b42a3c`
+- effective hash: `2f6d4fd745ae1649fb5e514dd6c2b9c37e7ec74cdf8134d0c9d8749d556e7fac`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -866,7 +866,7 @@ memory と正本が矛盾する場合は、正本を優先する。G-Brain は�
 3. **提示して承認を待つ（両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 `open <file>` で PC ブラウザにも表示する。**タップ用ファイルカード作成と open による PC ブラウザ表示の両方を毎回必須とする**。末尾に「この実装でいいですか？（進めて / 直す / やらない）」を置き、**承認なしに実装へ進まない**。未確認・未確定が残る間は承認欄に赤で理由を出し、承認を求めない。保存規約（gitignore済み一時パス・短い slug・共有 URL は1行）は `skills/plan-approval/SKILL.md` を参照。同意の扱いは共通ルール CARD 01「承認の有効範囲」（正本: `dotfiles/global/shared/SHARED_AGENTS.md` の `global-agent-behavior` ブロック）に従う。
 4. **承認直後に 📋 コミットメント台帳を全件タスク化する**: HTML プランの台帳の各行を、着手前に `TaskCreate` で 1 行 = 1 タスク化してから実装へ進む。台帳が全消化（実施済み or 明示保留）になるまで「完了」と宣言しない。詳細は `.claude/rules/general/plan-commitment-tracking.md`。
    - **AI worker を 1 度でも使う計画は必須**: 「AI worker 摩擦時は該当正本を worktree→PR→merge→fetch-only / detached 確認→cleanup で修正」の条項を台帳に必ず入れ、タスク化する（テンプレに既定行として焼き込み済み・消さない）。
-5. **承認後は標準パイプラインを通す**: 実装（dev-guardrails）→ codexレビュー → 実装監査 → CI → SSOT 同期確認 → マージ。本番投入は人間ゲート。
+5. **承認後は標準パイプラインを通す**: 実装（dev-guardrails）→ codexレビュー → 実装監査 → CI → SSOT 同期確認 → 自動マージ。マージ時の人の再確認は不要（共通憲法 CARD 01「PRの自動マージ（全PJ共通）」）。本番作業を含め、未承認の高リスク変更・依頼範囲の変更だけは同CARDの「承認」に従う。
 
 ## HTMLプランの中身（v4・2026-09-04〜）
 
