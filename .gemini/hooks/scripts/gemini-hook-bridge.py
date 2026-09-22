@@ -81,7 +81,7 @@ def run_generate_catalog(target_path):
     if not RUNTIME_SPEC["after"]["write_edit"]["auto_catalog"]:
         return
     normalized = str(target_path or "")
-    if normalized == "CLAUDE.md" or normalized.startswith(".claude/rules/"):
+    if normalized in ('CLAUDE.md', 'AGENTS.md') or normalized.startswith(".claude/rules/"):
         result = run_process("bash", [str(PROJECT_ROOT / "scripts" / "generate-agents-md.sh")])
         if result.returncode != 0:
             raise RuntimeError(combined_output(result) or "generate-agents-md.sh failed")

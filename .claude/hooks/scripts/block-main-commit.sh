@@ -576,6 +576,431 @@ guard_reason=$(python3 "$SCRIPT_DIR/../lib/upstream-write-guard.py" --cwd "$CWD"
   esac
 }
 
+# [2026-09-22][fix] git worktree add の作成先が $HOME 直下なら fail-closed
+# 背景:
+#   - ユーザー依頼意図: /Users/shintaro/jtt-system-interview-document のように、
+#     primary checkout の隣を $HOME 直下へ作る worktree を止める。
+#   - 守るべき業務ルール: AI の編集は git worktree add が必須。作成先の親は
+#     docs/worktree-operations.md が既に指定する親だけ。既存の primary checkout
+#     （~/jtt-system、~/business/AGENT-HUB、その他の登録ルート）での通常 git 操作は止めない。
+#     止めるのは、作成先の親が $HOME である git worktree add だけ。
+#   - 他案不採用理由: 新しい hook ファイルを足す案は、git コマンドを既に検査する
+#     本スクリプトが所有できるため不採用。$HOME 直下のディレクトリを存在だけで拒否する案は、
+#     登録済み primary checkout まで止めるため不採用。
+# 対応: worktree add の作成先を静的に解決し、親が $HOME、または親を証明できないときだけ
+#       1行の理由で deny する。
+home_child_worktree_add_reason() {
+  COMMAND_TEXT="$COMMAND_FOR_GIT_MATCH" HOOK_CWD="$CWD" python3 - <<'PY'
+import os
+import re
+import shlex
+
+text = os.environ.get("COMMAND_TEXT", "")
+hook_cwd = os.environ.get("HOOK_CWD", "") or "."
+home = os.environ.get("HOME", "")
+REASON = (
+    "[hook:block-main-commit] git worktree add destination must not be a "
+    "direct child of $HOME (forbidden example: "
+    "/Users/shintaro/jtt-system-interview-document)"
+)
+UNRESOLVED = (
+    "[hook:block-main-commit] git worktree add destination parent could not "
+    "be proved, so a direct child of $HOME is refused"
+)
+
+WRAPPERS = {"command", "nice", "nohup", "time", "stdbuf", "builtin"}
+GLOBAL_VALUE = {
+    "-C",
+    "-c",
+    "--git-dir",
+    "--work-tree",
+    "--namespace",
+    "--super-prefix",
+    "--exec-path",
+    "--config-env",
+}
+GLOBAL_FLAGS = {
+    "-p",
+    "--paginate",
+    "-P",
+    "--no-pager",
+    "--no-replace-objects",
+    "--bare",
+    "--literal-pathspecs",
+    "--glob-pathspecs",
+    "--noglob-pathspecs",
+    "--icase-pathspecs",
+}
+ADD_VALUE = {"-b", "-B", "--reason"}
+ADD_FLAGS = {
+    "-f",
+    "--force",
+    "--no-force",
+    "--orphan",
+    "--no-orphan",
+    "-d",
+    "--detach",
+    "--no-detach",
+    "--checkout",
+    "--no-checkout",
+    "--lock",
+    "--no-lock",
+    "--no-reason",
+    "-q",
+    "--quiet",
+    "--no-quiet",
+    "--track",
+    "--no-track",
+    "--guess-remote",
+    "--no-guess-remote",
+    "--relative-paths",
+    "--no-relative-paths",
+    "-h",
+    "--help",
+}
+
+
+def static_expand(token, home_dir):
+    if token is None or "$(" in token or "`" in token:
+        return None
+    expanded = re.sub(r"\$\{HOME\}", home_dir, token)
+    expanded = re.sub(r"\$HOME(?![A-Za-z0-9_])", home_dir, expanded)
+    if "$" in expanded or any(ch in expanded for ch in "*?[]{}"):
+        return None
+    if expanded.startswith("~"):
+        expanded = os.path.expanduser(expanded)
+        if expanded.startswith("~"):
+            return None
+    return expanded
+
+
+def split_segments(command):
+    parts = []
+    buf = []
+    quote = None
+    escaped = False
+    i = 0
+    while i < len(command):
+        ch = command[i]
+        if escaped:
+            buf.append(ch)
+            escaped = False
+            i += 1
+            continue
+        if ch == "\\" and quote != "'":
+            buf.append(ch)
+            escaped = True
+            i += 1
+            continue
+        if quote:
+            if ch == quote:
+                quote = None
+            buf.append(ch)
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+            buf.append(ch)
+            i += 1
+            continue
+        if ch == "&" and i + 1 < len(command) and command[i + 1] == "&":
+            parts.append(("".join(buf), "&&"))
+            buf = []
+            i += 2
+            continue
+        if ch == "|" and i + 1 < len(command) and command[i + 1] == "|":
+            parts.append(("".join(buf), "||"))
+            buf = []
+            i += 2
+            continue
+        if ch in "|\n;":
+            parts.append(("".join(buf), ch))
+            buf = []
+            i += 1
+            continue
+        buf.append(ch)
+        i += 1
+    if quote is not None or escaped:
+        return None
+    parts.append(("".join(buf), None))
+    return parts
+
+
+def is_redirect(token):
+    return bool(re.match(r"^[0-9]*[<>]&?[0-9]*$|^[<>]", token))
+
+
+def skip_wrappers(tokens):
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if "=" in tok and not tok.startswith("-") and not tok.startswith("/") and not tok.startswith("."):
+            key = tok.split("=", 1)[0]
+            if key in {"GIT_DIR", "GIT_WORK_TREE"} or not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
+                return None
+            i += 1
+            continue
+        if tok == "timeout" and i + 1 < len(tokens) and re.match(r"^[0-9]+(\.[0-9]+)?$", tokens[i + 1]):
+            i += 2
+            continue
+        if tok == "env":
+            if i + 1 < len(tokens) and tokens[i + 1].startswith("-"):
+                return None
+            i += 1
+            continue
+        if tok in WRAPPERS:
+            i += 1
+            continue
+        break
+    return i
+
+
+def parse_add(tokens, start, base):
+    i = start
+    path = None
+    saw_help = False
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok == "--":
+            i += 1
+            if path is None and i < len(tokens):
+                path = tokens[i]
+            break
+        if tok in {"-h", "--help"}:
+            saw_help = True
+            i += 1
+            continue
+        if tok in ADD_VALUE:
+            if i + 1 >= len(tokens):
+                return "unresolved"
+            i += 2
+            continue
+        if tok.startswith("--reason="):
+            i += 1
+            continue
+        if tok.startswith("-b") and len(tok) > 2 and not tok.startswith("--"):
+            i += 1
+            continue
+        if tok.startswith("-B") and len(tok) > 2 and not tok.startswith("--"):
+            i += 1
+            continue
+        if tok in ADD_FLAGS or tok in GLOBAL_FLAGS:
+            i += 1
+            continue
+        if tok.startswith("-"):
+            return "unresolved"
+        if is_redirect(tok):
+            i += 1
+            continue
+        if path is None:
+            path = tok
+            i += 1
+            continue
+        i += 1
+    if saw_help and path is None:
+        return "allow"
+    if path is None:
+        return "unresolved"
+    return destination_parent(path, base)
+
+
+def destination_parent(path_token, base):
+    if not home:
+        return "unresolved"
+    expanded = static_expand(path_token, home)
+    if expanded is None:
+        return "unresolved"
+    if not os.path.isabs(expanded):
+        if base is None:
+            return "unresolved"
+        base_expanded = static_expand(base, home)
+        if base_expanded is None:
+            return "unresolved"
+        if not os.path.isabs(base_expanded):
+            return "unresolved"
+        expanded = os.path.join(base_expanded, expanded)
+    destination = os.path.normpath(expanded)
+    parent = os.path.realpath(os.path.dirname(destination))
+    if parent == os.path.realpath(home):
+        return "deny"
+    return "allow"
+
+
+def inspect_git(tokens, base):
+    start = skip_wrappers(tokens)
+    if start is None or start >= len(tokens):
+        return None
+    exe = tokens[start]
+    if not (exe == "git" or exe.endswith("/git")):
+        if exe in {"bash", "sh", "zsh", "eval"}:
+            return inspect_shell(tokens[start:], base)
+        return None
+    i = start + 1
+    c_base = None
+    c_unresolved = False
+    while i < len(tokens) and tokens[i].startswith("-"):
+        tok = tokens[i]
+        if tok == "--":
+            i += 1
+            break
+        attached_c = None
+        if tok.startswith("-C") and len(tok) > 2:
+            attached_c = tok[2:]
+        elif tok.startswith("--git-dir="):
+            attached_c = tok.split("=", 1)[1]
+        if attached_c is not None:
+            resolved = static_expand(attached_c, home)
+            if resolved is None:
+                c_unresolved = True
+            else:
+                if not os.path.isabs(resolved):
+                    if base is None:
+                        c_unresolved = True
+                    else:
+                        resolved = os.path.normpath(os.path.join(base, resolved))
+                c_base = resolved
+            i += 1
+            continue
+        if tok in GLOBAL_VALUE:
+            if i + 1 >= len(tokens):
+                return "unresolved"
+            if tok == "-C":
+                resolved = static_expand(tokens[i + 1], home)
+                if resolved is None:
+                    c_unresolved = True
+                else:
+                    if not os.path.isabs(resolved):
+                        if base is None:
+                            c_unresolved = True
+                        else:
+                            resolved = os.path.normpath(os.path.join(base, resolved))
+                    c_base = resolved
+            i += 2
+            continue
+        if tok in GLOBAL_FLAGS or tok.startswith("--no-") or tok.startswith("--"):
+            if tok not in GLOBAL_FLAGS and "=" not in tok and tok not in {"--bare", "--no-pager", "--paginate"}:
+                # unknown long option: fail closed only if this is worktree add
+                rest = tokens[i + 1 :]
+                if "worktree" in rest and "add" in rest:
+                    return "unresolved"
+            i += 1
+            continue
+        return "unresolved"
+    if i >= len(tokens) or tokens[i] != "worktree":
+        return None
+    if i + 1 >= len(tokens) or tokens[i + 1] != "add":
+        return None
+    use_base = c_base if c_base is not None else base
+    if c_unresolved:
+        # An absolute destination does not depend on -C. A relative one does.
+        probe = parse_add(tokens, i + 2, None)
+        if probe == "allow":
+            return "allow"
+        if probe == "deny":
+            return "deny"
+        return "unresolved"
+    return parse_add(tokens, i + 2, use_base)
+
+
+def inspect_shell(tokens, base):
+    exe = tokens[0]
+    if exe == "eval":
+        if len(tokens) < 2:
+            return None
+        body = tokens[1]
+        if not static_expand(body, home) and ("$(" in body or "`" in body or "$" in body.replace("$HOME", "").replace("${HOME}", "")):
+            if "worktree" in body and re.search(r"\badd\b", body):
+                return "unresolved"
+        return scan_command(body, base)
+    if exe in {"bash", "sh", "zsh"}:
+        if "-c" not in tokens:
+            return None
+        idx = tokens.index("-c")
+        if idx + 1 >= len(tokens):
+            return "unresolved"
+        body = tokens[idx + 1]
+        if "$(" in body or "`" in body:
+            if "worktree" in body:
+                return "unresolved"
+        return scan_command(body, base)
+    return None
+
+
+def simple_cd(tokens):
+    start = skip_wrappers(tokens)
+    if start is None or start >= len(tokens) or tokens[start] != "cd":
+        return None
+    args = [tok for tok in tokens[start + 1 :] if not is_redirect(tok)]
+    if not args:
+        return home or None
+    if len(args) != 1 or args[0] in {"-", "--"}:
+        return "unresolved"
+    expanded = static_expand(args[0], home)
+    if expanded is None:
+        return "unresolved"
+    return expanded
+
+
+def scan_command(command, initial_base):
+    if "worktree" not in command:
+        return None
+    parts = split_segments(command)
+    if parts is None:
+        if re.search(r"\bgit\b", command) and re.search(r"\bworktree\b", command) and re.search(r"\badd\b", command):
+            return "unresolved"
+        return None
+    base = initial_base
+    base_trusted = True
+    for segment, sep_after in parts:
+        segment = segment.strip()
+        if not segment:
+            if sep_after in {"|", "||"}:
+                base_trusted = False
+            continue
+        try:
+            tokens = shlex.split(segment, posix=True)
+        except ValueError:
+            if "worktree" in segment:
+                return "unresolved"
+            continue
+        cd_target = simple_cd(tokens)
+        git_result = inspect_git(tokens, base if base_trusted else None)
+        if git_result in {"deny", "unresolved"}:
+            return git_result
+        if cd_target == "unresolved":
+            base_trusted = False
+        elif isinstance(cd_target, str) and sep_after in {"&&", ";", "\n"}:
+            if not os.path.isabs(cd_target):
+                if not base_trusted or base is None:
+                    base_trusted = False
+                else:
+                    base = os.path.normpath(os.path.join(base, cd_target))
+                    base_trusted = True
+            else:
+                base = os.path.normpath(cd_target)
+                base_trusted = True
+        elif sep_after in {"|", "||"}:
+            base_trusted = False
+        elif cd_target == "unresolved" or (cd_target and sep_after not in {"&&", ";", "\n", None}):
+            base_trusted = False
+    return None
+
+
+result = scan_command(text, os.path.abspath(hook_cwd) if hook_cwd else None)
+if result == "deny":
+    print(REASON)
+elif result == "unresolved":
+    print(UNRESOLVED)
+PY
+}
+
+if echo "$COMMAND_FOR_GIT_MATCH" | grep -q 'worktree'; then
+  home_child_worktree_reason="$(home_child_worktree_add_reason)"
+  if [ -n "${home_child_worktree_reason:-}" ]; then
+    _emit_deny_with_telemetry "$home_child_worktree_reason"
+  fi
+fi
+
 is_allowed_main_direct_path() {
   # 2026-07-01: AI hook 経由の main direct allowlist は廃止。
   # 互換テスト用に関数名は残すが、どの path も許可しない。

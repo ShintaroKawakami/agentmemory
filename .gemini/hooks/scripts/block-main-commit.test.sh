@@ -1227,6 +1227,56 @@ else
   FAIL=$((FAIL + 1))
 fi
 
+# [2026-09-22][test] worktree add の作成先が $HOME 直下なら拒否する。
+# primary checkout そのものでの通常 git と、登録ルートの隣への add は許可する。
+expect_block \
+  "HOME直下への worktree add は拒否" \
+  "$feature_repo" \
+  "git worktree add \"$HOME/jtt-system-interview-document\""
+expect_block \
+  "tilde の HOME 直下 worktree add は拒否" \
+  "$feature_repo" \
+  "git worktree add ~/jtt-system-interview-document"
+expect_allow \
+  "登録ルートの隣への worktree add は許可" \
+  "$feature_repo" \
+  "git worktree add \"$HOME/business/AGENT-HUB-slug\" -b feat/x origin/main"
+expect_allow \
+  "worktree list は HOME 上でも許可" \
+  "$HOME" \
+  "git worktree list"
+expect_allow \
+  "worktree remove は add ではないので許可" \
+  "$feature_repo" \
+  "git worktree remove \"$HOME/jtt-system-interview-document\""
+expect_allow \
+  "primary checkout での git status は許可" \
+  "$HOME/jtt-system" \
+  "git status"
+expect_block \
+  "cd して HOME 直下へ作る worktree add は拒否" \
+  "$feature_repo" \
+  "cd \"$HOME\" && git worktree add ./jtt-system-interview-document"
+expect_allow \
+  "primary の配下への worktree add は許可" \
+  "$feature_repo" \
+  "git worktree add \"$HOME/jtt-system/feature-x\" -b feat/x"
+expect_allow \
+  "commit メッセージ内の worktree add 言及は許可" \
+  "$feature_repo" \
+  "git commit -m 'note about worktree add'"
+
+home_child_out="$(run_hook "$feature_repo" "git worktree add \"$HOME/jtt-system-interview-document\"" 2>&1 || true)"
+if printf '%s' "$home_child_out" | grep -q 'direct child of $HOME' \
+  && printf '%s' "$home_child_out" | grep -q '/Users/shintaro/jtt-system-interview-document' \
+  && printf '%s' "$home_child_out" | grep -q 'permissionDecision":"deny'; then
+  printf '[PASS] %s\n' "HOME直下拒否の理由は1行で禁止例を含む"
+  PASS=$((PASS + 1))
+else
+  printf '[FAIL] %s: %s\n' "HOME直下拒否の理由は1行で禁止例を含む" "$home_child_out"
+  FAIL=$((FAIL + 1))
+fi
+
 TOTAL=$((PASS + FAIL))
 printf '\n=== block-main-commit.test.sh: %d/%d PASS ===\n' "$PASS" "$TOTAL"
 
