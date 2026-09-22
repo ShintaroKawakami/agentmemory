@@ -142,7 +142,8 @@ Mac Studio に新規 cron/launchd を置かない
 1. 英語 description のスキルでも意味が合うなら発火する
 2. `<skill>-ja` overlay があれば優先する
 3. 「英語スキルだから」でスキップしない
-4. Aside（ブラウザアプリ）を使うときは、公式 `aside-browser` skill と `aside guide` を先に読み、
+4. 「Aside」「aside」「アサイド」と指定されたらAIブラウザのAsideとして `aside-ops` を使う。
+   公式 `aside-browser` skill と `aside guide` を先に読み、
    AGENT-HUB の `dotfiles/aside/GLOBAL_AGENTS.md` を追加で読む。Aside 固有の操作制約はこの共通本文へ複製しない
 5. Raycast AI を使うときは、AGENT-HUB の `dotfiles/raycast/GLOBAL_AGENTS.md` を追加で読む。
    Raycast 固有の Profile / AI Commands の境界は共通本文へ複製しない
