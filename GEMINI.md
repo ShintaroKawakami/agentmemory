@@ -58,7 +58,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `2f6d4fd745ae1649fb5e514dd6c2b9c37e7ec74cdf8134d0c9d8749d556e7fac`
+- effective hash: `c0747f83dbe54dc8996ed1fbb2c5e0278eefe12c7be3cdf5a5f2e653150e45d6`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
@@ -1291,6 +1291,15 @@ AI が変更を加える通常作業では、git worktree を作成して別デ�
 - **軽量変更を含む AI 作業**: 例外なし。詳細は branch-rule.md 参照
 
 worktree 作成コマンドの例は `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
+
+## Worktree path
+
+Owner 2026-09-22: do not create a git worktree as a direct child of $HOME.
+
+- `git worktree add` is required for AI edits.
+- The new worktree path must not be a direct child of $HOME (forbidden example: /Users/shintaro/jtt-system-interview-document).
+- Use only the parent directory the doc already specifies. Do not invent a new parent.
+- Do not block the existing primary checkouts (~/jtt-system, ~/business/AGENT-HUB, and the other registered project roots). Block only `git worktree add` when the destination's parent is $HOME.
 
 ## いつ新規 worktree を作らなくてよいか
 
