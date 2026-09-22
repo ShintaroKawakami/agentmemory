@@ -1,9 +1,11 @@
 {
   "tool": "antigravity-sync",
-  "generated_at": "2026-09-08T07:59:18.457050+00:00",
-  "source_commit": "85378d3",
+  "generated_at": "2026-09-22T06:52:47.319027+00:00",
+  "source_commit": "6c005cf",
   "project_root": ".",
-  "generated_gemini_md": true,
+  "generated_gemini_md": false,
+  "instruction_surface": "AGENTS.md",
+  "rule_surface": ".agents/rules/AGENTS.md",
   "copied_agents": [
     "backend-architect.md",
     "backend-developer.md",
@@ -73,27 +75,7 @@
     "scripts/gemini-hook-bridge.py"
   ],
   "copied_agent_rules": [
-    "ai-model-selection.md",
-    "ai-worker-watch.md",
-    "branch-rule.md",
-    "constructive-dissent.md",
-    "gbrain-recall.md",
-    "hooks-structure-rule.md",
-    "latest-stack-context7.md",
-    "mandate-registry.md",
-    "mcp-key-management.md",
-    "memory-lookups.md",
-    "plan-approval-gate.md",
-    "plan-commitment-tracking.md",
-    "reference-over-hardcode.md",
-    "response-style.md",
-    "responsive-both-viewports.md",
-    "settings-protection-coexistence.md",
-    "sub-agent-scope-contract.md",
-    "tool-availability-resolution.md",
-    "ui-stitch-mandatory.md",
-    "visual-progress-map.md",
-    "worktree-rule.md"
+    "AGENTS.md"
   ],
   "hook_events": [
     "BeforeAgent",

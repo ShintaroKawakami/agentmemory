@@ -19,16 +19,39 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `c0747f83dbe54dc8996ed1fbb2c5e0278eefe12c7be3cdf5a5f2e653150e45d6`
+- effective hash: `a8febdeb49743ec7aecf8703d774259a340c1c3ff58e2296d3c1c1a2e4b4674e`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
-  - `claude-md` (selected_by=`global`, inheritance_id=`5da8780b1008377e`)
   - `gbrain-md` (selected_by=`global`, inheritance_id=`de26219fcac2c60c`)
-  - `gemini-md` (selected_by=`global`, inheritance_id=`d2fe0f94dbdf9274`)
 
 ### Claude Code on the web（クラウド起動指示）
 
 Claude Code on the web（`CLAUDE_CODE_REMOTE=true`）で、`.claude/skills` に AGENT-HUB の skill（例: plan-approval）が無ければ、セッション開始直後に `cd <このAGENTS.mdがあるPJのルート> && bash .claude/hooks/scripts/cloud-hub-bootstrap.sh` を実行し、終わったら元のcwdへ戻ってから作業を始める（複数PJを添付しているなら、hookを持つPJごとに1回ずつ）。AGENT-HUB を他リポと同時添付したセッションはcwdが親ディレクトリになり hook が自動発火しないため（実測2026-09-05）。取得できないと案内が出る場合は、作成画面の「＋」で ShintaroKawakami/AGENT-HUB を添付し直す。
+### 適用するハーネスルール
+
+以下は本文を読むための索引です。条件付きルールの適用範囲は参照先のfrontmatterに従います。
+
+- `.claude/rules/general/ai-model-selection.md` — 条件に該当する時だけ参照 (asset_id=`ai-model-selection` inheritance_id=`9466aa8cd58fb611`)
+- `.claude/rules/general/ai-worker-watch.md` — 常時参照 (asset_id=`ai-worker-watch` inheritance_id=`d0f860f95e9dce9c`)
+- `.claude/rules/general/branch-rule.md` — 常時参照 (asset_id=`branch-rule` inheritance_id=`f64b20f06e6b71f6`)
+- `.claude/rules/general/constructive-dissent.md` — 常時参照 (asset_id=`constructive-dissent` inheritance_id=`4922d83b15c142d6`)
+- `.claude/rules/general/gbrain-recall.md` — 常時参照 (asset_id=`gbrain-recall` inheritance_id=`d76b0c994a8ef7f4`)
+- `.claude/rules/general/hooks-structure-rule.md` — 条件に該当する時だけ参照 (asset_id=`hooks-structure-rule` inheritance_id=`47d7849e1bc9d609`)
+- `.claude/rules/general/latest-stack-context7.md` — 条件に該当する時だけ参照 (asset_id=`latest-stack-context7` inheritance_id=`6cbb121d4707f75f`)
+- `.claude/rules/general/mandate-registry.md` — 常時参照 (asset_id=`mandate-registry` inheritance_id=`373f1e4126f00846`)
+- `.claude/rules/general/mcp-key-management.md` — 常時参照 (asset_id=`mcp-key-management` inheritance_id=`a56034441d19874e`)
+- `.claude/rules/general/memory-lookups.md` — 常時参照 (asset_id=`memory-lookups` inheritance_id=`0d5b4aa7828a34bb`)
+- `.claude/rules/general/plan-approval-gate.md` — 常時参照 (asset_id=`plan-approval-gate` inheritance_id=`57a7362c64d21737`)
+- `.claude/rules/general/plan-commitment-tracking.md` — 条件に該当する時だけ参照 (asset_id=`plan-commitment-tracking` inheritance_id=`8f72268d42864cdc`)
+- `.claude/rules/general/reference-over-hardcode.md` — 条件に該当する時だけ参照 (asset_id=`reference-over-hardcode` inheritance_id=`c11ada1d33cda872`)
+- `.claude/rules/general/response-style.md` — 常時参照 (asset_id=`response-style` inheritance_id=`5a08beee858fd97d`)
+- `.claude/rules/general/responsive-both-viewports.md` — 条件に該当する時だけ参照 (asset_id=`responsive-both-viewports` inheritance_id=`f1de976176e1cfe6`)
+- `.claude/rules/general/settings-protection-coexistence.md` — 条件に該当する時だけ参照 (asset_id=`settings-protection-coexistence` inheritance_id=`b2c20a61aba97c16`)
+- `.claude/rules/general/sub-agent-scope-contract.md` — 常時参照 (asset_id=`sub-agent-scope-contract` inheritance_id=`2df0dc7f3e0e83f2`)
+- `.claude/rules/general/tool-availability-resolution.md` — 常時参照 (asset_id=`tool-availability-resolution` inheritance_id=`24858e26fca6d353`)
+- `.claude/rules/general/ui-stitch-mandatory.md` — 条件に該当する時だけ参照 (asset_id=`ui-stitch-mandatory` inheritance_id=`7c625ee9b414e7b8`)
+- `.claude/rules/general/visual-progress-map.md` — 常時参照 (asset_id=`visual-progress-map` inheritance_id=`60f192120744a171`)
+- `.claude/rules/general/worktree-rule.md` — 常時参照 (asset_id=`worktree-rule` inheritance_id=`3ac270c246d5b02e`)
 <!-- AGENT-HUB MANAGED: harness-inheritance END -->
 
 ## Project-specific instructions
