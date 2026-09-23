@@ -18,18 +18,17 @@ alwaysApply: true
 
 ## 正本
 
-- `CLAUDE.md`
-- `.claude/rules/`
 - `AGENTS.md`
+- `.claude/rules/`
 - `.claude/settings.json`
 - `.claude/hooks/`
 - `.claude/agents/`
 
 ## 運用ルール
 
-- Claude Code 側の正本を最優先で扱う
+- 選択されたプロジェクト指示ファイルと Claude Code 設定を正本として扱う
 - `.cursor/` 配下は派生物として扱う
-- `CLAUDE.md` または `.claude/rules/` に変更が入ったら、`sync-cursor-from-cc` を再実行する
+- `AGENTS.md` または `.claude/rules/` に変更が入ったら、`sync-cursor-from-cc` を再実行する
 - hooks / agents も Cursor 側で手編集せず、Claude 側ソースから再同期する
 - `.claude/commands/` と `.claude/skills/` / `.cursor/skills/` を優先して使う（AGENT-HUB 正本への symlink。dev-guardrails 必須）
 - `.cursor/rules/*.mdc` は `.claude/rules/*.md` からの生成物として扱う

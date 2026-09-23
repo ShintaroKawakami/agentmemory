@@ -34,9 +34,6 @@ fi
 
 if [ -d "$PROJECT_DIR/docs/business" ]; then
   INSTRUCTION_FILE="AGENTS.md"
-  if [ ! -f "$PROJECT_DIR/AGENTS.md" ] && [ -f "$PROJECT_DIR/CLAUDE.md" ]; then
-    INSTRUCTION_FILE="CLAUDE.md"
-  fi
   # docs/business/ が存在する場合: 3層読み込み戦略リマインダー
   cat <<REMINDER
 ⚠️ SSOT 3層読み込み戦略を実行せよ:
