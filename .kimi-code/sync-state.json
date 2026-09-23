@@ -1,8 +1,8 @@
 {
   "tool": "kimi-sync",
   "target": "kimi-code-cli",
-  "generated_at": "2026-09-19T09:14:43.990634+00:00",
-  "source_commit": "e12740e",
+  "generated_at": "2026-09-23T11:10:44.440982+00:00",
+  "source_commit": "9989fc8",
   "project_root": ".",
   "project_agents_md": ".kimi-code/AGENTS.md",
   "skills_link": "managed by sync-runtime-skills.py (manifest v2)",
@@ -56,7 +56,7 @@
     "scripts/telemetry-log.sh",
     "scripts/telemetry-log.test.sh"
   ],
-  "hook_library_version": "v3.6.44",
+  "hook_library_version": "v3.6.45",
   "hook_count": 13,
   "mcp_server_count": 9,
   "user_config_path": "${KIMI_CODE_HOME:-~/.kimi-code}/config.toml",
