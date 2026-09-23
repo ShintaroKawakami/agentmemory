@@ -55,6 +55,9 @@ def main() -> int:
         payload.get("path"),
     )
     tool_name = first_string(payload.get("tool_name"), payload.get("toolName"), payload.get("name"))
+    event_name = first_string(payload.get("hook_event_name"), payload.get("event"), payload.get("hookEventName"))
+    if event_name == "PostToolUse" and tool_name == "ReadFile":
+        tool_name = "Read"
     env["CLAUDE_TOOL_INPUT"] = json.dumps(tool_input or payload, ensure_ascii=False)
     env.setdefault("CLAUDE_TOOL_NAME", tool_name)
 
@@ -67,6 +70,11 @@ def main() -> int:
     stdin_payload_obj = {"tool_input": normalized_tool_input}
     if tool_name:
         stdin_payload_obj["tool_name"] = tool_name
+    if event_name:
+        stdin_payload_obj["hook_event_name"] = event_name
+    session_id = first_string(payload.get("session_id"), payload.get("sessionId"))
+    if session_id:
+        stdin_payload_obj["session_id"] = session_id
     if project_dir:
         stdin_payload_obj["cwd"] = project_dir
     stdin_payload = json.dumps(stdin_payload_obj, ensure_ascii=False)

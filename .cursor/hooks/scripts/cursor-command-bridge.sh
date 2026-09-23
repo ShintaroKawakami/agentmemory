@@ -91,6 +91,9 @@ except Exception:
     print(raw, end="")
     raise SystemExit(0)
 
+if not data.get("session_id") and isinstance(data.get("conversation_id"), str):
+    data["session_id"] = data["conversation_id"]
+
 EVENT_ALIASES = {
     "Stop": "stop",
     "stop": "stop",
@@ -129,7 +132,20 @@ def resolve_event(payload):
 # Pass the same command to existing Claude guards without executing its contents;
 # restrict normalization to the declared shell event, preserving Stop inference.
 shell_event = os.environ.get("CURSOR_BRIDGE_EVENT") or data.get("hook_event_name") or data.get("hookEventName")
-if shell_event == "beforeShellExecution":
+if shell_event == "beforeMCPExecution":
+    server = data.get("mcp_server_name")
+    tool = data.get("tool_name")
+    if isinstance(server, str) and isinstance(tool, str):
+        data["tool_name"] = "mcp" + "__" + server + "__" + tool
+    if isinstance(data.get("tool_input"), str):
+        try:
+            data["tool_input"] = json.loads(data["tool_input"])
+        except Exception:
+            data["tool_input"] = {}
+    event = "PreToolUse"
+elif shell_event == "postToolUse":
+    event = "PostToolUse"
+elif shell_event == "beforeShellExecution":
     command = data.get("command")
     if isinstance(command, str):
         tool_input = data.get("tool_input")
@@ -200,7 +216,7 @@ if event in ("stop", "subagentStop"):
         print(json.dumps({"followup_message": reason}, ensure_ascii=False), end="")
     else:
         print("{}", end="")
-elif event in ("preToolUse", "beforeShellExecution"):
+elif event in ("preToolUse", "beforeShellExecution", "beforeMCPExecution"):
     if event == "beforeShellExecution" and data.get("permission") in ("deny", "ask", "allow"):
         print(json.dumps(data, ensure_ascii=False), end="")
         raise SystemExit(0)
