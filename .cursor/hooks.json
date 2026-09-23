@@ -45,22 +45,22 @@
     "sessionStart": [
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/cloud-hub-bootstrap.sh\"'",
+        "command": "CURSOR_BRIDGE_EVENT=sessionStart bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/cloud-hub-bootstrap.sh\"'",
         "timeout": 180
       },
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/credit-baton-preflight.sh\"'",
+        "command": "CURSOR_BRIDGE_EVENT=sessionStart bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/credit-baton-preflight.sh\"'",
         "timeout": 5
       },
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/freshness-gate.sh\"'",
+        "command": "CURSOR_BRIDGE_EVENT=sessionStart bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/freshness-gate.sh\"'",
         "timeout": 10
       },
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/telemetry-log.sh\"'",
+        "command": "CURSOR_BRIDGE_EVENT=sessionStart bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/telemetry-log.sh\"'",
         "timeout": 5
       }
     ],
@@ -79,22 +79,22 @@
     "beforeSubmitPrompt": [
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/delegation-routing-reminder.sh\"'",
+        "command": "CURSOR_BRIDGE_EVENT=beforeSubmitPrompt bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/delegation-routing-reminder.sh\"'",
         "timeout": 5
       },
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/gbrain-recall-preflight.sh\"'",
+        "command": "CURSOR_BRIDGE_EVENT=beforeSubmitPrompt bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/gbrain-recall-preflight.sh\"'",
         "timeout": 5
       },
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/handover-preflight.sh\"'",
+        "command": "CURSOR_BRIDGE_EVENT=beforeSubmitPrompt bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/handover-preflight.sh\"'",
         "timeout": 5
       },
       {
         "type": "command",
-        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/pre-implementation-check.sh\"'",
+        "command": "CURSOR_BRIDGE_EVENT=beforeSubmitPrompt bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/pre-implementation-check.sh\"'",
         "timeout": 5
       }
     ],
