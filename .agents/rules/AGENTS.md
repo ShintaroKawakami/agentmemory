@@ -105,21 +105,29 @@ CARD 00 の話し方 → 返答・Plan・承認 → 変更・検証 → 完了�
 ## 30秒地図
 ```
 個人業務 → Mac mini Hermes
-店舗業務 → Supabase Cron
+店舗業務 → Supabase Cron（PJ ごとに登録先の Supabase が違う・下の表）
 有期ループ → loop-engineering（cronではない）
 Mac Studio に新規 cron/launchd を置かない
 ```
+
+| PJ | cron の登録先（Supabase 組織 JTT） | Hermes cron |
+|----|-----------------------------------|-------------|
+| jtt-system | `jtt-system`（ref `ptxubvyynxgbvcgqjinp`） | 禁止 |
+| jtt-cms | `jtt-storefront`（ref `hlrrehshnuaaimzvzxvt`） | 禁止 |
+
+「Supabase Cron で」と言われたら、作業中の PJ から上の表で登録先を決める。取り違えない（伸太郎さん確定 2026-09-24）。
 
 ## いつ
 定期実行・launchd・pg_cron・「毎日回す」系を新設・変更するとき。
 
 ## 何を
-1. 目的で系統を分ける（個人=Hermes / 店舗=Supabase Cron）
-2. Mac Studio に新規 cron/launchd を置かない
-3. 店舗系は日本語で「何が・間隔・前回・次回」が見える形にする
+1. 目的で系統を分ける（個人=Hermes / 店舗=Supabase Cron）。jtt-system・jtt-cms の cron は Hermes に置かない
+2. 登録先の Supabase プロジェクトを上の表で確かめる（jtt-system→jtt-system／jtt-cms→jtt-storefront）
+3. Mac Studio に新規 cron/launchd を置かない
+4. 店舗系は日本語で「何が・間隔・前回・次回」が見える形にする
 
 ## できた状態
-- 正しい系統に載っている
+- 正しい系統と、その PJ の Supabase プロジェクトに載っている
 - Studio に例外cronが増えていない（明示承認がある場合のみ例外）
 
 詳細: `skills/hermes-cron/SKILL.md` / `skills/mac-mini-ops/SKILL.md` / jtt-system cron SSOT
