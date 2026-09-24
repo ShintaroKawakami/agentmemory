@@ -117,6 +117,8 @@ Mac Studio に新規 cron/launchd を置かない
 
 「Supabase Cron で」と言われたら、作業中の PJ から上の表で登録先を決める。取り違えない（伸太郎さん確定 2026-09-24）。
 
+例外: jtt-system・jtt-cms の DB を Mac mini へ写すバックアップだけは Hermes の db-backup で行う（Supabase から Mac mini へは送れないため・伸太郎さん確定 2026-09-24・地図は skills/mac-mini-ops/references/backup-map.md）。
+
 ## いつ
 定期実行・launchd・pg_cron・「毎日回す」系を新設・変更するとき。
 
