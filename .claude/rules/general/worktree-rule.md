@@ -46,9 +46,12 @@ Owner 2026-09-22: do not create a git worktree as a direct child of $HOME.
 worktree 作成時、git 追跡外の機密ファイル（`.mcp.json` / `.env` 系）は main worktree の実体へ**自動 symlink**される（git post-checkout hook 由来）。追加操作は不要。仕組み・手動再設置手順・非破壊の詳細は
 `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
 
-## Mac mini ContextEngine mirror の自動追従
+## Mac mini ContextEngine の索引対象（2026-09-25〜）
 
-Mac Studio 側の worktree は Mac mini の ContextEngine mirror が自動追従する（対象: jtt-cms / jtt-apps / jtt-system / AGENT-HUB / hermes）。索引はミラーであり当日の新規変更は未反映のことがある。詳細・stale削除・semantic強化ジョブは
+Mac mini の ContextEngine は各 PJ の primary（main checkout）と、許可リスト
+（`~/.config/agent-hub/cbm-worktree-allowlist.json` と `--allow-worktree`）に載った worktree だけを索引する
+（対象: jtt-cms / jtt-apps / jtt-system / AGENT-HUB / hermes）。**作業中の feature worktree の差分は索引に入らない**ため、
+AI は該当ファイルを `Read` で直接読んで補う。詳細・許可リストの書式は
 `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
 
 ## branch contamination が発生した場合の復旧
