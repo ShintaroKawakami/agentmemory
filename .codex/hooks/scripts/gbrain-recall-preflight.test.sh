@@ -52,4 +52,21 @@ echo "$fix_both_output" | grep -q "catalog 探索・MCP tool 呼出しは自動�
 echo "$fix_both_output" | grep -q "tool-availability-resolution.md" \
   || fail "共通availability ruleへの参照が出ない: $fix_both_output"
 
+# --- [2026-09-26][feat] 出パンダ区分・権限リマインダー（独立 policy） ---------------------
+
+depanda_hit_output="$(run_hook "リーダーだけが使える権限にしたい")"
+echo "$depanda_hit_output" | grep -q "区分・権限の正本は出パンダ。スキル depanda-staff-roles を読んでから進める。" \
+  || fail "区分・権限プロンプトで depanda-staff-roles 案内が出ない: $depanda_hit_output"
+
+depanda_nohit_output="$(run_hook "今日は天気だけ確認")"
+[ -z "$depanda_nohit_output" ] \
+  || fail "無関係なプロンプトで depanda-staff-roles 案内が出てはいけない: $depanda_nohit_output"
+
+depanda_missing_json_output="$(DEPANDA_ROLES_POLICY_PATH=/tmp/does-not-exist-depanda-roles-policy.json run_hook "権限を変えたい")"
+[ -z "$depanda_missing_json_output" ] \
+  || fail "depanda-roles-policy.json が無い時は無言で終わるべき: $depanda_missing_json_output"
+
+echo "$fix_both_output" | grep -q "depanda-staff-roles" \
+  && fail "既存の相談・判断プロンプトで depanda-staff-roles 案内が意図せず出ている: $fix_both_output"
+
 echo "PASS: gbrain-recall-preflight"
