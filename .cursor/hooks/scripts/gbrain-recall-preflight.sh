@@ -18,6 +18,20 @@
 #   - tool availability は初期 tool 一覧の欠落を OFF と見なさず、共通 rule の証拠順序を案内する。
 # 対応: 新規 hook を追加。settings/gbrain-recall-preflight.json（Claude）と
 #   settings-codex/gbrain-recall-preflight.json（Codex）を同一 PR で追加する。
+#
+# [2026-09-26][feat] 出パンダ区分・権限リマインダーを本 hook に相乗り（伸太郎さん承認）。
+# 背景:
+#   - ユーザー依頼意図: 従業員の区分・権限・グループ分けを設計・変更する会話で、
+#     depanda-staff-roles スキル（正本は出パンダ）を思い出させたい。
+#   - 守るべき業務ルール: 発火語・案内文は hook-library/lib/depanda-roles-policy.json
+#     （新規・独立ファイル）から読む。既存 gbrain-recall-policy.json は変更しない
+#     （相談/バグ/経営の既存3パターンの挙動は変えない）。JSON が無い・壊れている場合は
+#     無言でスキップし exit 0（既存の gbrain-recall-policy.json 読込失敗時のような
+#     エラー出力はしない — 本リマインダーは付加機能のため fail-open を静かに保つ）。
+#   - 他案不採用理由: 新規スクリプト+settings配線は最小変更に反するため不採用
+#     （既存 UserPromptSubmit matcher にそのまま相乗りできる）。
+# 対応: depanda-roles-policy.json を読み、キーワード一致時に案内行を1行追加する。
+#   既存3パターンの出力・判定には触れない。
 
 set -euo pipefail
 
@@ -81,6 +95,32 @@ CONSULT_BOTH_RE = re.compile("|".join(re.escape(w) for w in CONSULT_BOTH_KEYWORD
 TECH_ONLY_RE = re.compile("|".join(re.escape(w) for w in TECH_ONLY_KEYWORDS))
 BUSINESS_ONLY_RE = re.compile("|".join(re.escape(w) for w in BUSINESS_ONLY_KEYWORDS))
 
+# [2026-09-26][feat] 出パンダ区分・権限リマインダー（独立 policy・fail-open は静かにスキップ）。
+# 台帳が無い・壊れている場合でも、既存3パターンの判定・出力には影響しない。
+_DEPANDA_POLICY_PATH = os.environ.get("DEPANDA_ROLES_POLICY_PATH") or os.path.join(
+    os.environ.get("HOOK_LIB_DIR", ""), "depanda-roles-policy.json"
+)
+def _depanda_words(policy: dict):
+    return [w for w in policy.get("keywords", ()) if isinstance(w, str) and w]
+
+
+def _depanda_reminder_text(policy: dict) -> str:
+    value = policy.get("reminder", "")
+    return value if isinstance(value, str) and value else ""
+
+
+_DEPANDA_KEYWORDS = _depanda_words({})
+_DEPANDA_REMINDER = _depanda_reminder_text({})
+try:
+    with open(_DEPANDA_POLICY_PATH, encoding="utf-8") as _df:
+        _depanda_policy = json.load(_df)
+    _DEPANDA_KEYWORDS = _depanda_words(_depanda_policy)
+    _DEPANDA_REMINDER = _depanda_reminder_text(_depanda_policy)
+except Exception:
+    pass  # missing/invalid JSON: 無言でスキップ（本リマインダーだけ機能しない）
+
+DEPANDA_ROLES_RE = re.compile("|".join(re.escape(w) for w in _DEPANDA_KEYWORDS)) if _DEPANDA_KEYWORDS else None
+
 raw = os.environ.get("HOOK_INPUT", "")
 prompt = prompt_from_payload(raw)
 forced = os.environ.get("GBRAIN_RECALL_PREFLIGHT_FORCE", "0") == "1"
@@ -88,7 +128,8 @@ forced = os.environ.get("GBRAIN_RECALL_PREFLIGHT_FORCE", "0") == "1"
 consult_both_hit = bool(CONSULT_BOTH_RE.search(prompt))
 tech_hit = bool(TECH_ONLY_RE.search(prompt))
 business_hit = bool(BUSINESS_ONLY_RE.search(prompt))
-any_hit = consult_both_hit or tech_hit or business_hit
+depanda_roles_hit = bool(DEPANDA_ROLES_RE and DEPANDA_ROLES_RE.search(prompt))
+any_hit = consult_both_hit or tech_hit or business_hit or depanda_roles_hit
 
 if not forced and not any_hit:
     raise SystemExit(0)
@@ -106,6 +147,9 @@ elif tech_hit:
 elif business_hit:
     print("- shintaro-gbrain を検索してから着手（経営相談・戦略・クレーム対応）")
     print("- jtt-gbrain（会社そのもの: 人・取引先・PJ）は AVAILABLE なら追加で見る")
+if depanda_roles_hit and _DEPANDA_REMINDER:
+    # [2026-09-26][feat] 既存3パターンと独立の追加行。他パターンの出力を変更しない。
+    print(f"- {_DEPANDA_REMINDER}")
 print("- tool availability: 初期 tool 一覧の欠落だけでは可否を決めない")
 print("- status の証拠順序: セッション catalog → 遅延 catalog → 選択状態 → runtime 実測 → 結論")
 print("- status: AVAILABLE / NOT_SELECTED / RUNTIME_UNAVAILABLE / UNPROVEN")

@@ -7,9 +7,9 @@ alwaysApply: true
 <!-- source_rule: .claude/rules/general/ai-worker-watch.md -->
 <!-- agents-md-card:start -->
 ### CARD: ai-worker-watch — 委譲後は見張りを立てる
-- **いつ**: `delegate_impl` で AI worker へ委譲したとき／PR を作って CI を待つとき
-- **何を**: 委譲・PR 作成の直後に見張りを background で1本立てる。ポーリングだけで待たない＋5分ごとに get_job_status を自分で呼び1行報告
-- **できた状態**: 終了・期限切れのどちらでも AI が自分で起きている（無言で待ち続けていない）
+- **いつ**: `delegate_impl` で AI worker へ委譲したとき／PR を作って CI を待つとき／Bash で CLI を裏起動したとき
+- **何を**: 委譲・PR 作成・CLI 裏起動の直後に見張りを background で1本立てる。ポーリングだけで待たない＋5分ごとに状態を自分で呼び1行報告
+- **できた状態**: 終了・期限切れ・ログ停止のどれでも AI が自分で起きている（無言で待ち続けていない）
 - **詳細**: `.claude/rules/general/ai-worker-watch.md`
 <!-- agents-md-card:end -->
 
@@ -52,9 +52,14 @@ MCP は job 終端時に `~/.cache/agent-hub/ai-worker-mcp/jobs/<job_id>.termina
 `delegate_impl` で委譲した直後、または `gh pr create` で PR を作った直後に、対応する見張りを
 **background で1本立てる**（絶対パスで呼ぶ。配布先 PJ の cwd からは相対パスで解決できない）。
 
+`codex exec` / `claude -p` / `gemini -p` / `opencode run` などを Bash で裏起動する時は、
+原則 `skills/agent-dispatch/scripts/direct-cli-worker-run.sh` 経由にする（stdin を閉じ、
+無出力で止める。Issue #3187）。ランナーを使えない素の裏起動だけ、ログ見張りを別に立てる。
+
 ```
 ~/business/AGENT-HUB/scripts/watch-worker-job.sh <job_id> [deadline] [worktree_path]
 ~/business/AGENT-HUB/scripts/watch-pr-checks.sh <pr_number> <owner/repo> [deadline] [interval]
+~/business/AGENT-HUB/scripts/watch-cli-log.sh --pid <pid> --log <file> [--stall 300] [--deadline 1800]
 ```
 
 PR の監視開始時の head SHA を固定し、取得前後に一致を確認する。別途開始した
@@ -103,6 +108,7 @@ PM は把握していなかった）。
 |-----------|-----------|
 | `watch-worker-job.sh` | 0=終端検知 / 2=期限切れ（未終端・状態確認へ） |
 | `watch-pr-checks.sh` | 0=固定 head の全チェックと指定 run が成功 / 1=失敗あり / 2=期限切れ / 3=状態を読めなかった / 4=チェック無し・未検証 / 5=head または run ID 不一致 / 64=引数不正 |
+| `watch-cli-log.sh` | 0=対象プロセス終了 / 2=ログが stall 秒伸びない、または期限切れ（自動では止めない） / 64=引数不正 |
 
 ## セッションが死んだ場合
 
