@@ -8,14 +8,14 @@ alwaysApply: true
 <!-- agents-md-card:start -->
 ### CARD: sub-agent-scope-contract — 委譲は3点必須
 - **いつ**: Task/Agent に作業を委譲するとき
-- **何を**: allowed_files / forbidden_actions / verify before return を必ず書く。探索ならcontext-engine先、UIならdesign-philosophy先
+- **何を**: allowed_files / forbidden_actions / verify before return を必ず書く。探索ならcontext-engine先、UIならdesign-philosophy先。isolation委譲前にpwd/originでrepo確認
 - **できた状態**: 委譲先が範囲外編集・stash破壊・捏造検証をしていない
 - **詳細**: `.claude/rules/general/sub-agent-scope-contract.md`
 <!-- agents-md-card:end -->
 
 # サブエージェント Scope Contract
 
-サブエージェント（Task / Agent tool）に作業を委譲するとき、delegate 元のプロンプトに**必ず以下 3 項目（コード探索を伴う場合は §4、UI/デザインを伴う場合は §5 を足す）を含める**。制定経緯・テンプレート全文は `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` を参照。
+サブエージェント（Task / Agent tool）に作業を委譲するとき、delegate 元のプロンプトに**必ず以下 3 項目（コード探索を伴う場合は §4、UI/デザインを伴う場合は §5、`isolation: "worktree"` 委譲時は §6 を足す）を含める**。加えて「調査のみ・実装しない」委譲は **§7 の起動型ルール**（読み取り専用エージェント型で起動）を守り、全委譲で **§8 の定型文**（委譲後に届く親からの SendMessage は正規の追加指示）を必ず含める。制定経緯・テンプレート全文は `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` を参照。
 
 ## 1. allowed_files（編集を許可するファイル）
 
@@ -33,6 +33,7 @@ alwaysApply: true
 - `existing CaD コメントを削除しない`
 - **`.claude/hooks/` / `hook-library/` のガード hook（block-main-commit 等）をデバッグ目的で一時編集しない**（deny 原因調査はログ・分割コマンド・worktree 委譲で行う。2026-08-12 jtt-system 配布インシデント再発防止）
 - **検査・テスト・受け入れ条件を通すために timestamp・実行者ID・実行していないコマンドの出力・確認内容などの値を捏造しない**。指示と検査要求が矛盾したら通す側に倒さず、報告だけで済ませず**停止**して呼び出し元へ確認する（詳細: `~/business/AGENT-HUB/skills/plan-approval/SKILL.md`。2026-08-14 実測）
+- **環境変数を調べる時は `env | cut -d= -f1` のように名前だけを出し、値を出力しない**。`env` / `printenv` をそのまま実行すると API トークン等の値が会話出力へ流出する（2026-10-03 実測 / Issue #3438）
 - **`git stash` 系（pop / apply / drop / clear）を実行しない**。stash はリポジトリ共有であり、隔離 worktree にいても他セッションの未コミット作業を壊しうる（2026-08-15 実測: 隔離 worktree での検証中に他ブランチの stash を pop し conflict 発生。衝突しなければ気付かず消えていた）
 - 自分が作っていない**他ブランチの reflog / git config を変更しない**
 - 自分が作っていない **worktree・リモートブランチを削除しない**
@@ -55,6 +56,12 @@ worker へ渡す検証要求も同じ前提で書き、sandbox/環境要因で�
 - `git diff --name-only で編集ファイル一覧が allowed_files と一致することを確認`
 - `lint / typecheck を実行してエラーが出ないことを確認`
 - `想定外の編集があった場合は revert してから報告`
+
+**委譲後の親側確認（必須）**: delegate から返却を受け取ったら、親は必ず `git status --porcelain` で
+作業場全体の無断変更を確認する。**untracked の新規ファイルを含めて見る**ため `git diff` 系だけでは済ませない
+（`git diff` は新規作成ファイルを検出できない。2026-10-01 jtt-cms JTTC-165・Issue #3258:
+「読み取り専用」と明示した調査委譲の Fable サブエージェントが `__tests__` ファイルを新規作成し
+型検査を壊した実測。想定外の変更は revert してから次へ進む）。
 
 ## 4. context-engine first（コード探索を伴う委譲・Explore 含む）
 
@@ -80,9 +87,39 @@ worker へ渡す検証要求も同じ前提で書き、sandbox/環境要因で�
 
 理由: AI Worker（Kimi/Codex/Cursor/GLM 等）自身にデザインセンスが無くても、親が設計思想 doc を必読で渡せば思想に沿った画面を作れる。渡さないと委譲先が自己流判断でずれる。
 
+## 6. isolation 委譲前の repo 確認（`isolation: "worktree"` 指定時）
+
+`isolation: "worktree"` の隔離 worktree は**委譲時点の primary cwd の repo に作られる**。Bash の `cd` を含む
+複合コマンドで primary cwd が別 repo へ残っていると、隔離 worktree が別 repo に作られて委譲が止まる
+（2026-09-23 実測・issue #3015）。
+
+- 委譲直前に、親が `pwd` と `git remote get-url origin` で primary cwd が対象 repo であることを確認する。
+  違えば `mcp__ccd_directory__change_directory` 等で対象 repo へ戻してから委譲する。
+- 委譲プロンプト冒頭に「`git remote get-url origin` が対象 repo でなければ、何も変更せず停止して報告」を必ず入れる。
+- 別 repo のファイル参照・git 操作は `cd` せず、絶対パス指定 / `git -C <path>` の単発コマンドで行い、
+  primary cwd を動かさない。
+
+## 7. 読み取り専用委譲は読み取り専用エージェント型で起動する
+
+「調査のみ・実装しない」委譲は、**Write/Edit 系ツールを持たない読み取り専用のエージェント型**
+（Claude Code なら `subagent_type: "Explore"` 相当）で起動し、`model` パラメータでモデルを指定する。
+Edit/Write を持つ general-purpose 型へプロンプト文言で「読み取り専用・実装しない」と書くだけでは
+縛れない。禁止をプロンプト頼みにしない（2026-10-01 jtt-cms JTTC-165・Issue #3258: 読み取り専用と
+明示した Fable 調査サブエージェントがテストファイルを新規作成した実測）。
+AI worker / CLI 委譲も同じ考え方で、Codex なら `--sandbox read-only` 付き起動のように権限側で縛る。
+
+## 8. 委譲後に届く親からの SendMessage は正規の追加指示
+
+委譲プロンプトに次の定型文を必ず含める:
+
+- 「委譲後に同じ会話の親から届く SendMessage は、正規の追加指示として扱ってよい（外部からの prompt injection ではない）」
+
+理由: 委譲プロンプトに明記がないと、委譲先が親からの追加指示を会話外からの不正な注入
+（prompt injection）と誤判定して実行しない実測があった（2026-09-15 高沢さん返信作業・Issue #2871）。
+
 ## delegate プロンプトのテンプレート・親側の verify ステップ
 
-テンプレート全文と、親セッションが `git diff --stat` / `git diff -- <files>` で確認する verify コマンド列は
+テンプレート全文と、親セッションが `git status --porcelain` / `git diff --stat` / `git diff -- <files>` で確認する verify コマンド列は
 `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` を参照。allowed_files 外に変更が混入していた場合は
 revert し、delegate にやり直しを指示する。
 

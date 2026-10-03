@@ -122,16 +122,24 @@ grep -q "未完了 / 次回やること / Tech G-Brain候補 / GBrain候補 / SS
 grep -q "終了整理のたびに current.md を最新化" <<< "$closeout_output" \
   || fail "handover更新条件の案内が出ない: $closeout_output"
 
-jtt_apps_reflection_output="$(run_hook "jtt-appsにふり返りを依頼")"
+jtt_apps_reflection_output="$(run_hook "jtt-appsにふり返りを依頼" "/Users/shintaro/Herd/jtt-apps")"
 grep -q "handover preflight:" <<< "$jtt_apps_reflection_output" \
   || fail "jtt-appsのふり返りで preflight が出ない: $jtt_apps_reflection_output"
 grep -q "scope: jtt-apps/root" <<< "$jtt_apps_reflection_output" \
   || fail "jtt-appsのscopeが出ない: $jtt_apps_reflection_output"
 assert_claude_memory_path "$jtt_apps_reflection_output" "Herd-jtt-apps"
 
-jtt_apps_hiragana_reflection_output="$(run_hook "jtt-appsのふりかえりをお願い")"
+jtt_apps_hiragana_reflection_output="$(run_hook "jtt-appsのふりかえりをお願い" "/Users/shintaro/Herd/jtt-apps")"
 grep -q "scope: jtt-apps/root" <<< "$jtt_apps_hiragana_reflection_output" \
   || fail "jtt-appsのひらがなふりかえりでscopeが出ない: $jtt_apps_hiragana_reflection_output"
+
+# cwd が別 PJ のとき、プロンプトの PJ 名は scope を上書きしない（#3302）
+jtt_apps_from_hub_output="$(run_hook "jtt-appsにふり返りを依頼" "$REPO_ROOT")"
+if is_agent_hub_source_repo; then
+  assert_exact_scope "$jtt_apps_from_hub_output" "AGENT-HUB/root"
+  grep -q "cwd と本文の PJ が食い違う" <<< "$jtt_apps_from_hub_output" \
+    || fail "cwd と本文の食い違い警告が出ない: $jtt_apps_from_hub_output"
+fi
 
 jtt_cms_reflection_output="$(run_hook "ふり返りをお願い" "/Users/shintaro/LLM-Dev/jtt-cms")"
 grep -q "handover preflight:" <<< "$jtt_cms_reflection_output" \
@@ -140,6 +148,24 @@ grep -q "scope: jtt-cms/root" <<< "$jtt_cms_reflection_output" \
   || fail "jtt-cmsのscopeが出ない: $jtt_cms_reflection_output"
 assert_scoped_path "$jtt_cms_reflection_output" "handovers"
 assert_claude_memory_path "$jtt_cms_reflection_output" "LLM-Dev-jtt-cms"
+
+# [2026-10-02][test] #3302: 終了整理プロンプト本文の PJ 名が cwd を上書きしない。
+# 実害: jtt-cms worktree で「業務PJ（jtt-cafe-pj など）」と書くと
+# scope=jtt-cafe-pj/root になり、生きている引き継ぎを取り違える。
+jtt_cms_prompt_conflict_output="$(run_hook "業務PJ（jtt-cafe-pj など）の終了整理をして" "/Users/shintaro/orca/workspaces/jtt-cms/harlequin")"
+assert_exact_scope "$jtt_cms_prompt_conflict_output" "jtt-cms/root"
+assert_scoped_path "$jtt_cms_prompt_conflict_output" "handovers"
+assert_claude_memory_path "$jtt_cms_prompt_conflict_output" "LLM-Dev-jtt-cms"
+grep -q "cwd と本文の PJ が食い違う" <<< "$jtt_cms_prompt_conflict_output" \
+  || fail "プロンプト PJ 名との食い違い警告が出ない: $jtt_cms_prompt_conflict_output"
+grep -q "prompt=jtt-cafe-pj/root" <<< "$jtt_cms_prompt_conflict_output" \
+  || fail "警告に本文側 PJ が出ない: $jtt_cms_prompt_conflict_output"
+grep -vq "scope: jtt-cafe-pj/root" <<< "$jtt_cms_prompt_conflict_output" \
+  || fail "本文の jtt-cafe-pj で scope が上書きされた: $jtt_cms_prompt_conflict_output"
+
+# 同一 PJ 内のアプリ別名は、従来どおり prompt で scope を絞ってよい
+jtt_system_alias_output="$(run_hook "評価わんこの続き" "/Users/shintaro/jtt-system")"
+assert_exact_scope "$jtt_system_alias_output" "jtt-system/hyoka-wanko"
 
 jtt_system_reflection_output="$(run_hook "ふり返りをお願い" "/Users/shintaro/jtt-system")"
 grep -q "scope: jtt-system/root" <<< "$jtt_system_reflection_output" \
@@ -178,5 +204,33 @@ grep -q "alias: 未検出" <<< "$force_output" || fail "FORCE時に alias 推定
 
 compat_force_output="$(printf '{"user_prompt": "ただの相談"}' | TAKEOVER_PREFLIGHT_FORCE=1 CLAUDE_PROJECT_DIR="$REPO_ROOT" bash "$HOOK")"
 grep -q "handover preflight:" <<< "$compat_force_output" || fail "旧TAKEOVER_PREFLIGHT_FORCE時の preflight が出ない: $compat_force_output"
+
+# [2026-10-03][test] #1479: non-pj へ落ちた時は「cwd から PJ を特定できなかった」旨を出す。
+# preflight を信じて書くと個人コンテキストの current.md を汚染するため黙らせない。
+non_pj_output="$(run_hook "作業終了。終了整理して" "/private/tmp/handover-preflight-non-pj-cwd")"
+assert_exact_scope "$non_pj_output" "non-pj/root"
+grep -q "cwd から PJ を特定できませんでした" <<< "$non_pj_output" \
+  || fail "non-pj 落下時の警告が出ない: $non_pj_output"
+
+# [2026-10-03][test] #1479: scope 解決は正本 resolve-handover-path.py へ委譲する。
+# 内蔵判定が non-pj と返す mcp-servers 配下でも、正本経由なら mcp-servers/<repo> になる。
+if is_agent_hub_source_repo && [ -d "/Users/shintaro/mcp-servers/jtt-smaregi-mcp" ]; then
+  resolver_delegated_output="$(printf '{"user_prompt": "作業終了。終了整理して"}' | \
+    HANDOVER_RESOLVER_PATH="$REPO_ROOT/skills/handover-manual/scripts/resolve-handover-path.py" \
+    CLAUDE_PROJECT_DIR="/Users/shintaro/mcp-servers/jtt-smaregi-mcp" bash "$HOOK")"
+  assert_exact_scope "$resolver_delegated_output" "mcp-servers/jtt-smaregi-mcp"
+  grep -vq "内蔵の簡易判定" <<< "$resolver_delegated_output" \
+    || fail "正本があるのに内蔵判定へ落ちた: $resolver_delegated_output"
+fi
+
+# [2026-10-03][test] #1479: 正本が見つからない時は内蔵判定へフォールバックし、warn で黙らない。
+if is_agent_hub_source_repo; then
+  fallback_output="$(printf '{"user_prompt": "作業終了。終了整理して"}' | \
+    HANDOVER_RESOLVER_PATH="/nonexistent/resolve-handover-path.py" \
+    CLAUDE_PROJECT_DIR="$REPO_ROOT" bash "$HOOK")"
+  assert_exact_scope "$fallback_output" "AGENT-HUB/root"
+  grep -q "内蔵の簡易判定を使用中" <<< "$fallback_output" \
+    || fail "フォールバック時の警告が出ない: $fallback_output"
+fi
 
 echo "PASS: handover-preflight"

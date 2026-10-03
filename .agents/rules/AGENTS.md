@@ -90,9 +90,16 @@ CARD 00 の話し方 → 返答・Plan・承認 → 変更・検証 → 完了�
 
 Claude Code・ローカルCodex・Kimi Code・CursorはORCAで履歴／状態を確認する。
 Devin DesktopのDevin LocalとWarp内蔵エージェントは、当面必要時のcomputer useで確認する。
-ORCAの対象はMac Studioのみ。Status MCPは呼ばない。見えない状態は不明、doneは成功とは扱わない。
+ORCAの対象はMac Studioのみ。見えない状態は不明、doneは成功とは扱わない。
 手順・対象差・証拠の扱いは `skills/agent-dispatch/references/mac-studio-observation.md` を読む。
 この観測方針はタスク送信・権限追加・Grok Botのスケジュール切替を許可しない。
+
+
+## AI作業記憶の共通契約
+
+開始・引継ぎ時に `~/business/AGENT-HUB/agent-memory/registry/placement-policy.md` の「AI作業記憶の3層契約」を読み、Hub commit・契約版・本文SHA-256・読込時刻を確認する。更新時だけ再読する。
+AgentMemoryは引継ぎ一次記録、agent-gbrainはtech（既存技術知識・教訓）とrule（Hub同版の読取専用派生）、Hubは役割・規則・スキルの正本。詳細は上記一箇所を参照し、個人shintaro-gbrainへ混載しない。
+参照だけのロード、本文読込、source認証、実保存を区別する。未接続・未読を全適用としない。agent-gbrainの本番writerは未提供であり、ローカル候補検査を保存成功と報告しない。
 
 <!-- AGENT-HUB MANAGED: global-agent-behavior END -->
 
@@ -195,6 +202,7 @@ Mac Studio に新規 cron/launchd を置かない
 | **イラストマニュアル** | 見て数秒で分かる店舗掲示のイラストセット（A4×場面数。長文手順書ではない） | `cafe-image-assistant` ＋ `chatgpt-image-creator`（語の正本: `docs/reference/illust-manual-vocabulary.md`） |
 | **モバイル操作マニュアル** | アプリ画面の操作案内。**UIモック／スクショ・キャラ禁止**（物理オペのイラスト掲示とは別型） | `app-manual-creator`（語の正本: `docs/reference/illust-manual-vocabulary.md`） |
 | **ChatGPT壁打ち**／**お金の稼ぎ方** | ChatGPT Business「お金の稼ぎ方」等での経営・個人の稼ぎ・施策の対話と、その続き・保存物。**対象 PJ は jtt-cafe-pj**（AgentMemory=jtt-cafe-pj／判断軸=shintaro-gbrain／会社の事実=jtt-gbrain）。実装前の要件整理（`brainstorm`）ではない | 語の正本: `docs/reference/kabeuchi-vocabulary.md`（PJ を聞き直さない） |
+| **シフトの仕組み（を直して）**／**シフトスキル** | 出パンダのシフトを作る・点検する・確定する仕組み全体（ルール台帳・シフト系スキル4つ・スクリプト・シフト SSOT・出パンダ本体の確定チェック）。「直して」と言われたら、地図で症状から直す場所を決め、作った所＋見逃した点検の2か所を直す | `shift-plan-html` から入り、語と地図の正本 `~/business/AGENT-HUB/docs/reference/shift-system-vocabulary.md` を先に読む |
 
 bare「マニュアル」だけでは長文 Docs・イラスト掲示・アプリ操作と混同しやすい。物理掲示かアプリ操作かを確認してから進む。
 <!-- AGENT-HUB MANAGED: global-skill-trigger-ja END -->

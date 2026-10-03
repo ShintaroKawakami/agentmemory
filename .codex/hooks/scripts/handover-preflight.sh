@@ -25,6 +25,7 @@ HOOK_INPUT="$RAW_INPUT" HOOK_LIB_DIR="$HOOK_LIB_DIR" command python3 - "$PROJECT
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -299,6 +300,62 @@ def scope_from_cwd(project: str, path: Path) -> str:
     return "root"
 
 
+# [2026-10-03][fix] #1479: scope 解決を正本 resolve-handover-path.py へ委譲する。
+# 背景:
+# - ユーザー依頼意図: preflight が PJ 内でも non-pj/root や別 PJ scope を返し、
+#   preflight を信じた closeout が別 scope の current.md へ誤保存されるのを直す。
+#   同型の再報告が #2951 / #2980 / #3278 / #3302 と続いた。
+# - 守るべき業務ルール: project / scope の判定写像は resolve-handover-path.py（正本）と一致させる。
+#   2 箇所に同じ写像を持つと片方だけ更新されて drift する（2026-08-05 CaD で DRY 化を本 Issue へ分離済み）。
+# - 他案不採用理由:
+#   1) 内蔵判定を正本へ追従更新する案: 過去 5 回 drift で再発しており、構造的に解決しないため不採用。
+#   2) hook を正本 import へ全面移行する案: 正本が見つからない環境で preflight 全体が壊れるため、
+#      正本優先・内蔵判定フォールバックの2段とした（フォールバック時は warn を出して黙らない）。
+RESOLVER_REL = Path("skills") / "handover-manual" / "scripts" / "resolve-handover-path.py"
+
+
+def candidate_resolver_paths() -> list[Path]:
+    # HANDOVER_RESOLVER_PATH が設定されていればそれだけを使う（テスト用の明示指定）。
+    env_path = os.environ.get("HANDOVER_RESOLVER_PATH", "").strip()
+    if env_path:
+        return [Path(env_path).expanduser()]
+    paths: list[Path] = []
+    for surface in (".claude", ".agents", ".cursor", ".kimi-code", ".gemini"):
+        paths.append(project_dir / surface / RESOLVER_REL)
+    paths.append(Path.home() / ".claude" / RESOLVER_REL)
+    paths.append(Path.home() / ".agents" / RESOLVER_REL)
+    paths.append(Path("/Users/shintaro/business/AGENT-HUB") / RESOLVER_REL)
+    return paths
+
+
+def resolve_scope_via_resolver(prompt: str) -> dict | None:
+    """正本 resolve-handover-path.py の `scope` サブコマンドで project/scope を解決する。
+
+    見つからない・失敗した場合は None を返し、呼び出し側が内蔵判定へフォールバックする。
+    """
+    for resolver in candidate_resolver_paths():
+        if not resolver.is_file():
+            continue
+        try:
+            result = subprocess.run(
+                [sys.executable, str(resolver), "scope", "--cwd", str(project_dir), "--prompt", prompt],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except Exception:
+            continue
+        if result.returncode != 0:
+            continue
+        try:
+            data = json.loads(result.stdout)
+        except ValueError:
+            continue
+        if isinstance(data.get("project"), str) and isinstance(data.get("scope"), str):
+            return data
+    return None
+
+
 def handover_path(project: str, scope: str) -> str:
     return str(Path.home() / ".agent-hub" / "handovers" / project / scope / "current.md")
 
@@ -334,20 +391,51 @@ def print_hint(app: dict[str, object] | None, forced: bool) -> None:
     reflection_path = "agent-memory/registry/reflection-policy.md"
     placement_path = "agent-memory/registry/placement-policy.md"
 
-    if app is not None:
-        project = str(app.get("project") or project_from_cwd(project_dir))
-        scope = str(app.get("canonical_name") or scope_from_cwd(project, project_dir))
-        display = app.get("display_name") or scope
+    # [2026-10-02][fix]
+    # 背景:
+    # - ユーザー依頼意図: jtt-cms worktree で終了整理したのに、プロンプト本文の
+    #   「jtt-cafe-pj」例示で preflight が scope=jtt-cafe-pj/root を返し、生きている
+    #   引き継ぎを取り違える（#3302）。#1479 の逆向き。
+    # - 守るべき業務ルール: scope は cwd / git root → project registry 解決を正とする。
+    #   プロンプトキーワードが別 PJ を示しても上書きしない。警告だけ出す。
+    #   同一 PJ 内のアプリ別名（評価わんこ → hyoka-wanko）は resolve-handover-path.py と同じく許可する。
+    # - 他案不採用理由: 発話を常に優先する案は説明文の PJ 名に引きずられるため不採用。
+    resolved = resolve_scope_via_resolver(prompt)
+    resolver_used = resolved is not None
+    if resolved is not None:
+        cwd_project = str(resolved["project"])
+        cwd_scope = str(resolved["scope"])
     else:
-        project = project_from_cwd(project_dir)
-        scope = scope_from_cwd(project, project_dir)
-        display = scope
+        cwd_project = project_from_cwd(project_dir)
+        cwd_scope = scope_from_cwd(cwd_project, project_dir)
+    project = cwd_project
+    scope = cwd_scope
+    display = cwd_scope
+    project_mismatch = False
+    prompt_label = ""
+
+    if app is not None:
+        prompt_project = str(app.get("project") or "")
+        prompt_scope = str(app.get("canonical_name") or "")
+        prompt_label = str(app.get("display_name") or prompt_project or prompt_scope)
+        if prompt_project and prompt_project != cwd_project:
+            project_mismatch = True
+        else:
+            if prompt_scope:
+                scope = prompt_scope
+            display = prompt_label or scope
+            app_for_memory = app
+    else:
+        app_for_memory = None
+
+    if project_mismatch:
+        app_for_memory = None
 
     print("handover preflight:")
     print(f"- scope: {project}/{scope}")
     print(f"- handover_path: {handover_path(project, scope)}")
     print(f"- legacy_path: {legacy_path(project, scope)}")
-    print(f"- claude_memory: {claude_memory_path(project, app)}")
+    print(f"- claude_memory: {claude_memory_path(project, app_for_memory)}")
     print(f"- manual: {manual_path}")
     print(f"- reflection-policy: {reflection_path}")
     print(f"- placement-policy: {placement_path}")
@@ -358,8 +446,24 @@ def print_hint(app: dict[str, object] | None, forced: bool) -> None:
     print("- closeout: 未完了 / 次回やること / Tech G-Brain候補 / GBrain候補 / SSOT昇格候補を分ける")
     print("- gbrain: 技術名・PJ固有名・短期状態は候補にせず、人間の判断原則へ抽象化")
     print("- handover_update: 終了整理のたびに current.md を最新化（未完了なしでも書く。「更新不要」は使わない）")
+    if project_mismatch:
+        prompt_project = str(app.get("project") or "?")
+        prompt_scope = str(app.get("canonical_name") or "root")
+        print(
+            f"- warn: cwd と本文の PJ が食い違う。cwd を優先"
+            f"（cwd={cwd_project}/{cwd_scope}, prompt={prompt_project}/{prompt_scope}）"
+        )
+    if project == "non-pj":
+        # [2026-10-03][fix] #1479: non-pj へ落ちた時に黙らない。
+        # preflight を信じて書くと個人コンテキストの current.md を汚染するため、
+        # 「cwd から PJ を特定できなかった」ことを明示して AI が確認できるようにする。
+        print("- warn: cwd から PJ を特定できませんでした（non-pj 扱い）。作業ディレクトリと保存先を確認してください")
+    if not resolver_used:
+        print("- warn: 正本 resolve-handover-path.py が見つかりません。内蔵の簡易判定を使用中（scope が古い判定の可能性あり）")
     if forced and app is None:
         print("- alias: 未検出。cwdから推定")
+    elif project_mismatch:
+        print(f"- app: cwd優先（本文は {prompt_label or '未検出'}）")
     elif app is not None:
         print(f"- app: {display}")
 

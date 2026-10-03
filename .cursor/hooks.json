@@ -121,6 +121,12 @@
       },
       {
         "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'python3 \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/stop-goal-check.py\"'",
+        "timeout": 15,
+        "loop_limit": 10
+      },
+      {
+        "type": "command",
         "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/telemetry-log.sh\"'",
         "timeout": 5,
         "loop_limit": 10

@@ -138,6 +138,28 @@ expect_unclassified_deny() {
   fi
 }
 
+# [2026-10-03][fix] #3103: 書込先が解決できて session cwd と別リポジトリ/別worktreeの
+#   場合は OTHER_TARGET_GIT_GUARD_MSG（別ターゲット文言）で止まることを検査する。
+#   main 文言・分類不能文言の混入も否定する（文言の3分類を固定）。
+expect_other_target_deny() {
+  local name="$1"
+  local cwd="$2"
+  local command="$3"
+  local out
+  out="$(run_hook "$cwd" "$command" 2>&1 || true)"
+  if printf '%s' "$out" | grep -q 'permissionDecision.*deny' \
+    && printf '%s' "$out" | grep -q '別リポジトリ/別worktree' \
+    && ! printf '%s' "$out" | grep -q 'mainブランチへの直接コミット/プッシュはブロックされました' \
+    && ! printf '%s' "$out" | grep -q '書込先を安全に証明できない' \
+    && ! printf '%s' "$out" | grep -q 'third-party upstream への書込みは禁止'; then
+    printf '[PASS] %s\n' "$name"
+    PASS=$((PASS + 1))
+  else
+    printf '[FAIL] %s: %s\n' "$name" "$out"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 export HOME="$tmp/home"
@@ -632,10 +654,19 @@ expect_allow \
 # このケースが検証しているのは「refspec に `:` を含むため has_unsafe_push が unsafe 判定し、
 # 書込先(-C先)自体は解決できている（＝分類不能ではない）ので main 文言のまま止まる」こと。
 # アサーション・コマンドは変更せず、名前だけ実体に合わせて修正した。
-expect_main_branch_deny \
-  "④ -C 経由 push の : 付き refspec は unsafe 判定で main 文言のまま拒否" \
+# [2026-10-03][fix] #3103: 書込先が別リポジトリと解決できた unsafe push は、
+#   作業場所のずれが分かる別ターゲット文言(OTHER_TARGET_GIT_GUARD_MSG)へ切り替わった。
+expect_other_target_deny \
+  "④ -C 経由 push の : 付き refspec は unsafe 判定で別ターゲット文言で拒否" \
   "$main_repo" \
   "git -C $feature_repo push origin HEAD:refs/heads/feature/x"
+
+# [2026-10-03][test] #3103: -C 先が session cwd と同一リポジトリなら、別ターゲット文言ではなく
+#   従来どおり main 文言で止まることを固定する（cwd ずれ無し＝文言切替条件を満たさない）。
+expect_main_branch_deny \
+  "④同一repo -C 経由 push の : 付き refspec は main 文言のまま拒否" \
+  "$main_repo" \
+  "git -C $main_repo push origin HEAD:refs/heads/feature/x"
 
 # [2026-08-27][test] ④に対応する「本当に main 宛ての colon refspec」ケースを追加。
 # 背景: 上の④は push 先が feature/x（main ではない）で、colon 付き refspec というだけで
@@ -788,6 +819,43 @@ expect_block \
   "GIT_CONFIG環境上書きpushは拒否" \
   "$feature_repo" \
   "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=remote.origin.pushurl GIT_CONFIG_VALUE_0=git@github.com:ThirdParty/feature.git git push origin feature/test"
+
+# [2026-10-03][test] issue #3239: 無害 GIT_CONFIG_* 環境（Claude Code が常駐させる
+# credential.interactive / credential.guiPrompt）で、feature worktree からの正当な
+# origin 宛 push が「cannot prove Git push target ... GIT_CONFIG_* environment」で
+# 止まらないこと。緩和は厳格な単純形だけなので、cd 前置き（literal + `&&`・1回）と
+# remote 省略は通し、宛先すり替え経路・複合形・third-party cd 先は従来どおり拒否する。
+GIT_CONFIG_COUNT=2
+GIT_CONFIG_KEY_0=credential.interactive
+GIT_CONFIG_VALUE_0=never
+GIT_CONFIG_KEY_1=credential.guiPrompt
+GIT_CONFIG_VALUE_1=false
+export GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1
+expect_allow \
+  "無害GIT_CONFIG環境のfeature pushは許可" \
+  "$feature_repo" \
+  "git push origin feature/test"
+expect_allow \
+  "無害GIT_CONFIG環境のcd前置きpushは許可" \
+  "$main_repo" \
+  "cd $feature_repo && git push origin feature/test"
+expect_allow \
+  "無害GIT_CONFIG環境のremote省略pushは許可" \
+  "$feature_repo" \
+  "git push"
+expect_block \
+  "無害GIT_CONFIG環境でもcd先third-party pushは拒否" \
+  "$feature_repo" \
+  "cd $third_party_repo && git push origin feature/test"
+expect_block \
+  "無害GIT_CONFIG環境でもcd前置きのpush option付きは拒否" \
+  "$feature_repo" \
+  "cd $feature_repo && git push -o ci.skip origin feature/test"
+expect_block \
+  "無害GIT_CONFIG環境でもcdの;区切りpushは拒否" \
+  "$main_repo" \
+  "cd $feature_repo; git push origin feature/test"
+unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1
 
 expect_block \
   "git global option経由のthird-party pushは拒否" \
@@ -1276,6 +1344,47 @@ else
   printf '[FAIL] %s: %s\n' "HOME直下拒否の理由は1行で禁止例を含む" "$home_child_out"
   FAIL=$((FAIL + 1))
 fi
+
+# [2026-10-03][test] issue #2897: 書込み系を1つも含まない複合コマンドの誤拒否を回帰固定。
+# 背景:
+#   - ユーザー依頼意図: `cd <repo> && cat f | head && git worktree list | grep x` が
+#     「conditional or piped cd」で、`gh issue list --search "... python3 ..."` が
+#     「opaque runtime payload」で誤拒否され、調査コマンドの都度分割を強いられていた。
+#   - 守るべき業務ルール: deny 側（書込みを含む piped cd 複合、opaque payload 内の
+#     write 言及、変数間接指定）は従来どおり fail-closed を維持する。
+#   - 他案不採用理由: 許可側だけのテストでは、将来早期許可を緩めたときに deny 回帰を
+#     検知できないため不採用（許可・拒否を対で置く）。
+expect_allow \
+  "read-only 複合（cd + cat|head + echo + git worktree list|grep）は許可" \
+  "$feature_repo" \
+  "cd $feature_repo && cat README.md | head -30 && echo \"===worktrees===\" && git worktree list | grep -i repo"
+
+expect_allow \
+  "gh issue list の --search 文字列内の python3 語は許可" \
+  "$feature_repo" \
+  'gh issue list --repo example/repo --search "block-main-commit python3 unresolved command wrapper" --state all --limit 20'
+
+expect_allow \
+  "read-only gh の後ろのスクリプト実行（ペイロードに write 言及なし）は許可" \
+  "$feature_repo" \
+  "gh issue list && python3 analyze.py"
+
+expect_allow \
+  "gh --version 等の書込みえない gh は許可" \
+  "$feature_repo" \
+  "gh --version"
+
+expect_unclassified_deny \
+  "read-only 複合に混ざった piped push は従来どおり拒否" \
+  "$feature_repo" \
+  "cd $feature_repo && git status | head -1 && git push origin feature/test | tail -1" \
+  "across conditional or piped cd"
+
+expect_unclassified_deny \
+  "eval 経由の push は証明不能として拒否" \
+  "$feature_repo" \
+  'eval "git push origin feature/test"' \
+  "through eval"
 
 TOTAL=$((PASS + FAIL))
 printf '\n=== block-main-commit.test.sh: %d/%d PASS ===\n' "$PASS" "$TOTAL"
