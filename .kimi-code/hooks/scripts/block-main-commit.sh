@@ -392,6 +392,19 @@ _emit_deny_with_telemetry() {
 
 DENY_MSG='[hook:block-main-commit] mainブランチへの直接コミット/プッシュはブロックされました。\n\n対応手順:\n1. git checkout -b feature/xxx でブランチを作成\n2. ブランチ上でコミット\n3. gh pr create でPRを作成\n\n理由: mainマージ = 本番DB自動適用 + 本番デプロイが即座に発動するため、レビューなしの変更は禁止です。'
 
+# [2026-10-03][fix] Issue #3103: 書込先が「別リポジトリ/別worktree」と解決できたのに
+# main 文言(DENY_MSG)で止まる誤誘導を直す。
+# 背景:
+#   - 依頼意図: セッションの作業場所が別リポジトリの main に残ったまま
+#     `git -C <worktree> push origin <branch>:refs/heads/wip/...` を投げると、
+#     colon refspec は main 波及を静的に否定できず unsafe 判定→最終 deny へ進み、
+#     実際は feature 宛てでも「main 直接 push」文言で止まっていた（jtt-apps 9a7c2e83 実害）。
+#   - 守るべき業務ルール: 止める条件・許可条件は変えない（文言だけ）。書込先が解決できて
+#     session cwd と別リポジトリ/別worktree のときは、別ターゲット文言で
+#     「cwd がずれている」ことが分かるメッセージにする。
+#   - 他案不採用理由: colon refspec を通す案は main 保護を弱めるため不採用（issue の捨て案）。
+OTHER_TARGET_GIT_GUARD_MSG='[hook:block-main-commit] 書込先は別リポジトリ/別worktreeですが、そのブランチが main、または書込が main へ波及しないことを安全に証明できないため停止しました。\n\n対応手順:\n1. 書込先の worktree/リポジトリへ作業場所を移してから、単一の非mainブランチ名だけを指定して commit/push する（src:dst・wildcard・複数 ref・値を取るオプションは証明不能として拒否）\n2. AI worker の未PRブランチを GitHub へ退避する場合は、ai-worker MCP の push_branch_backup(job_id) を使う（refs/heads/wip/ へ安全に push する正式経路）\n\n理由: セッションの作業場所が main のまま別リポジトリ/別worktreeへ書き込むコマンドは、main への波及を静的に否定できない限り拒否します（mainマージ = 本番DB自動適用 + 本番デプロイ）。'
+
 read_stdin
 COMMAND=$(extract_field command)
 
@@ -1703,7 +1716,12 @@ if [ "$BRANCH" = "main" ]; then
   #        必ず初期化してから判定する。
   # 対応: `unresolved_git_target` をブロック手前で 0 初期化し、3 つの解決結果が全て空のときだけ 1 を立てる。
   #   最終 deny はこのフラグだけで DENY_MSG / UNCLASSIFIED_GIT_GUARD_MSG を振り分ける。
+  # [2026-10-03][fix] #3103: `resolved_eff_dir` も同じくブロック手前で空初期化する
+  #   （set -u 下で unset 参照によるクラッシュを防ぐ）。解決できた dir が
+  #   session cwd と別リポジトリ/別worktree のときだけ最終 deny を
+  #   OTHER_TARGET_GIT_GUARD_MSG へ振り分ける。
   unresolved_git_target=0
+  resolved_eff_dir=""
   if command_targets_other_dir; then
     eff_dir_a="$(effective_target_dir)"
     if [ -n "$eff_dir_a" ]; then
@@ -1726,6 +1744,7 @@ if [ "$BRANCH" = "main" ]; then
         exit 0  # 同一 -C 先への add && commit 等の複合（issue #1672）
       fi
     fi
+    resolved_eff_dir="${eff_dir_a:-${eff_dir_b:-${eff_dir_c:-}}}"
     if [ -z "$eff_dir_a" ] && [ -z "$eff_dir_b" ] && [ -z "$eff_dir_c" ]; then
       unresolved_git_target=1  # 3関数とも解決不能＝真に書込先を証明できなかった（パイプ等）
     fi
@@ -1743,6 +1762,16 @@ if [ "$BRANCH" = "main" ]; then
     #   従来どおり main 保護の DENY_MSG。
     if [ "$unresolved_git_target" = "1" ]; then
       _emit_deny_with_telemetry "$UNCLASSIFIED_GIT_GUARD_MSG\n\n検出理由: cannot prove -C/cd write target through piped or compound command"
+    fi
+    # [2026-10-03][fix] #3103: 書込先は解決できたが session cwd とは別リポジトリ/別worktreeの
+    #   場合（cwd ずれ・colon refspec 等で unsafe 判定・-C 先が main）は main 文言を使わず、
+    #   作業場所のずれが分かる別ターゲット文言で止める。許可/拒否の条件は不変。
+    if [ -n "$resolved_eff_dir" ]; then
+      target_top="$(git -C "$resolved_eff_dir" rev-parse --show-toplevel 2>/dev/null || true)"
+      cwd_top="$(git -C "$CWD" rev-parse --show-toplevel 2>/dev/null || true)"
+      if [ -n "$target_top" ] && [ -n "$cwd_top" ] && [ "$target_top" != "$cwd_top" ]; then
+        _emit_deny_with_telemetry "$OTHER_TARGET_GIT_GUARD_MSG\n\n書込先: ${target_top}\nセッション cwd: ${cwd_top}"
+      fi
     fi
     _emit_deny_with_telemetry "$DENY_MSG"
   fi

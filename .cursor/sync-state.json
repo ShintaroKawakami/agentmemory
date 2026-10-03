@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-09-30T16:26:45.126765+00:00",
-  "source_commit": "a7aa5b33865f857f66806895e88d07d4dd9e6e1e",
+  "generated_at": "2026-10-03T19:31:15.751598+00:00",
+  "source_commit": "2f46450f9a3571089c274301c059ac25b57851bd",
   "source_rule_files": [
     ".claude/rules/general/ai-model-selection.md",
     ".claude/rules/general/ai-worker-watch.md",
@@ -66,6 +66,9 @@
     ".claude/hooks/scripts/post-merge-gate.sh",
     ".claude/hooks/scripts/post-merge-gate.test.sh",
     ".claude/hooks/scripts/pre-implementation-check.sh",
+    ".claude/hooks/scripts/stop-goal-check.py",
+    ".claude/hooks/scripts/stop-goal-check.test.py",
+    ".claude/hooks/scripts/stop-goal-check.test.sh",
     ".claude/hooks/scripts/stop-quality-check.sh",
     ".claude/hooks/scripts/storage-url-pr-gate.sh",
     ".claude/hooks/scripts/subagent-quality-check.sh",
@@ -157,6 +160,9 @@
     ".cursor/hooks/scripts/post-merge-gate.sh",
     ".cursor/hooks/scripts/post-merge-gate.test.sh",
     ".cursor/hooks/scripts/pre-implementation-check.sh",
+    ".cursor/hooks/scripts/stop-goal-check.py",
+    ".cursor/hooks/scripts/stop-goal-check.test.py",
+    ".cursor/hooks/scripts/stop-goal-check.test.sh",
     ".cursor/hooks/scripts/stop-quality-check.sh",
     ".cursor/hooks/scripts/storage-url-pr-gate.sh",
     ".cursor/hooks/scripts/subagent-quality-check.sh",
@@ -186,6 +192,7 @@
     ".cursor/skills/agent-dispatch",
     ".cursor/skills/agentmemory-routing",
     ".cursor/skills/ai-project-rules",
+    ".cursor/skills/app-icon-creator",
     ".cursor/skills/aside-ops",
     ".cursor/skills/avoid-ai-writing",
     ".cursor/skills/avoid-ai-writing-ja",
@@ -204,6 +211,7 @@
     ".cursor/skills/mcp-dev-kit",
     ".cursor/skills/natural-japanese",
     ".cursor/skills/new-project",
+    ".cursor/skills/owner-omitted-principles",
     ".cursor/skills/plan-approval",
     ".cursor/skills/post-merge",
     ".cursor/skills/project-prompt-review",
@@ -211,7 +219,9 @@
     ".cursor/skills/skill-audit",
     ".cursor/skills/skill-doctor",
     ".cursor/skills/skill-doctor-ja",
-    ".cursor/skills/slide-deck"
+    ".cursor/skills/slide-deck",
+    ".cursor/skills/timebound-physical-feasibility",
+    ".cursor/skills/verify-to-release"
   ],
   "generated_environment_files": [
     ".cursor/environment.json"
