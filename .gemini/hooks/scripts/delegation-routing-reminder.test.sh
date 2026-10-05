@@ -52,6 +52,8 @@ TMP_PROJECT="$(mktemp -d)"
 CACHE_DIR="$TMP_PROJECT/runtime-cache"
 trap 'rm -rf "$TMP_PROJECT"' EXIT
 export DELEGATION_REMINDER_CACHE_DIR="$CACHE_DIR"
+# [2026-10-05][test] 生成コピー（.codex/hooks 配下）から走っても既定は Claude 経路で検証する。
+export AGENT_HUB_HOOK_CLIENT=claude
 mkdir -p "$CACHE_DIR"
 
 fail() {
@@ -738,5 +740,18 @@ set -e
 echo "$fb_missing_output" | grep -q "三役体制" || fail "Test 35: agents.yaml が完全に無くても従来文言は出るべき: $fb_missing_output"
 echo "$fb_missing_output" | grep -q "Claude 週次" && fail "Test 35: agents.yaml が完全に無いのに残量文言が出てしまう: $fb_missing_output" || true
 rm -rf "$FB_TMP2"
+
+# ===== [2026-10-05][test] Codex では「今回の終わり」を出し「三役体制」を出さない =====
+# 36) Codex 扱い（AGENT_HUB_HOOK_CLIENT=codex）で「直して」→ 今回の終わり。三役体制は出ない。
+#     同一セッションでも HIT のたびに出る（依頼ごとに終わりを決めさせるため）。
+for n in 1 2; do
+  codex_out="$(run_hook_env "$(payload "これを直して" "sess-codex-finish")" env AGENT_HUB_HOOK_CLIENT=codex 2>&1)"
+  echo "$codex_out" | grep -q "今回の終わり" || fail "Test 36($n): Codex で「今回の終わり」が出ない: $codex_out"
+  echo "$codex_out" | grep -q "三役体制" && fail "Test 36($n): Codex で「三役体制」が出てしまう: $codex_out" || true
+done
+# 37) Codex 以外では従来どおり「三役体制」が出て、「今回の終わり」は出ない。
+claude_out="$(run_hook_env "$(payload "これを直して" "sess-claude-finish")" env AGENT_HUB_HOOK_CLIENT=claude 2>&1)"
+echo "$claude_out" | grep -q "三役体制" || fail "Test 37: Claude で「三役体制」が出ない: $claude_out"
+echo "$claude_out" | grep -q "今回の終わり" && fail "Test 37: Claude で「今回の終わり」が出てしまう: $claude_out" || true
 
 echo "PASS: delegation-routing-reminder"
