@@ -1,7 +1,7 @@
 <!-- agents-md-card:start -->
 ### CARD: sub-agent-scope-contract — 委譲は3点必須
 - **いつ**: Task/Agent に作業を委譲するとき
-- **何を**: allowed_files / forbidden_actions / verify before return を必ず書く。探索ならcontext-engine先、UIならdesign-philosophy先。isolation委譲前にpwd/originでrepo確認
+- **何を**: 冒頭に「今回の終わり」1行＋allowed_files / forbidden_actions / verify before return を必ず書く。探索ならcontext-engine先、UIならdesign-philosophy先。isolation委譲前にpwd/originでrepo確認
 - **できた状態**: 委譲先が範囲外編集・stash破壊・捏造検証をしていない
 - **詳細**: `.claude/rules/general/sub-agent-scope-contract.md`
 <!-- agents-md-card:end -->
@@ -111,6 +111,11 @@ AI worker / CLI 委譲も同じ考え方で、Codex なら `--sandbox read-only`
 
 理由: 委譲プロンプトに明記がないと、委譲先が親からの追加指示を会話外からの不正な注入
 （prompt injection）と誤判定して実行しない実測があった（2026-09-15 高沢さん返信作業・Issue #2871）。
+
+## 9. 委譲の文には『今回の終わり』を1行書く
+
+- 委譲プロンプトの冒頭に「今回の終わり：〜」を1行書く。
+- verify before return は、その終わりを確かめるのに必要な分だけにする。
 
 ## delegate プロンプトのテンプレート・親側の verify ステップ
 
