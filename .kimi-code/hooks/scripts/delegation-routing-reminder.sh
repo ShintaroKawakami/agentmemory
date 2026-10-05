@@ -90,6 +90,27 @@
 #   取得して、warn/strong の帯に応じた文言を既存メッセージに追記する。
 #   マーカーは $CACHE_DIR/$DATE_HASH-tier で日付+閾値帯単位スロットルする。
 
+# [2026-10-05][fix] Codex では「三役体制」文言の代わりに「今回の終わり」1行を出す
+# 背景:
+#   - ユーザー依頼意図: Codex に「直して」と頼むと、Claude 向けの「PM本体のinline実装は原則禁止」
+#     が Codex にも注入され、Codex 憲法（小さな修正は自分でやってよい）と矛盾して作業範囲が
+#     広がる一因になっていた（オーナー承認 2026-10-05）。
+#   - 守るべき業務ルール: Claude 側の出力は1文字も変えない。hook の本数も増やさない。
+#     Codex 判定はスクリプト自身のパスに /.codex/hooks/ を含むか、または
+#     AGENT_HUB_HOOK_CLIENT=codex（テスト用上書き）。クレジット行は従来どおり残す。
+#   - 他案不採用理由: Codex 専用の別 hook を足す案は、hook 本数が増え配布・台帳登録が
+#     重くなるため不採用。Codex では依頼ごとに「終わり」を決めさせたいので、セッション1回
+#     スロットルにせず HIT のたびに出す。
+#     AGENT_HUB_HOOK_CLIENT が設定されていればパス判定より優先する（生成コピーの test が
+#     .codex 配下から走っても Claude 経路を検証できるようにするため）。
+IS_CODEX=0
+case "${BASH_SOURCE[0]}" in
+  */.codex/hooks/*|.codex/hooks/*) IS_CODEX=1 ;;
+esac
+if [ -n "${AGENT_HUB_HOOK_CLIENT:-}" ]; then
+  [ "$AGENT_HUB_HOOK_CLIENT" = "codex" ] && IS_CODEX=1 || IS_CODEX=0
+fi
+
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -926,7 +947,13 @@ emit_daily_credit_line_once() {
 # 実装意図キーワード検知（HIT）。セッション ID が取れない場合はスロットルできないため、
 # その場で1回だけ出して抜ける（マーカーは書かない。次回プロンプトでも同じ判定になり得るが
 # 非ブロックなので実害は小さい）。
-if [ "$HIT" = "1" ]; then
+if [ "$HIT" = "1" ] && [ "$IS_CODEX" = "1" ]; then
+  cat <<'MSG'
+今回の終わり: 返答の最初の1行に「今回の終わり：〜」を書き、そこまでできたら「終わり」と言って止まってください。「直して」なら、その不具合が直ったら終わりです。周りの改善や再発防止は、頼まれた時だけで大丈夫です。
+MSG
+  emit_credit_line_once
+  emit_daily_credit_line_once
+elif [ "$HIT" = "1" ]; then
   if [ -z "$SESSION_HASH" ]; then
     cat <<'MSG'
 【三役体制】着手前に委譲判定を1行宣言してから進めること: ①10分未満の小修正/ガバナンス領域/対話型ブラウザ軽作業(claude-in-chrome)→Claudeサブエージェント内製（ブラウザは sonnet 第一候補・Fable直禁止） ②まとまった実装・並列・大量読み→AI worker（agent-dispatch） ③調査: 小=context-engine直・中大=参謀Kimi ④緊急時のみ利用者の明示指示でPM直実装（解消後は委譲へ自動復帰）。PM本体のinline実装は原則禁止。
@@ -949,7 +976,7 @@ fi
 
 # [2026-08-11][feat] Fable 大量読み継続検知（HEAVYHIT）。HIT とは独立の判定・独立のマーカーで
 # セッション1回スロットルする（同一プロンプトで両方出ることもあれば片方だけのこともある）。
-if [ "$HEAVY_HIT" = "1" ]; then
+if [ "$HEAVY_HIT" = "1" ] && [ "$IS_CODEX" != "1" ]; then
   if [ -z "$SESSION_HASH" ]; then
     cat <<'MSG'
 【三役体制】大量読みが続いています。参謀 Kimi / worker への委譲を検討してください。

@@ -69,5 +69,7 @@ AI セッション（cwd=main）から既存の feature worktree へ移る場合
 
 対象 worktree そのものの作成と cleanup は `git -C <repo> worktree add` / `git worktree remove` 等の単発コマンドで行い、この経路でも main checkout・他セッションの worktree・削除系 action の自動化禁止は同じく守る。
 
+隔離 worktree セッション内から共有 checkout の read-only 確認（終了整理の各PJ clean / branch 機械確認など）が必要な場合は、`git -C` が本体ガードに拒否されるため `bash ~/business/AGENT-HUB/scripts/pj-clean-check.sh <checkoutパス>...`（`--all` で全PJ）を使う（Issue #1511）。書き込み系を同じ方式で潜らせることは禁止。
+
 サブエージェントの worktree が古いベース（origin/main 以前）から切られる問題への対処、外側隔離 worktree の残存・cleanup 手順、fallback・session lifecycle・merge-pr.py headRefOid 要件の実測経緯は
 `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。

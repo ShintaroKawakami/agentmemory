@@ -68,7 +68,7 @@ block-main-commit hook は cwd 変更を伴う複合コマンドでの main 直 
 2. isolation 指定ができない場合のみ、GitHub API / connector で remote feature branch commit → PR → CI → merge の fallback を使う（main 直更新は禁止のまま）。
 3. commit/push を含まない操作（`git add` / `git status` / `gh pr create` 等）はメインセッションから直接 `cd <worktree> && ...` してよい。
 4. hook 検査を `bash -c` 等で素通りさせる回避は**禁止**。
-5. **`skills/post-merge/scripts/merge-pr.py` は実行元 HEAD が対象 PR の `headRefOid` と一致することを要求する**（不一致は fail-closed でマージ拒否）。**対象 PR の worktree を cwd にして実行する**こと。main checkout や別 PR の worktree からは実行できない（2026-08-18 実測）。
+5. **`skills/post-merge/scripts/merge-pr.py` は実行元 HEAD が対象 PR の `headRefOid` と一致することを要求する**（不一致は fail-closed でマージ拒否）。**対象 PR の worktree を cwd にして実行する**こと。main checkout や別 PR の worktree からは実行できない（2026-08-18 実測）。**2 の API fallback で作った PR はローカルにブランチが無い**ため、マージ時に `git -C <repo> fetch origin <branch>` → `git -C <repo> worktree add <dir> <branch>` で専用 worktree を用意してから実行する。隔離セッション自身が worktree add を実行できない場合はサブエージェントへ委譲する（Issue #1508・2026-08-07 実測）。
 6. **isolation:worktree サブエージェント等が「他の commit を対象 PR worktree へ取り込んで push」する時の正規手順**: 対象 worktree を cwd にして `git merge --ff-only <commit>`（worktree はオブジェクトを共有するため fetch 不要）→ その cwd から plain `git push origin HEAD:<branch>` を実行する。**`-C` 越しの push にしない**。main cwd からの `git -C <worktree> push origin HEAD:<branch>`（src:dst refspec）は書込先を証明できず拒否される（Issue #2870・2026-09-15 実測。third-party 誤判定を避ける条件と実測一覧は `~/business/AGENT-HUB/docs/worktree-operations.md`）。
 
 <!-- [2026-08-31][fix]
