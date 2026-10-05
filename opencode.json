@@ -36,28 +36,6 @@
         "X-API-Key": "{env:CODEBASE_CONTEXT_ENGINE_MCP_API_KEY}"
       }
     },
-    "jtt-gbrain": {
-      "type": "local",
-      "enabled": true,
-      "command": [
-        "/bin/bash",
-        "/Users/shintaro/business/AGENT-HUB/scripts/gbrain-mcp-preregistered-client.sh",
-        "https://gbrain-mcp.jtt.cafe/mcp",
-        "GBRAIN_MCP_CLIENT_ID_JTT",
-        "GBRAIN_MCP_CLIENT_SECRET_JTT"
-      ]
-    },
-    "my-gbrain": {
-      "type": "local",
-      "enabled": true,
-      "command": [
-        "/bin/bash",
-        "/Users/shintaro/business/AGENT-HUB/scripts/gbrain-mcp-preregistered-client.sh",
-        "https://gbrain-mcp.jtt.cafe/mcp",
-        "GBRAIN_MCP_CLIENT_ID_MYGBRAIN_SHINTARO",
-        "GBRAIN_MCP_CLIENT_SECRET_MYGBRAIN_SHINTARO"
-      ]
-    },
     "stitch": {
       "type": "remote",
       "enabled": true,
