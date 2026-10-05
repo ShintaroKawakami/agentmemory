@@ -334,6 +334,84 @@ def differing_resolver_paths(used: Path) -> list[Path]:
     return differs
 
 
+# [2026-10-05][fix] #1516: 停滞したローカル main が hook / PJ別条項台帳を古い版で供給する問題の可視化。
+# 背景:
+# - ユーザー依頼意図: 共有 checkout 非占有ルールで AI は共有 main を pull しないため、
+#   local main の停滞は設計上の既定状態。実行時に読む harness 資産が古いまま供給され、
+#   「直した」と「実行時に届いている」の差を検知する仕組みが無かった。
+# - 守るべき業務ルール: 検知はキャッシュ済み remote ref のみで行い network アクセスしない。
+# - 他案不採用理由: working tree ではなく origin/main から全資産を読む案は、hook 自身を含む
+#   全読み取り経路の書き換えが必要で最小修正でないため不採用（台帳の読み取り経路是正は
+#   render-commitment-ledger.py 側で別途実施）。
+AGENT_HUB_CHECKOUT = Path("/Users/shintaro/business/AGENT-HUB")
+
+
+def _git_stdout(repo: Path, *args: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo), *args],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return None
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def local_main_staleness(repo: Path) -> tuple[str, str, int] | None:
+    """(ローカル既定ブランチ名, origin 側 ref, 遅れコミット数)。判定不能・遅れなしは None。
+
+    HEAD ではなくローカル既定ブランチと origin の差を見る。worktree セッションでは
+    HEAD は作業ブランチのため HEAD..origin/main は「遅れ」を正しく測れない。
+    """
+    default_ref = _git_stdout(
+        repo, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"
+    )
+    if default_ref and default_ref.startswith("origin/"):
+        local = default_ref[len("origin/"):]
+    else:
+        local = "main"
+        default_ref = "origin/main"
+    count = _git_stdout(repo, "rev-list", "--count", f"{local}..{default_ref}")
+    if count is None:
+        return None
+    try:
+        behind = int(count)
+    except ValueError:
+        return None
+    if behind <= 0:
+        return None
+    return local, default_ref, behind
+
+
+def stale_checkout_warnings() -> list[str]:
+    """cwd の repo と AGENT-HUB canonical checkout の local main 停滞を warn する。
+
+    配布先 PJ の main が最新でも、配布元の AGENT-HUB checkout が古ければ
+    hook / skill / 条項台帳は古い版が供給されるため、両方を見る。
+    """
+    warnings: list[str] = []
+    seen: set[str] = set()
+    for repo in (project_dir, AGENT_HUB_CHECKOUT):
+        try:
+            key = str(repo.resolve())
+        except OSError:
+            key = str(repo)
+        if key in seen:
+            continue
+        seen.add(key)
+        stale = local_main_staleness(repo)
+        if stale is None:
+            continue
+        branch, remote_ref, behind = stale
+        warnings.append(
+            f"- warn: {key} のローカル {branch} は {remote_ref} より {behind} コミット遅れています。"
+            " hook / rule / PJ別条項台帳が古い版で供給されている可能性があります（Issue #1516）"
+        )
+    return warnings
+
+
 def handover_path(project: str, scope: str) -> str:
     return str(Path.home() / ".agent-hub" / "handovers" / project / scope / "current.md")
 
@@ -430,6 +508,8 @@ def print_hint(app: dict[str, object] | None, forced: bool) -> None:
     print("- closeout: 未完了 / 次回やること / Tech G-Brain候補 / GBrain候補 / SSOT昇格候補を分ける")
     print("- gbrain: 技術名・PJ固有名・短期状態は候補にせず、人間の判断原則へ抽象化")
     print("- handover_update: 終了整理のたびに current.md を最新化（未完了なしでも書く。「更新不要」は使わない）")
+    for stale_line in stale_checkout_warnings():
+        print(stale_line)
     if project_mismatch:
         prompt_project = str(app.get("project") or "?")
         prompt_scope = str(app.get("canonical_name") or "root")

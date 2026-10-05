@@ -285,4 +285,31 @@ grep -q "別候補の resolver と内容が異なります" <<< "$drift_output" 
   || fail "resolver 版ずれの自己申告が出ない: $drift_output"
 rm -rf "$drift_dir"
 
+# [2026-10-05][test] #1516: ローカル main が origin/main より遅れている repo では
+# 「hook / 条項台帳が古い可能性」の警告を出す（キャッシュ済み ref のみ・network 不要）。
+# hook は project_dir を Path.resolve() するので、比較は realpath 済みパスで行う。
+stale_dir="$(mktemp -d)"
+git -C "$stale_dir" init -b main >/dev/null
+git -C "$stale_dir" -c user.email=test@example.com -c user.name=test commit --allow-empty -m v1 >/dev/null
+git -C "$stale_dir" -c user.email=test@example.com -c user.name=test commit --allow-empty -m v2 >/dev/null
+git -C "$stale_dir" update-ref refs/remotes/origin/main HEAD
+git -C "$stale_dir" reset --hard HEAD~1 >/dev/null
+stale_real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$stale_dir")"
+stale_output="$(run_hook "作業終了。終了整理して" "$stale_dir")"
+grep -q "warn: ${stale_real} のローカル main は origin/main より 1 コミット遅れています" <<< "$stale_output" \
+  || fail "local main 停滞の警告が出ない: $stale_output"
+rm -rf "$stale_dir"
+
+# 遅れていない repo では当該パスの警告を出さない
+fresh_dir="$(mktemp -d)"
+git -C "$fresh_dir" init -b main >/dev/null
+git -C "$fresh_dir" -c user.email=test@example.com -c user.name=test commit --allow-empty -m v1 >/dev/null
+git -C "$fresh_dir" update-ref refs/remotes/origin/main HEAD
+fresh_real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$fresh_dir")"
+fresh_output="$(run_hook "作業終了。終了整理して" "$fresh_dir")"
+if grep -q "warn: ${fresh_real} のローカル" <<< "$fresh_output"; then
+  fail "遅れの無い repo で停滞警告が出た: $fresh_output"
+fi
+rm -rf "$fresh_dir"
+
 echo "PASS: handover-preflight"
