@@ -1,7 +1,7 @@
 {
   "tool": "antigravity-sync",
-  "generated_at": "2026-10-03T19:31:22.071187+00:00",
-  "source_commit": "2f46450",
+  "generated_at": "2026-10-05T02:57:26.996202+00:00",
+  "source_commit": "2ec705e",
   "project_root": ".",
   "generated_gemini_md": false,
   "instruction_surface": "AGENTS.md",
@@ -32,6 +32,7 @@
     "lib/handover-preflight-policy.json",
     "lib/hook-io.sh",
     "lib/quality-check-common.sh",
+    "lib/resolve-handover-path.py",
     "lib/staff-message-policy.json",
     "lib/storage-url-common.py",
     "lib/upstream-write-guard.py",
@@ -85,7 +86,7 @@
     "BeforeAgent",
     "BeforeTool"
   ],
-  "mcp_server_count": 8,
+  "mcp_server_count": 6,
   "warnings": [
     "backend-developer.md: agent frontmatter `model: claude-sonnet-5` は Claude 固有のため除去（Gemini 側 inherit 相当）",
     "backend-developer.md: agent frontmatter field `memory` は Gemini 互換でないため除去",

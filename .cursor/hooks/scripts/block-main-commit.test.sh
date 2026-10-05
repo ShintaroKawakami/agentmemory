@@ -496,8 +496,8 @@ expect_block \
   "$main_repo" \
   "git -C $feature_repo commit -m \"broken"
 
-expect_allow \
-  "先頭 cd + multiline の feature push を許可" \
+expect_block \
+  "先頭 cd + 改行後の未知コマンドは宛先を証明できないため拒否" \
   "$main_repo" \
   "cd $feature_repo && git push --force-with-lease
 commit body with spaces"
@@ -1385,6 +1385,37 @@ expect_unclassified_deny \
   "$feature_repo" \
   'eval "git push origin feature/test"' \
   "through eval"
+
+# [2026-10-04][test] 括弧groupもowner guardを通す。cdのsubshell scopeは
+# 平坦化して推測せず拒否し、通常group/引用引数/read-onlyは許可する。
+expect_block "括弧groupのthird-party pushは拒否" "$feature_repo" \
+  "(git push upstream feature/test)"
+expect_block "nested括弧groupのthird-party pushは拒否" "$feature_repo" \
+  "( (git push upstream feature/test) )"
+expect_block "括弧groupのthird-party gh API POSTは拒否" "$feature_repo" \
+  "(gh api -X POST repos/ThirdParty/feature/issues -f title=test)"
+expect_block "括弧pipelineのthird-party pushは拒否" "$feature_repo" \
+  "true|(git push upstream feature/test)"
+expect_block "括弧group内cdのthird-party pushは拒否" "$feature_repo" \
+  "(cd $third_party_repo && git push origin feature/test)"
+expect_block "subshell cdでgroup外originを取り違えない" "$third_party_repo" \
+  "(cd $feature_repo) && git push origin feature/test"
+expect_allow "括弧groupのown pushはowner検査後に許可" "$feature_repo" \
+  "(git push origin feature/test)"
+expect_allow "nested括弧groupのown pushは許可" "$feature_repo" \
+  "( (git push origin feature/test) )"
+expect_allow "括弧read-only groupは許可" "$feature_repo" \
+  "(git status --short && git log --oneline)"
+expect_allow "括弧内cdでもread-only groupは許可" "$feature_repo" \
+  "(cd $third_party_repo && git status --short)"
+expect_allow "引用引数の括弧git文字列は実行名と混同しない" "$feature_repo" \
+  'printf "%s" "(git push upstream feature/test)"'
+expect_allow "引数cdはgroup書込のcwd変更と混同しない" "$feature_repo" \
+  "printf '%s' cd && (git push origin feature/test)"
+expect_block "prefixed cdのgroup書込は既存guardで拒否" "$feature_repo" \
+  "(MODE=test cd $third_party_repo && git push origin feature/test)"
+expect_allow "read-only groupの引数pythonは実行名と混同しない" "$feature_repo" \
+  "(cd $third_party_repo && printf '%s' python)"
 
 TOTAL=$((PASS + FAIL))
 printf '\n=== block-main-commit.test.sh: %d/%d PASS ===\n' "$PASS" "$TOTAL"

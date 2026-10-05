@@ -34,4 +34,9 @@ enabled = true
 [mcp_servers.stitch.env_http_headers]
 X-Goog-Api-Key = "STITCH_API_KEY"
 
+[mcp_servers.tech-gbrain]
+command = "/bin/bash"
+args = ["/Users/shintaro/business/AGENT-HUB/scripts/gbrain-mcp-preregistered-client.sh", "https://gbrain-mcp.jtt.cafe/mcp", "GBRAIN_MCP_CLIENT_ID_TECH", "GBRAIN_MCP_CLIENT_SECRET_TECH"]
+enabled = true
+
 # <<< AGENT-HUB MANAGED CODEX MCP END

@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-03T19:31:15.751598+00:00",
-  "source_commit": "2f46450f9a3571089c274301c059ac25b57851bd",
+  "generated_at": "2026-10-05T02:57:23.613247+00:00",
+  "source_commit": "2ec705e6b427649450b42749cc0fda77a1b63507",
   "source_rule_files": [
     ".claude/rules/general/ai-model-selection.md",
     ".claude/rules/general/ai-worker-watch.md",
@@ -33,6 +33,7 @@
     ".claude/hooks/lib/handover-preflight-policy.json",
     ".claude/hooks/lib/hook-io.sh",
     ".claude/hooks/lib/quality-check-common.sh",
+    ".claude/hooks/lib/resolve-handover-path.py",
     ".claude/hooks/lib/staff-message-policy.json",
     ".claude/hooks/lib/storage-url-common.py",
     ".claude/hooks/lib/upstream-write-guard.py",
@@ -126,6 +127,7 @@
     ".cursor/hooks/lib/handover-preflight-policy.json",
     ".cursor/hooks/lib/hook-io.sh",
     ".cursor/hooks/lib/quality-check-common.sh",
+    ".cursor/hooks/lib/resolve-handover-path.py",
     ".cursor/hooks/lib/staff-message-policy.json",
     ".cursor/hooks/lib/storage-url-common.py",
     ".cursor/hooks/lib/upstream-write-guard.py",
@@ -215,6 +217,7 @@
     ".cursor/skills/plan-approval",
     ".cursor/skills/post-merge",
     ".cursor/skills/project-prompt-review",
+    ".cursor/skills/shintaro-gbrain",
     ".cursor/skills/shintaro-voice",
     ".cursor/skills/skill-audit",
     ".cursor/skills/skill-doctor",

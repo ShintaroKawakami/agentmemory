@@ -517,6 +517,27 @@ expect_block "xargs bare optional-arg option fail closed" "xargs -l git reset --
 expect_allow "xargs non-git command stays allowed" "ls | xargs -n1 rm -f"
 expect_allow "xargs safe git subcommand stays allowed" "printf 'x\n' | xargs git log --oneline"
 
+# [2026-10-05][test] issue #1385: 語の途中で始まる引用の内側にある `;&|(){}` は字句データ。
+# 背景:
+#   - ユーザー依頼意図: `git branch -r --format='%(refname)' | grep ...` のように破壊操作を
+#     含まない構文が `unresolved command wrapper` で deny される誤検知を直したい。
+#     語中引用を含む token を shlex(posix=False, punctuation_chars=...) が誤分割・例外化し、
+#     偽の segment 境界を作っていた。
+#   - 守るべき業務ルール: 許可回帰と deny 回帰を対で足し、検知力を片側にしか動かさない。
+#     同じ誤分割が `x='a;echo y' bash -c 'git reset --hard'` の shell -c 再帰検査を抜く
+#     見逃しホールも実測したため、deny 側に閉じる回帰も必須。
+expect_allow "pipe with mid-word quoted format allow" "git branch -r --format='%(refname)' | grep -v HEAD"
+expect_allow "pipe with mid-word quoted brace format allow" "git log --format='%{h}' | head -5"
+expect_allow "mid-word quoted semicolon assignment allow" "x='a;eval y' git status"
+expect_allow "mid-word double quoted paren allow" 'echo x="(b)"'
+expect_allow "for loop with quoted loop var allow" 'for b in a b c; do git branch -D "$b"; done'
+expect_allow "PIPESTATUS echo after pipeline allow" 'pnpm test --filter foo | cat; echo "exit=${PIPESTATUS[0]}"'
+expect_allow "cd then rm -rf scratch dir allow" 'cd /tmp/x && rm -rf /tmp/x/scratch'
+expect_block "mid-word quote cannot hide shell -c reset" "x='a;echo y' bash -c 'git reset --hard'"
+expect_block "mid-word quote cannot hide shell -c clean" "x='a|echo y' bash -c 'git clean -fd'"
+expect_block "mid-word quote keeps reset visible" "x='a;b' git reset --hard"
+expect_block "mid-word quoted format then reset deny" "git branch --format='%(x)'; git reset --hard"
+
 TOTAL=$((PASS + FAIL))
 printf '\n=== block-destructive-git.test.sh: %d/%d PASS ===\n' "$PASS" "$TOTAL"
 

@@ -549,19 +549,109 @@ def token_has_unresolved_executable_expansion(token: str) -> bool:
         index += 1
     return False
 
+# [2026-10-05][fix] 語の途中で始まる引用を正しく字句解析する（issue #1385）。
+# 背景:
+#   - ユーザー依頼意図: `git branch -r --format='%(refname)' | grep ...` のように破壊操作を
+#     含まない構文が `unresolved command wrapper` で deny される誤検知を直したい。
+#   - 守るべき業務ルール: 引用内の `;&|(){}` は区切りではなく字句データ。shlex の
+#     posix=False + punctuation_chars は「語の途中で開く引用」の内側にある区切り文字を
+#     誤って分割し（`a='b;c'` → `a='b`, `;`, `c'`）、引用内に `(`/`{` があると
+#     「No closing quotation」で例外化する。その誤分割は偽の segment 境界を作り、
+#     `x='a;echo y' bash -c 'git reset --hard'` の shell -c 再帰検査を抜く見逃しホール
+#     にもなっていた（実測で allow 確認）。
+#   - 他案不採用理由: 例外時に punctuation を減らして再試行する案は、brace/subshell の
+#     segment 境界を失い検知力を下げる。posix=True の shlex は引用を剥がすため、
+#     生 token を必要とする呼び出し側（command_executable_index の wrapper 解釈・
+#     decode_shell_command による -c 引数復元）には使えない。
+# 対応: 引用状態を明示追跡する小さな字句解析で、posix=False+punctuation_chars と同等の
+#   token 列を作る。区切りは引用外だけ、引用符は token に残す、バックスラッシュは
+#   単一引用外で次の1文字を字句化する。未終端引用は None で呼び出し側の fail-closed を維持。
+def shell_lex_words(text: str, punctuation: str):
+    """Return ``shlex``-style tokens with quotes kept, or ``None``.
+
+    Drop-in replacement for ``shlex(posix=False, punctuation_chars=...)`` that
+    still works when a quote opens mid-word.  Whitespace splits words and a
+    maximal run of ``punctuation`` characters becomes one token only outside
+    quotes; quote characters stay inside their token so callers can decode
+    each token later.  ``None`` is returned on unterminated quotes so callers
+    keep their existing fail-closed contract.
+    """
+    tokens = []
+    word = []
+    punct_run = []
+    quote = None
+    index = 0
+    length = len(text)
+
+    def flush_word():
+        if word:
+            tokens.append("".join(word))
+            del word[:]
+
+    def flush_punct():
+        if punct_run:
+            tokens.append("".join(punct_run))
+            del punct_run[:]
+
+    while index < length:
+        char = text[index]
+        if quote == "'":
+            # Single-quoted text keeps every character literally.
+            word.append(char)
+            if char == "'":
+                quote = None
+            index += 1
+            continue
+        if char == "\\":
+            # Outside single quotes the next character is literal; a trailing
+            # backslash is kept as a literal like shlex does.
+            flush_punct()
+            word.append(char)
+            if index + 1 < length:
+                word.append(text[index + 1])
+                index += 2
+            else:
+                index += 1
+            continue
+        if quote == '"':
+            word.append(char)
+            if char == '"':
+                quote = None
+            index += 1
+            continue
+        if char in {"'", '"'}:
+            flush_punct()
+            quote = char
+            word.append(char)
+            index += 1
+            continue
+        if char in punctuation:
+            flush_word()
+            punct_run.append(char)
+            index += 1
+            continue
+        if char.isspace():
+            flush_punct()
+            flush_word()
+            index += 1
+            continue
+        flush_punct()
+        word.append(char)
+        index += 1
+    if quote is not None:
+        return None
+    flush_punct()
+    flush_word()
+    return tokens
+
+
 def has_unresolved_command_start(text: str) -> bool:
     """Inspect raw command-start words without evaluating shell syntax."""
-    try:
-        # Keep parentheses inside words so `$(...)`, extglob, and zsh qualifiers
-        # remain visible. The regular parser separately handles grouping syntax.
-        lexer = shlex.shlex(text, posix=False, punctuation_chars=";&|")
-        # Real shell comments were removed by
-        # collapse_shell_line_continuations().  Keep `#` inside parameter
-        # expansions such as `${#name}` visible to the lexer.
-        lexer.commenters = ""
-        lexer.whitespace_split = True
-        tokens = list(lexer)
-    except Exception:
+    # Keep parentheses inside words so `$(...)`, extglob, and zsh qualifiers
+    # remain visible. The regular parser separately handles grouping syntax.
+    # Real shell comments were removed by collapse_shell_line_continuations().
+    tokens = shell_lex_words(text, ";&|")
+    if tokens is None:
         return True
 
     segment: list[str] = []
@@ -861,14 +951,10 @@ def decode_shell_command(token: str) -> str:
     return words[0]
 
 def segment_tokens(text: str):
-    try:
-        # Keep the outer quote around `bash -c`/`sh -c` bodies so the nested
-        # command can be decoded once without losing its own quoted path tokens.
-        lexer = shlex.shlex(text, posix=False, punctuation_chars=";&|(){}")
-        lexer.commenters = ""
-        lexer.whitespace_split = True
-        tokens = list(lexer)
-    except Exception:
+    # Keep the outer quote around `bash -c`/`sh -c` bodies so the nested
+    # command can be decoded once without losing its own quoted path tokens.
+    tokens = shell_lex_words(text, ";&|(){}")
+    if tokens is None:
         return None
     segments: list[list[str]] = []
     current: list[str] = []

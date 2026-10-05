@@ -174,10 +174,40 @@ grep -q "scope: jtt-system/root" <<< "$jtt_system_reflection_output" \
 # [2026-08-05][test] mac-mini-server 配下の repo が non-pj へ落ちないことを固定する。
 # 正本 resolve-handover-path.py の MAC_MINI_REPOS と同じ解決になることを回帰で守る
 # （closeout で preflight だけ non-pj/root を出し、handover が別 scope へ書かれかけた）。
+CANONICAL_RESOLVER="$REPO_ROOT/skills/handover-manual/scripts/resolve-handover-path.py"
+# [2026-10-04][fix] 配布先では正本スキルが .claude/skills に配置される。
+# HUB と同じ resolver で比較し、参照切れを空の期待値として扱わない。
+# 他案不採用: HUB専用パス固定では配布先で参照切れになり、テストの省略では回帰を守れない。
+if [ ! -f "$CANONICAL_RESOLVER" ]; then
+  CANONICAL_RESOLVER="$REPO_ROOT/.claude/skills/handover-manual/scripts/resolve-handover-path.py"
+fi
+# [2026-10-04][fix] skill未選択の配布先では上の2参照先が存在しない。
+# hookに同梱した同じ正本で検査する。skillを強制追加したり、検査を省略する案は採らない。
+if [ ! -f "$CANONICAL_RESOLVER" ]; then
+  CANONICAL_RESOLVER="$SCRIPT_DIR/../lib/resolve-handover-path.py"
+fi
+[ -f "$CANONICAL_RESOLVER" ] || fail "正本 resolver が見つからない: $CANONICAL_RESOLVER"
+resolver_scope() {
+  # hook は CLAUDE_PROJECT_DIR を Path.resolve() してから正本へ渡す
+  # （mac-mini-server/* には mcp-servers への symlink があり、解決前後で project が変わる）。
+  # 比較は hook が正本へ渡すのと同じ正規化済み cwd で行う。
+  local resolved_cwd
+  resolved_cwd="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1")"
+  python3 "$CANONICAL_RESOLVER" scope --cwd "$resolved_cwd" --prompt "$2" \
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["project"] + "/" + d["scope"])'
+}
 for mm_repo in register sales analytics keiei-dashboard cron-dashboard; do
   mm_output="$(run_hook "作業終了。終了整理して" "/Users/shintaro/mac-mini-server/$mm_repo")"
   assert_exact_scope "$mm_output" "$mm_repo/root"
   assert_scoped_path "$mm_output" "handovers"
+done
+
+# [2026-10-04][test] #1501: hook と正本 resolver が同じ scope を返すことを
+# mac-mini-server 配下の実在 repo 全件で回帰する（二重管理の再発検知）。
+for mm_dir in /Users/shintaro/mac-mini-server/*/; do
+  [ -d "$mm_dir" ] || continue
+  mm_output="$(run_hook "作業終了。終了整理して" "$mm_dir")"
+  assert_exact_scope "$mm_output" "$(resolver_scope "$mm_dir" "作業終了。終了整理して")"
 done
 
 # 台帳外の mac-mini-server 直下は non-pj ではなく mac-mini-server 扱い（正本と同じ）
@@ -219,18 +249,40 @@ if is_agent_hub_source_repo && [ -d "/Users/shintaro/mcp-servers/jtt-smaregi-mcp
     HANDOVER_RESOLVER_PATH="$REPO_ROOT/skills/handover-manual/scripts/resolve-handover-path.py" \
     CLAUDE_PROJECT_DIR="/Users/shintaro/mcp-servers/jtt-smaregi-mcp" bash "$HOOK")"
   assert_exact_scope "$resolver_delegated_output" "mcp-servers/jtt-smaregi-mcp"
-  grep -vq "内蔵の簡易判定" <<< "$resolver_delegated_output" \
-    || fail "正本があるのに内蔵判定へ落ちた: $resolver_delegated_output"
+  grep -q "resolver: " <<< "$resolver_delegated_output" \
+    || fail "正本 resolver が使われていない: $resolver_delegated_output"
 fi
 
-# [2026-10-03][test] #1479: 正本が見つからない時は内蔵判定へフォールバックし、warn で黙らない。
+# [2026-10-04][test] #1501: 正本がどこにも見つからない時は scope を推定せず
+# unresolved + warn で黙らない（hook に写像の複製は残さない）。
 if is_agent_hub_source_repo; then
   fallback_output="$(printf '{"user_prompt": "作業終了。終了整理して"}' | \
     HANDOVER_RESOLVER_PATH="/nonexistent/resolve-handover-path.py" \
     CLAUDE_PROJECT_DIR="$REPO_ROOT" bash "$HOOK")"
-  assert_exact_scope "$fallback_output" "AGENT-HUB/root"
-  grep -q "内蔵の簡易判定を使用中" <<< "$fallback_output" \
-    || fail "フォールバック時の警告が出ない: $fallback_output"
+  assert_exact_scope "$fallback_output" "unresolved/unresolved"
+  grep -q "正本 resolve-handover-path.py が見つかりません" <<< "$fallback_output" \
+    || fail "正本不在時の警告が出ない: $fallback_output"
 fi
+
+# [2026-10-04][test] #1501: skill が配布されていない配布先（PJ 内 skills 無し）でも、
+# hook 同梱の ../lib/resolve-handover-path.py で正本と同一の scope 解決ができる。
+# mktemp の cwd は PJ マーカーを持たないため正本仕様どおり non-pj/root になる。
+dist_sim_dir="$(mktemp -d)"
+dist_output="$(run_hook "作業終了。終了整理して" "$dist_sim_dir")"
+assert_exact_scope "$dist_output" "non-pj/root"
+grep -q "resolver: .*lib/resolve-handover-path.py" <<< "$dist_output" \
+  || fail "skill 非配置の配布先で hook 同梱 resolver が使われていない: $dist_output"
+rm -rf "$dist_sim_dir"
+
+# [2026-10-04][test] #1501: 配布物どうし（PJ 内 skill 配置 vs hook 同梱）の
+# resolver が食い違う時、hook が版ずれを自己申告する。
+drift_dir="$(mktemp -d)"
+mkdir -p "$drift_dir/.claude/skills/handover-manual/scripts"
+cp "$CANONICAL_RESOLVER" "$drift_dir/.claude/skills/handover-manual/scripts/resolve-handover-path.py"
+printf '\n# drifted copy\n' >> "$drift_dir/.claude/skills/handover-manual/scripts/resolve-handover-path.py"
+drift_output="$(run_hook "作業終了。終了整理して" "$drift_dir")"
+grep -q "別候補の resolver と内容が異なります" <<< "$drift_output" \
+  || fail "resolver 版ずれの自己申告が出ない: $drift_output"
+rm -rf "$drift_dir"
 
 echo "PASS: handover-preflight"

@@ -77,6 +77,8 @@ worker へ渡す検証要求も同じ前提で書き、sandbox/環境要因で�
 - 「まず `~/business/AGENT-HUB/docs/design/design-philosophy.md`（伸太郎殿の設計思想 SSOT）を Read してから着手する」を**必読指定**する。
 - 必ず該当ファイルの**絶対パス**（`~/business/AGENT-HUB/docs/design/design-philosophy.md`）を渡す（委譲先の実行 cwd は消費先PJであり、相対パスでは解決不能なため）。
 - Stitch を使う画面作成は、`stitch-screen-creator` グローバルエージェント（設計思想を step0 で必読にしている）へ委譲するのが既定。
+- **実装を別セッション / 別 worker が持つ場合、Stitch を回すのはその実装を持つ側**。
+  PM は設計思想 doc の必読指定と採否の受け渡しだけを持つ（採否は伸太郎殿が Stitch Web で行う）。
 
 理由: AI Worker（Kimi/Codex/Cursor/GLM 等）自身にデザインセンスが無くても、親が設計思想 doc を必読で渡せば思想に沿った画面を作れる。渡さないと委譲先が自己流判断でずれる。
 

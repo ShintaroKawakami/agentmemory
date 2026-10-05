@@ -52,12 +52,15 @@ tool の可用性は、現在のセッションで確認できた証拠だけで
 
 このルールは判定の読み手向けであり、hook が catalog を探索したり MCP tool を呼び出したりすることを認めない。hook は、確認すべき証拠と status を短く案内するだけにする。実際の catalog 確認・選択確認・runtime 実測はモデルまたは利用者が適切な画面・道具で行う。
 
-## 必須 G-Brain
+## G-Brainの共通入口と必要source
 
-相談・直し・判断では、`shintaro-gbrain` と `tech-gbrain` を必須確認対象とし、それぞれの status と根拠を確認する。両方が `AVAILABLE` のときだけ、該当する brain を検索してから応答する。
+本人の会話・開発は `my-gbrain` を共通入口にする。必要なsourceは `.claude/rules/general/gbrain-recall.md`、接続・source指定と未配布環境のlegacy readは `.claude/skills/agentmemory-routing/SKILL.md`（HUB正本: `skills/agentmemory-routing/SKILL.md`） に従う。
+旧 `shintaro-gbrain` と `tech-gbrain` の2接続が同時に `AVAILABLE` であることを条件にしない。
 
-どちらか一方でも `RUNTIME_UNAVAILABLE`・`NOT_SELECTED`・`UNPROVEN` なら、推測で進めず停止・待機する。runtime が `RUNTIME_UNAVAILABLE` のときは復旧を案内し、`NOT_SELECTED` / `UNPROVEN` のときは選択・追加証拠の確認を案内する。いずれも未確認を成功扱いせず、検索済みとも記録しない。
+My GBrainが `AVAILABLE` でも、必要sourceの読取許可や実取得を確認済みとは限らない。
+`whoami` の認可範囲、必要sourceを指定した読取結果、返却sourceを確認する。
+必要sourceが未許可・未取得ならその不足を明示し、検索済みと記録しない。
+My GBrainが `RUNTIME_UNAVAILABLE` なら復旧を案内する。`NOT_SELECTED` / `UNPROVEN` の場合は、既存の許可済み読取経路の証拠を確認する。
 
-`jtt-gbrain`（会社そのものの脳）は 2026-08-30 に追加した3つ目だが、**必須には含めない**。`AVAILABLE` なら追加で検索し、そうでなければその1つを飛ばして先へ進んでよい（必須2つの検索まで止めないこと）。飛ばした場合はその旨を一言添える。
-
-理由: 3つとも必須にすると、jtt-gbrain がまだ繋がっていない環境で既存2つの検索まで止まる。配線されているかの強制は `registries/mcp-registry.yaml` の `shintaro-gbrain.requires_assets` が担い、resolver が fail-close で検査するため、本ルールで二重に止める必要がない。
+会社source `jtt-gbrain` の取得不足で、取得済みの判断軸・技術の確認まで止めない。
+ただし会社の事実が必要な判断は、根拠不足を明示し推測で補わない。読取許可をwrite許可と解釈しない。

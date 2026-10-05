@@ -801,7 +801,11 @@ def main() -> None:
                 daily_line = (
                     f"{prefix}週次 {weekly}%{detail}。実装={workers_str}へ委譲、"
                     "探索・大量読みはサブエージェントへ委譲し、Claudeは指示・検証・判断に専念してください"
-                    "（ブラウザ操作は例外でPM直可）。"
+                    # [2026-10-04][fix] Issue #2562: 正本（agents.yaml task_routing.
+                    # fable_usage_policy）の interactive_browser 但し書きを文言へ反映する。
+                    # 「例外でPM直可」だけだと sonnet サブエージェント内製が第一候補である
+                    # 条件が読み手へ届かず、節約モード中に PM 直実行を誘発した。
+                    "（ブラウザ操作は sonnet サブエージェント内製が第一候補。不可と実測した場合のみ PM 直）。"
                 )
 
     print("HIT=1" if hit else "HIT=0")
