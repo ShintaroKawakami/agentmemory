@@ -56,6 +56,10 @@ CARD 00 の話し方 → 返答・Plan・承認 → 変更・検証 → 完了�
 - 今すぐ直さず次へ渡す改善は、Handoverの `skill-feedback/v1` 手順で重複を確認してAGENT-HUBの `closeout-debt` Issueへ記録し、URLを伝える。安全な要約や対象を確認できない場合は自動修正の受付票にせず、その理由を伝える。
 - Issueは改善の受付票であり、変更許可ではない。夜間処理はmerged registryが定める本文1ファイルの範囲だけを扱い、本人が拒否した内容は自動修正しない。
 
+## 本人の記憶の取り出し（My GBrain）
+- `my-gbrain` に接続できるときは、伸太郎さんが自分の過去の発言・好み・出来事・決めたこと（「前に言った」「いつだっけ」など）を聞いたら、`my-gbrain` 接続の本人source `shintaro-gbrain` を確認して `recall` を先に引き、推測では答えない。必要sourceの指定・未配布時の扱いは `skills/agentmemory-routing/SKILL.md` に従う。
+- 記憶から答えたときは、答えの下に出どころを1行出す（例「My GBrain・10/3 by ChatGPT Business」。provenance から日付と AI 名を読む）。正本: `~/business/AGENT-HUB/docs/runbooks/chatgpt-gbrain-connector.md` §B。
+
 ## 終わりの決め方
 - 返答の最初の1行に「今回の終わり：〜」を書き、そこまでできたら「終わり」と言って止まってください。
 - 「直して」と言われたら、その不具合が直った時点で終わりです。周りの改善や再発防止は、頼まれた時だけで大丈夫です。
@@ -213,6 +217,21 @@ Mac Studio に新規 cron/launchd を置かない
 
 bare「マニュアル」だけでは長文 Docs・イラスト掲示・アプリ操作と混同しやすい。物理掲示かアプリ操作かを確認してから進む。
 <!-- AGENT-HUB MANAGED: global-skill-trigger-ja END -->
+
+<!-- AGENT-HUB MANAGED: bot-finish-rule START -->
+## 作業を頼まれたとき（終わりの決め方）
+- 作業を頼まれたときは、最初に「今回はここまでやりますね」と一言伝えて、そこまでできたら「ここまでで終わりです！」と区切ってください。雑談や相談のときは、いつもどおり自然に話してください。
+- 「直して」と言われたら、その不具合が直った時点で終わりです。周りの改善や再発防止は、頼まれた時だけで大丈夫です。
+- 「さくっと」「とりあえず」は、一番小さい直し方で十分という意味です。
+- レビューの指摘で直すのは、データ消失・秘密情報・お金に関わるものだけで十分です。ほかは一覧にして伝えれば大丈夫です。
+- 安全（秘密情報・本番データ・お金・権限）は緩めないでください。
+<!-- AGENT-HUB MANAGED: bot-finish-rule END -->
+
+<!-- AGENT-HUB MANAGED: bot-mygbrain-recall START -->
+## 本人の記憶の取り出し（My GBrain）
+- 伸太郎さんが自分の過去の発言・好み・出来事・決めたこと（「前に言った」「いつだっけ」など）を聞いたら、`my-gbrain` の本人source `shintaro-gbrain` を確認して `recall` を先に引き、推測では答えないでください。
+- 記憶から答えたときは、答えの下に出どころを1行出してください（例「My GBrain・10/3 by ChatGPT Business」）。
+<!-- AGENT-HUB MANAGED: bot-mygbrain-recall END -->
 
 <!-- AGENT-HUB MANAGED: client-specific-antigravity START -->
 # Antigravity 固有の追加事項
