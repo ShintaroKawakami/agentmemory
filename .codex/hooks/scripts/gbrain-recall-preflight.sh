@@ -139,14 +139,14 @@ if not any_hit:
     print("- 該当キーワードなし（FORCE 表示）")
 if consult_both_hit:
     # [2026-08-30] jtt-gbrain（3つ目・会社そのもの）は「あるなら追加で見る」。必須2つの検索は止めない。
-    # 既存テストが下記の固定文言を grep するため、文言は変えず後ろの行として足すこと。
-    print("- shintaro-gbrain と tech-gbrain の両方を検索してから着手（相談・直し・判断）")
-    print("- jtt-gbrain（会社そのもの: 人・取引先・PJ）は AVAILABLE なら追加で見る。無ければ飛ばして進む")
+    # [2026-10-04] 接続はMy GBrainへ統一。必要sourceの確認と案内専用の境界は保つ。
+    print("- My GBrainでsource shintaro-gbrain と tech-gbrain-shared の両方を検索してから着手（相談・直し・判断）")
+    print("- My GBrainの会社source jtt-gbrainは許可・取得可能なら追加で見る。不足は明示する")
 elif tech_hit:
-    print("- tech-gbrain を検索してから着手（バグ修正・障害調査・回帰）")
+    print("- My GBrainでsource tech-gbrain-shared を検索してから着手（バグ修正・障害調査・回帰）")
 elif business_hit:
-    print("- shintaro-gbrain を検索してから着手（経営相談・戦略・クレーム対応）")
-    print("- jtt-gbrain（会社そのもの: 人・取引先・PJ）は AVAILABLE なら追加で見る")
+    print("- My GBrainでsource shintaro-gbrain を検索してから着手（経営相談・戦略・クレーム対応）")
+    print("- My GBrainの会社source jtt-gbrainは許可・取得可能なら追加で見る")
 if depanda_roles_hit and _DEPANDA_REMINDER:
     # [2026-09-26][feat] 既存3パターンと独立の追加行。他パターンの出力を変更しない。
     print(f"- {_DEPANDA_REMINDER}")
@@ -154,6 +154,8 @@ print("- tool availability: 初期 tool 一覧の欠落だけでは可否を決�
 print("- status の証拠順序: セッション catalog → 遅延 catalog → 選択状態 → runtime 実測 → 結論")
 print("- status: AVAILABLE / NOT_SELECTED / RUNTIME_UNAVAILABLE / UNPROVEN")
 print("- hook は案内のみ。catalog 探索・MCP tool 呼出しは自動実行しない")
+# [2026-10-04][fix] 配布先で読めるruntimeパスを案内する。HUB専用パス固定は参照切れになるため採らない。
+print("- 接続名とsourceは別。source確認・legacy read条件・二重保存防止は.claude/skills/agentmemory-routing/SKILL.mdを読む（HUB正本: skills/agentmemory-routing/SKILL.md）")
 print("- 詳細: .claude/rules/general/gbrain-recall.md")
 print("- 共通ルール: .claude/rules/general/tool-availability-resolution.md")
 PY

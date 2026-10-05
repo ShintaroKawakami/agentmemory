@@ -234,84 +234,36 @@ def matched_app(prompt: str, apps: list[dict[str, object]]) -> dict[str, object]
     return None
 
 
-# [2026-08-05][fix] mac-mini-server 配下の repo が non-pj へ落ちる誤判定を修正する。
+# [2026-10-04][fix] #1501: scope 解決の写像を正本 resolver 1 箇所へ集約する。
 # 背景:
-# - ユーザー依頼意図: closeout で preflight が `scope: non-pj/root` を提示したが、正本である
-#   `skills/handover-manual/scripts/resolve-handover-path.py` は同じ cwd を `register/root` と解決していた。
-#   preflight を信じると handover が別 scope（non-pj）へ書かれ、次セッションが引き継ぎを見失う。
-# - 守るべき業務ルール: preflight の project 解決は resolve-handover-path.py（正本）と一致させる。
-#   正本は `/mac-mini-server/<repo>` を MAC_MINI_REPOS で個別 repo として解決するが、本 hook は
-#   hermes だけを特別扱いし、register / sales / analytics / keiei-dashboard / cron-dashboard を
-#   取りこぼしていた（2 箇所に同じ写像を持っていて片方だけ更新された典型）。
+# - ユーザー依頼意図: hook 内蔵の簡易判定（MAC_MINI_REPOS / checks）が正本
+#   `skills/handover-manual/scripts/resolve-handover-path.py` と drift し続けた
+#   二重管理を解消したい（#1500 / #1479 で写像は揃えたが構造は残ったまま）。
+# - 守るべき業務ルール: project / scope 判定の正本は resolve-handover-path.py のみ。
+#   hook は正本を参照し、hook 側に project リストの複製を持たない（reference-over-hardcode）。
 # - 他案不採用理由:
-#   1) hook から resolve-handover-path.py を import する案: hook は各 PJ へ配布され skill の
-#      配置パスが保証されないため、実行時解決に失敗すると preflight 全体が壊れる。今回は最小差分で
-#      写像だけ揃え、DRY 化は AGENT-HUB Issue へ分離する。
-#   2) git remote 名から機械的に決める案: worktree / fork / ミラーで別名になり、既存 scope と乖離する。
-MAC_MINI_REPOS = (
-    "keiei-dashboard",
-    "cron-dashboard",
-    "hermes",
-    "analytics",
-    "sales",
-    "register",
-)
-
-
-def project_from_cwd(path: Path) -> str:
-    if (path / "DISTRIBUTION.yaml").is_file() and (path / "hook-registry.yaml").is_file():
-        return "AGENT-HUB"
-    text = str(path)
-    checks = [
-        ("AGENT-HUB", "/AGENT-HUB"),
-        ("jtt-system", "/jtt-system"),
-        ("jtt-apps", "/jtt-apps"),
-        ("jtt-cms", "/jtt-cms"),
-        ("jtt-cafe-pj", "/jtt-cafe-pj"),
-        ("hermes", "/mac-mini-server/hermes"),
-    ]
-    for project, marker in checks:
-        if marker in text:
-            return project
-    parts = path.parts
-    if "mac-mini-server" in parts:
-        idx = parts.index("mac-mini-server")
-        if idx + 1 < len(parts) and parts[idx + 1] in MAC_MINI_REPOS:
-            return parts[idx + 1]
-        return "mac-mini-server"
-    if (path / "pnpm-workspace.yaml").is_file() and (path / "apps").is_dir():
-        return "jtt-system"
-    return "non-pj"
-
-
-def scope_from_cwd(project: str, path: Path) -> str:
-    parts = path.parts
-    if project == "jtt-system" and "apps" in parts:
-        idx = parts.index("apps")
-        if idx + 1 < len(parts):
-            return parts[idx + 1]
-    if project == "AGENT-HUB":
-        for marker in ("skills", "hook-library", "snippet-prompts", "agent-memory"):
-            if marker in parts:
-                idx = parts.index(marker)
-                if idx + 1 < len(parts):
-                    return parts[idx + 1]
-                return marker
-    return "root"
-
-
-# [2026-10-03][fix] #1479: scope 解決を正本 resolve-handover-path.py へ委譲する。
-# 背景:
-# - ユーザー依頼意図: preflight が PJ 内でも non-pj/root や別 PJ scope を返し、
-#   preflight を信じた closeout が別 scope の current.md へ誤保存されるのを直す。
-#   同型の再報告が #2951 / #2980 / #3278 / #3302 と続いた。
-# - 守るべき業務ルール: project / scope の判定写像は resolve-handover-path.py（正本）と一致させる。
-#   2 箇所に同じ写像を持つと片方だけ更新されて drift する（2026-08-05 CaD で DRY 化を本 Issue へ分離済み）。
-# - 他案不採用理由:
-#   1) 内蔵判定を正本へ追従更新する案: 過去 5 回 drift で再発しており、構造的に解決しないため不採用。
-#   2) hook を正本 import へ全面移行する案: 正本が見つからない環境で preflight 全体が壊れるため、
-#      正本優先・内蔵判定フォールバックの2段とした（フォールバック時は warn を出して黙らない）。
+#   1) 写像を YAML 台帳へ切り出す案: 正本の判定は単なるリストでなく worktree 正本
+#      root 解決 / .git 実在判定 / package.json name / jtt-cms scope 正名まで含むため、
+#      台帳では表現しきれない。
+#   2) hook が各 PJ の CLAUDE.md canonical project を読む案: scope（アプリ別名・
+#      worktree）まで解決できず、正本との完全一致を保てない。
+#   3) 内蔵フォールバックを残す案: fallback が古いまま drift する二重管理の再来のため不採用。
+# 対応: 正本の byte 同一ミラーを hook-library/lib/ へ同梱する（lib/ は deploy-hooks が
+# 全配布先の hooks/lib/ へ一括コピーするため、skill が無い配布先でも
+# ../lib/resolve-handover-path.py に正本が来る）。ミラーは tests/test_handover_manual.py の
+# 一致テストが正本との byte 同一を強制するため drift しない（symlink は harness
+# generation ledger が canonical asset として拒否するため不採用）。
+# 候補順は PJ 内 skill 配置 → 同梱 → ユーザ全体 → AGENT-HUB 正本パス。
+# どこにも無ければ scope を推定せず unresolved + warn で黙らない。
 RESOLVER_REL = Path("skills") / "handover-manual" / "scripts" / "resolve-handover-path.py"
+
+
+def bundled_resolver_path() -> Path | None:
+    """hook payload 同梱の正本 resolver（各PJ hooks/lib/resolve-handover-path.py）。"""
+    lib_dir = os.environ.get("HOOK_LIB_DIR", "").strip()
+    if not lib_dir:
+        return None
+    return Path(lib_dir) / "resolve-handover-path.py"
 
 
 def candidate_resolver_paths() -> list[Path]:
@@ -322,16 +274,19 @@ def candidate_resolver_paths() -> list[Path]:
     paths: list[Path] = []
     for surface in (".claude", ".agents", ".cursor", ".kimi-code", ".gemini"):
         paths.append(project_dir / surface / RESOLVER_REL)
+    bundled = bundled_resolver_path()
+    if bundled is not None:
+        paths.append(bundled)
     paths.append(Path.home() / ".claude" / RESOLVER_REL)
     paths.append(Path.home() / ".agents" / RESOLVER_REL)
     paths.append(Path("/Users/shintaro/business/AGENT-HUB") / RESOLVER_REL)
     return paths
 
 
-def resolve_scope_via_resolver(prompt: str) -> dict | None:
+def resolve_scope_via_resolver(prompt: str) -> tuple[dict, Path] | None:
     """正本 resolve-handover-path.py の `scope` サブコマンドで project/scope を解決する。
 
-    見つからない・失敗した場合は None を返し、呼び出し側が内蔵判定へフォールバックする。
+    戻り値は (scope JSON, 使用した resolver のパス)。見つからない・失敗した場合は None。
     """
     for resolver in candidate_resolver_paths():
         if not resolver.is_file():
@@ -352,8 +307,31 @@ def resolve_scope_via_resolver(prompt: str) -> dict | None:
         except ValueError:
             continue
         if isinstance(data.get("project"), str) and isinstance(data.get("scope"), str):
-            return data
+            return data, resolver
     return None
+
+
+def differing_resolver_paths(used: Path) -> list[Path]:
+    """使用中 resolver と内容が異なる候補を列挙する（版ずれの自己申告用）。
+
+    hook payload と skill 配置は別系統で配布されるため、どちらかが古いまま
+    停滞しうる。食い違いを warn できれば原因切り分けが 1 手で済む（#1501 コメント）。
+    """
+    try:
+        used_real = used.resolve()
+        used_bytes = used.read_bytes()
+    except OSError:
+        return []
+    differs: list[Path] = []
+    for candidate in candidate_resolver_paths():
+        try:
+            if candidate.resolve() == used_real or not candidate.is_file():
+                continue
+            if candidate.read_bytes() != used_bytes:
+                differs.append(candidate)
+        except OSError:
+            continue
+    return differs
 
 
 def handover_path(project: str, scope: str) -> str:
@@ -400,14 +378,18 @@ def print_hint(app: dict[str, object] | None, forced: bool) -> None:
     #   プロンプトキーワードが別 PJ を示しても上書きしない。警告だけ出す。
     #   同一 PJ 内のアプリ別名（評価わんこ → hyoka-wanko）は resolve-handover-path.py と同じく許可する。
     # - 他案不採用理由: 発話を常に優先する案は説明文の PJ 名に引きずられるため不採用。
-    resolved = resolve_scope_via_resolver(prompt)
-    resolver_used = resolved is not None
-    if resolved is not None:
+    resolved_pair = resolve_scope_via_resolver(prompt)
+    if resolved_pair is not None:
+        resolved, used_resolver = resolved_pair
         cwd_project = str(resolved["project"])
         cwd_scope = str(resolved["scope"])
+        resolver_differs = differing_resolver_paths(used_resolver)
     else:
-        cwd_project = project_from_cwd(project_dir)
-        cwd_scope = scope_from_cwd(cwd_project, project_dir)
+        # #1501: 写像の複製は持たない。正本がどこにも無い時は推定せず unresolved。
+        used_resolver = None
+        resolver_differs = []
+        cwd_project = "unresolved"
+        cwd_scope = "unresolved"
     project = cwd_project
     scope = cwd_scope
     display = cwd_scope
@@ -433,9 +415,11 @@ def print_hint(app: dict[str, object] | None, forced: bool) -> None:
 
     print("handover preflight:")
     print(f"- scope: {project}/{scope}")
-    print(f"- handover_path: {handover_path(project, scope)}")
-    print(f"- legacy_path: {legacy_path(project, scope)}")
-    print(f"- claude_memory: {claude_memory_path(project, app_for_memory)}")
+    if used_resolver is not None:
+        print(f"- resolver: {used_resolver}")
+        print(f"- handover_path: {handover_path(project, scope)}")
+        print(f"- legacy_path: {legacy_path(project, scope)}")
+        print(f"- claude_memory: {claude_memory_path(project, app_for_memory)}")
     print(f"- manual: {manual_path}")
     print(f"- reflection-policy: {reflection_path}")
     print(f"- placement-policy: {placement_path}")
@@ -458,8 +442,14 @@ def print_hint(app: dict[str, object] | None, forced: bool) -> None:
         # preflight を信じて書くと個人コンテキストの current.md を汚染するため、
         # 「cwd から PJ を特定できなかった」ことを明示して AI が確認できるようにする。
         print("- warn: cwd から PJ を特定できませんでした（non-pj 扱い）。作業ディレクトリと保存先を確認してください")
-    if not resolver_used:
-        print("- warn: 正本 resolve-handover-path.py が見つかりません。内蔵の簡易判定を使用中（scope が古い判定の可能性あり）")
+    if used_resolver is None:
+        # [2026-10-04][fix] #1501: 正本不在では scope を推定しない（誤 scope を出す方が害）。
+        print("- warn: 正本 resolve-handover-path.py が見つかりません（skill 配置・hook 同梱の両方なし）。scope を確定できないため unresolved としています")
+    elif resolver_differs:
+        # [2026-10-04][fix] #1501 コメント: hook 側が「自分の版が古いかもしれない」を
+        # 自己申告する。配布物同士の食い違いを出せば原因切り分けが 1 手で済む。
+        others = ", ".join(str(path) for path in resolver_differs)
+        print(f"- warn: 別候補の resolver と内容が異なります（使用中: {used_resolver} / 相違: {others}）。どちらかの配布物が古い可能性があります")
     if forced and app is None:
         print("- alias: 未検出。cwdから推定")
     elif project_mismatch:

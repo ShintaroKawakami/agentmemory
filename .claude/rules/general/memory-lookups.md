@@ -27,13 +27,13 @@ memory は、前回までの作業状態・人物名・用語・過去の判断�
 | 用語 | 意味（要約） | 正本 |
 |------|--------------|------|
 | **イラストマニュアル** | 従業員が絵を見て数秒で直感理解するための**掲示セット**（物理オペ・キャラ必須）。A4 は紙の単位（場面 N → だいたい N 枚）。長文手順書・Google Doc ではない | `docs/reference/illust-manual-vocabulary.md` |
-| **モバイル操作マニュアル** | アプリ操作の案内。**UIモック／スクショ・キャラ禁止**（物理オペのイラスト掲示とは別） | `docs/reference/illust-manual-vocabulary.md` |
-| **ChatGPT壁打ち**／**お金の稼ぎ方** | 経営・個人の稼ぎ・施策の対話（ChatGPT「お金の稼ぎ方」「施策壁打ち」「困りごと相談」）とその続き。**対象 PJ = jtt-cafe-pj**。AgentMemory は jtt-cafe-pj、判断軸は shintaro-gbrain、会社の事実は jtt-gbrain。`brainstorm`（実装前の要件整理）とは別物 | `docs/reference/kabeuchi-vocabulary.md` |
+| **モバイル操作マニュアル** | アプリ操作の案内。**実スクショ／UIモックを使う**・**キャラは禁止**（物理オペのイラスト掲示とは別） | `docs/reference/illust-manual-vocabulary.md` |
+| **ChatGPT壁打ち**／**お金の稼ぎ方** | 経営・個人の稼ぎ・施策の対話（ChatGPT「お金の稼ぎ方」「施策壁打ち」「困りごと相談」）とその続き。**対象 PJ = jtt-cafe-pj**。AgentMemory は jtt-cafe-pj、My GBrainで読むsourceは判断軸が `shintaro-gbrain`、会社の事実が `jtt-gbrain`。`brainstorm`（実装前の要件整理）とは別物 | `docs/reference/kabeuchi-vocabulary.md` |
 
 「イラストマニュアル」と言われたら長文 Docs を書かず、上記正本 → `cafe-image-assistant` / `chatgpt-image-creator` 経路へ進む。
 「モバイル操作マニュアル」／アプリの使い方なら `app-manual-creator`（キャラ生成へ進まない）。
 bare「マニュアル」だけなら「長文手順書か、イラスト掲示（物理）か、アプリ操作か」を確認する。
-「ChatGPT壁打ち」「お金の稼ぎ方をみてみたい」と言われたら、対象 PJ を jtt-cafe-pj と確定して AgentMemory（jtt-cafe-pj）→ shintaro-gbrain → jtt-gbrain の順に続きを読む。PJ を聞き直さず、`brainstorm` も発火させない。
+「ChatGPT壁打ち」「お金の稼ぎ方をみてみたい」と言われたら、対象 PJ を jtt-cafe-pj と確定して AgentMemory（jtt-cafe-pj）を読んだ後、My GBrainで判断軸source `shintaro-gbrain` と会社source `jtt-gbrain` を読む。接続とsourceの照合は `.claude/skills/agentmemory-routing/SKILL.md`（HUB正本: `skills/agentmemory-routing/SKILL.md`） に従う。PJ を聞き直さず、`brainstorm` も発火させない。
 
 ## 検索手順
 

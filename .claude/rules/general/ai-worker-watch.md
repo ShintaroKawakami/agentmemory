@@ -64,6 +64,9 @@ PR の監視開始時の head SHA を固定し、取得前後に一致を確認�
 `PASS` は固定 head のチェックと指定 run がすべて成功した状態。`FAILED` と
 `UNKNOWN_STATE` は成功として扱わない。チェック無しで追加 run だけ成功しても未検証のままとする。
 明示指定 run の `skipped` は、要求した検証が実行されていないため成功に含めない。
+`UNLINKED_RUN` は `workflow_dispatch` など PR チェックに紐づかない head run の検出報告で、
+見張りの待機・判定には使わない。その run の完了を待つ場合はヒント中の `--run <run_id>@<head_sha>`
+を指定して見張りを立て直す。
 
 Claude Code なら `run_in_background: true` で起動する。ポーリングだけで無言で待たない。
 

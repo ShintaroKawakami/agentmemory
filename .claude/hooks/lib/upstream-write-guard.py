@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Fail closed when a Git/GitHub write targets a repository outside the user's fork owner.
 
+2026-10-05 オーナー方針: このガードの補強は凍結。本人の依頼が無い補強PRを作らない。
+
 [2026-08-13][feat]
 Background:
   - User intent: prohibit every third-party upstream write across all projects and
@@ -21,22 +23,45 @@ import shlex
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 def git(cwd: Path, *args: str) -> str:
     return subprocess.check_output(["git", "-C", str(cwd), *args], text=True, stderr=subprocess.DEVNULL).strip()
 
 
+# [2026-10-04][fix] issue #3529: AI worker の隔離 sandbox は basename `git` の
+# exec を拒否するため、owner 照会プローブ自体が PermissionError（OSError 系）で
+# 落ち、read-only でないコマンドまで未捕捉例外で拒否されていた。照会失敗は
+# 「owner 不明」として扱い、書込み系は下流の resolve_owner / effective_owner で
+# 従来どおり fail-closed する。照会失敗を許可扱いにはしない。
 def configured_owner() -> str:
-    return subprocess.run(
-        ["git", "config", "--global", "github.user"],
-        text=True,
-        capture_output=True,
-    ).stdout.strip()
+    try:
+        return subprocess.run(
+            ["git", "config", "--global", "github.user"],
+            text=True,
+            capture_output=True,
+        ).stdout.strip()
+    except OSError:
+        return ""
 
 
 def github_owner(url: str) -> str | None:
-    match = re.search(r"github\.com(?::|/)([^/]+)/[^/]+?(?:\.git)?$", url.strip())
+    # [2026-10-05][fix] CMS review: evilgithub.com passed the old substring match.
+    # Prove the exact GitHub hostname using the standard parser; do not change
+    # authentication or accept unknown URL forms as a configured owner's fork.
+    value = url.strip()
+    if "://" in value:
+        try:
+            parsed = urlsplit(value)
+        except ValueError:
+            return None
+        if (parsed.scheme not in {"http", "https", "ssh", "git"}
+                or parsed.hostname != "github.com" or parsed.query or parsed.fragment):
+            return None
+        match = re.fullmatch(r"/([^/\s]+)/[^/\s]+", parsed.path)
+    else:
+        match = re.fullmatch(r"(?:[^/@:\s]+@)?github\.com:([^/\s]+)/[^/\s]+", value)
     return match.group(1) if match else None
 
 
@@ -75,7 +100,7 @@ def cloud_environment() -> bool:
 def origin_owner(cwd: Path) -> str | None:
     try:
         url = git(cwd, "remote", "get-url", "--push", "origin")
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, OSError):
         return None
     return github_owner(url)
 
@@ -137,13 +162,12 @@ def resolve_remote_urls(cwd: Path, remote: str | None) -> list[str]:
 
 
 def first_positional_after(tokens: list[str], start: int) -> str | None:
-    value_options = {"--repo", "-R", "--head", "--base", "--title", "--body", "--body-file", "-f", "-F", "-X", "--method"}
+    # [2026-10-04][fix] push-option / receive-pack の値を remote と誤認しない。
+    # 値が区切り文字でも、その後ろの実際の送信先を検査する。
+    value_options = {"--repo", "-R", "--head", "--base", "--title", "--body", "--body-file", "-f", "-F", "-X", "--method", "-o", "--push-option", "--receive-pack", "--exec"}
     index = start
     while index < len(tokens):
         token = tokens[index]
-        if ">" in token or "<" in token:
-            index += 1
-            continue
         if token in value_options:
             index += 2
             continue
@@ -239,7 +263,11 @@ def api_method_and_endpoint(tokens: list[str]) -> tuple[str, str | None]:
             continue
         if token in {"-f", "-F", "--field", "--raw-field", "--input"}:
             fields_imply_post = True
-        if any(token.startswith(prefix) for prefix in ("-f=", "-F=", "--field=", "--raw-field=", "--input=")):
+        # [2026-10-05][fix] CMS配布レビューで -ftitle=... がGET扱いとなりowner検査を抜けた。
+        # 本人の送信先だけ許可する既存契約を維持し、gh標準の直結形式もPOSTへ送る。
+        # 個別PJでの修正やgh api全拒否は、正本共有と本人宛の利用を壊すため採らない。
+        if ((token.startswith(("-f", "-F")) and len(token) > 2)
+                or any(token.startswith(prefix) for prefix in ("--field=", "--raw-field=", "--input="))):
             fields_imply_post = True
             index += 1
             continue
@@ -265,33 +293,78 @@ def repository_api_owner(endpoint: str | None) -> str | None:
 
 
 def option_value(tokens: list[str], names: set[str]) -> str | None:
+    # [2026-10-05][fix] CMS全文レビューで重複--orgの後方値が第三者宛先を隠した。
+    # 守る原則: 検査したownerと実宛先を一致させ、owner selectorの重複を拒否する。
+    # 他案不採用: 最初/最後の値採用はCLI解釈へ依存、独自parser追加は保守を増やす。
+    # 対応: 既存値取得で分離/等号形式を合わせて重複検出する。
+    values: list[str] = []
     for index, token in enumerate(tokens):
         if token in names and index + 1 < len(tokens):
-            return tokens[index + 1]
+            values.append(tokens[index + 1])
         for name in names:
             if token.startswith(name + "="):
-                return token.split("=", 1)[1]
-    return None
+                values.append(token.split("=", 1)[1])
+    if len(values) > 1:
+        raise ValueError("duplicate owner target")
+    return values[0] if values else None
 
 
 def github_owner_from_args(tokens: list[str], group: str | None, action: str | None) -> str | None:
+    # [2026-10-05][fix] CMS全文レビューで本文URL・selector文字列が宛先と誤認された。
+    # 依頼意図: 承認済み共通保護を各PJへ通常配布する前に誤許可を閉じる。
+    # 守る原則: 本文・タイトルは送信先の根拠にせず、本人宛ての正常操作は維持する。
+    # 他案不採用: 全引数URL探索は本文を誤認、gh全option schemaの自作は保守を増やす。
+    # 対応: 明示selectorと先頭targetだけを採用、不明なoption値は拒否する。
+    # 回帰で確認した既知の値なしmerge flagsだけはselector前でも許可する。
+    no_value_flags = {"--squash", "--merge", "--rebase", "--auto", "--delete-branch"}
+    if (group, action) == ("pr", "create"):
+        no_value_flags.add("--draft")
+    for index, token in enumerate(tokens):
+        if (index and token.startswith(("--repo", "-R", "--owner", "-O"))
+                and tokens[index - 1].startswith("-")
+                and tokens[index - 1] not in no_value_flags
+                and "=" not in tokens[index - 1]):
+            raise ValueError("repository selector may be another option's value")
     repo = repo_option(tokens)
-    if repo:
-        if re.search(r"\$|`|\$\(", repo):
-            raise ValueError("dynamic repository target")
-        return repo.split("/", 1)[0] if "/" in repo else None
+    if repo and re.search(r"\$|`|\$\(", repo):
+        raise ValueError("dynamic repository target")
     owner = option_value(tokens, {"--owner", "-O"})
-    if owner:
-        return owner
-    for token in tokens:
-        match = re.search(r"https?://github\.com/([^/]+)/[^/]+(?:/|$)", token)
-        if match:
-            return match.group(1)
-    if group == "repo" and action not in {None, "clone", "fork", "list", "view"}:
-        positionals = gh_positionals(tokens)
-        if len(positionals) >= 3 and re.match(r"^[^/\s]+/[^/\s]+$", positionals[2]):
-            return positionals[2].split("/", 1)[0]
-    return None
+    target_owner = None
+    target_repo = None
+    # [2026-10-05][fix] CMS全文レビューで本人--repoが第三者PR URLを隠した。
+    # 守る原則: 明示selectorで先頭の実宛先を上書きせず、矛盾する指定を拒否する。
+    # 他案不採用: selector優先の早期returnは誤許可、GH全parser追加は保守を増やす。
+    # 対応: 既存先頭target判定後にrepo/ownerと照合する。
+    # Body/title URLs never establish a destination. Only a command's leading
+    # target positional can do so; unparsed flag ordering is refused.
+    accepts_target = ((group in {"issue", "pr"} and action not in {None, "create", "new"})
+                      or (group == "repo" and action not in {None, "clone", "fork", "list", "view"}))
+    if accepts_target:
+        target = tokens[2] if tokens[:2] == [group, action] and len(tokens) >= 3 and not tokens[2].startswith("-") else None
+        if target and "://" in target:
+            try:
+                parsed_target = urlsplit(target)
+            except ValueError:
+                raise ValueError("unproven positional URL target")
+            target_url = target
+            resource = "issues" if group == "issue" else "pull" if group == "pr" else None
+            if resource and re.fullmatch(r"/[^/\s]+/[^/\s]+/" + resource + r"/[0-9]+", parsed_target.path):
+                target_url = parsed_target._replace(path="/".join(parsed_target.path.split("/")[:3])).geturl()
+            target_owner = github_owner(target_url)
+            if target_owner is None:
+                raise ValueError("unproven positional URL target")
+            target_repo = urlsplit(target_url).path.strip("/")
+        if group == "repo" and target and re.match(r"^[^/\s]+/[^/\s]+$", target):
+            target_repo = target
+            target_owner = target.split("/", 1)[0]
+        if target is None and any("://" in token or (group == "repo" and "/" in token) for token in tokens[2:]):
+            raise ValueError("unproven positional repository target")
+    if target_repo and repo and target_repo != repo:
+        raise ValueError("conflicting positional and explicit repository targets")
+    repo_owner = repo.split("/", 1)[0] if repo and "/" in repo else None
+    if owner and any(candidate and candidate != owner for candidate in (target_owner, repo_owner)):
+        raise ValueError("conflicting repository owner targets")
+    return target_owner or repo_owner or owner
 
 
 def git_config_owner_change(tokens: list[str], git_index: int) -> str | None:
@@ -791,6 +864,7 @@ _OPAQUE_EXECUTABLE_NAMES = frozenset(
         "node", "nodejs", "ruby", "perl", "php", "lua", "osascript", "expect",
         "eval", "env", "xargs", "source",
         "bash", "sh", "zsh", "dash", "ksh", "fish",
+        "ash", "csh", "tcsh", "nu", "pwsh", "powershell",
         "ssh", "sudo", "make", "just", "rake", "bundle",
         "npm", "npx", "yarn", "pnpm", "pipenv", "poetry", "cargo", "go",
         "docker", "kubectl", "watch", "parallel", "tmux", "screen",
@@ -806,7 +880,65 @@ _OPAQUE_EXECUTABLE_NAMES = frozenset(
 _GIT_TARGET_WRITE_SUBCOMMANDS = frozenset({"push", "lfs", "config"})
 
 
+# [2026-10-04][fix] 引用された -c の中のコマンドは fetch でも実行される。
+# 値の中身を推測する案は採らず、既存の無害な認証プロンプト設定だけを認める。
+def git_inline_config_is_unsafe(tokens: list[str], git_index: int) -> bool:
+    _, end = git_subcommand(tokens, git_index)
+    index = git_index + 1
+    while index < end:
+        token = tokens[index]
+        config = None
+        if token in {"-c", "--config-env"}:
+            if index + 1 >= end:
+                return True
+            config = tokens[index + 1]
+            index += 2
+        elif token.startswith("-c") and token != "-c":
+            config = token[2:]
+            index += 1
+        elif token.startswith("--config-env="):
+            config = token[len("--config-env="):]
+            index += 1
+        elif token in {"-C", "--git-dir", "--work-tree", "--namespace"}:
+            index += 2
+        else:
+            index += 1
+        if config is not None and not git_config_key_is_harmless(config.split("=", 1)[0]):
+            return True
+    return False
+
+
+# [2026-10-04][fix] fetch等の実行プログラム指定は引用された引数内で任意実行できる。
+# 引数の文字列を推測して安全扱いする案は採らず、通常のfetchを保って明示指定だけ拒否する。
+def git_executable_option_is_unsafe(tokens: list[str], git_index: int) -> bool:
+    subcommand, command_index = git_subcommand(tokens, git_index)
+    # [2026-10-04][fix] Gitは長いオプションの省略と短いフラグの結合を受け付ける。
+    # 完全一致だけの検査は採らない。値を取る短いフラグの後ろを別フラグ扱いもしない。
+    args = tokens[command_index + 1:]
+    for token in args:
+        # 引用された区切りや--がオプション値になり得るため、値で走査を止めない。
+        # 字句境界を失ったargvから安全を推測する案は採らず、後続の実行指定も拒否する。
+        name = token.split("=", 1)[0]
+        if name.startswith("--") and len(name) > 2:
+            if any(option.startswith(name) for option in ("--upload-pack", "--receive-pack", "--exec")):
+                return True
+            # cloneの--config/-cも、接続プログラム等の任意設定を実行できる。
+            if subcommand == "clone" and "--config".startswith(name):
+                return True
+        elif subcommand in {"clone", "ls-remote"} and token.startswith("-") and not token.startswith("--"):
+            for flag in token[1:]:
+                if flag == "u":
+                    return True
+                if subcommand == "clone" and flag == "c":
+                    return True
+                if subcommand == "clone" and flag in {"b", "o", "j", "t"}:
+                    break
+    return False
+
+
 def _git_token_blocks_read_only_proof(tokens: list[str], git_index: int) -> bool:
+    if git_inline_config_is_unsafe(tokens, git_index) or git_executable_option_is_unsafe(tokens, git_index):
+        return True
     subcommand, _ = git_subcommand(tokens, git_index)
     if subcommand is None:
         return False  # グローバルオプションのみ（git --version 等）は書込みえない
@@ -831,6 +963,116 @@ def _gh_token_blocks_read_only_proof(tokens: list[str], gh_index: int) -> bool:
     return not gh_is_read_only(group, action)
 
 
+def _shell_command_segments(command: str) -> tuple[list[tuple[str, list[str]]], list[str]]:
+    """Tokenize shell separators without joining a no-space pipeline to git/gh."""
+    # [2026-10-04][fix] 配布レビュー: true|git push の git を見落として
+    # 読取専用と早期許可していた。標準 shlex を証明と宛先検査で共用する。
+    # 空白を要求する案・正規表現の追記だけの案は、別表記で再発するため採らない。
+    def lex(posix: bool, text: str = command) -> list[str]:
+        lexer = shlex.shlex(text, posix=posix, punctuation_chars=";&|\n<>()")
+        lexer.whitespace = " \t\r"
+        lexer.whitespace_split = True
+        lexer.commenters = ""
+        return list(lexer)
+
+    # [2026-10-05][fix] 非POSIXのshlexは語の途中の引用符（--pretty='%h %s'）を
+    # 開始と認識せず空白で割り、読取専用gitまで誤ブロックしていた。引用部分を
+    # 一時的に空白なしの記号へ置換して分割し、戻す。解釈のずれは下のPOSIX照合で
+    # 従来どおりfail-closedになる。
+    quoted: list[str] = []
+
+    def mask(match: re.Match[str]) -> str:
+        quoted.append(match.group(0))
+        return f"\x00{len(quoted) - 1}\x00"
+
+    masked = re.sub(r"""'[^']*'|"(?:\\.|[^"\\])*\"""", mask, command)
+    raw_tokens = [
+        re.sub(r"\x00(\d+)\x00", lambda m: quoted[int(m.group(1))], raw)
+        for raw in lex(False, masked)
+    ]
+    decoded_tokens: list[str] = []
+    for raw in raw_tokens:
+        if raw and all(char in ";&|\n" for char in raw):
+            decoded_tokens.append(raw)
+        else:
+            decoded = shlex.split(raw)
+            if len(decoded) != 1:
+                raise ValueError("ambiguous shell argument")
+            decoded_tokens.append(decoded[0])
+    # Non-POSIX tokens retain quoted separators but can split "up"stream.
+    # Never inspect a target unless the decoded arguments agree with POSIX shlex.
+    # Unsupported quote concatenation/escaping is rejected rather than guessed.
+    if decoded_tokens != lex(True):
+        raise ValueError("ambiguous shell argument concatenation")
+    # [2026-10-04][fix] shlex groups &&> into one punctuation token.
+    # Split only unquoted operator tokens after quote-preserving validation;
+    # raw-string splitting would also damage quoted search text, so avoid it.
+    pairs: list[tuple[str, str]] = []
+    for raw, token in zip(raw_tokens, decoded_tokens):
+        if raw and all(char in ";&|\n<>()" for char in raw) and any(char in "<>()" for char in raw):
+            pairs.extend((operator, operator) for operator in re.findall(
+                r"&>>|&>|>>|<<|<&|>&|<>|>\||&&|\|\||[;&|\n<>()]", raw))
+        else:
+            pairs.append((raw, token))
+    # [2026-10-04][fix] Consumer regression: final stderr duplication is
+    # shell syntax, not a numeric Git remote. Only remove the literal unquoted
+    # suffix after lexical validation. A spaced `2 >&1` keeps remote argument 2;
+    # quoted `"2>&1"` likewise remains an argument. Other redirect forms keep
+    # their existing conservative target checks.
+    suffix_end = len(pairs)
+    while suffix_end and pairs[suffix_end - 1][0].strip("\n") == "":
+        suffix_end -= 1
+    if (suffix_end >= 3 and pairs[suffix_end - 3:suffix_end] == [("2", "2"), (">&", ">&"), ("1", "1")]
+            and re.search(r"[ \t]2>&1[ \t\r\n]*$", command)):
+        pairs = pairs[:suffix_end - 3] + pairs[suffix_end:]
+    segments: list[tuple[str, list[str]]] = []
+    separators: list[str] = []
+    tokens: list[str] = []
+    pending_separator: str | None = None
+    # [2026-10-04][fix] SYSTEM配布レビュー: (git push ...) の (git が
+    # 実行名と認識されず所有者検査を素通りした。既存shlexで未引用の括弧を
+    # 分離し、group内のgit/ghも通常の宛先検査へ送る。引用引数は保持する。
+    # cdを含む書込groupはscopeを平坦化して宛先を推測せずfail-closedにする。
+    # 自前shell parser/新しいcwd stackは保守範囲を増やすため採らない。
+    has_shell_group = False
+    for raw, token in pairs:
+        if raw in {"(", ")"}:
+            has_shell_group = True
+            continue
+        if raw and all(char in ";&|\n" for char in raw):
+            separator = raw.strip("\n") or "\n"
+            if separator not in {";", "&&", "||", "|", "\n"}:
+                raise ValueError("unsupported shell separator")
+            if tokens:
+                segments.append((shlex.join(tokens), tokens))
+                tokens = []
+                pending_separator = separator
+            elif pending_separator is not None and separator != "\n":
+                raise ValueError("ambiguous consecutive shell separators")
+        else:
+            if not tokens and segments and pending_separator is not None:
+                separators.append(pending_separator)
+                pending_separator = None
+            tokens.append(token)
+    if tokens:
+        segments.append((shlex.join(tokens), tokens))
+    elif pending_separator not in {None, ";", "\n"}:
+        raise ValueError("missing command after shell separator")
+    if has_shell_group and any("cd" in segment_tokens for _, segment_tokens in segments):
+        if any(
+            (Path(token).name == "git" and _git_token_blocks_read_only_proof(segment_tokens, index))
+            or (Path(token).name == "gh" and _gh_token_blocks_read_only_proof(segment_tokens, index))
+            or (index == 0 and (
+                Path(token).name.startswith("python")
+                or Path(token).name in _OPAQUE_EXECUTABLE_NAMES
+            ))
+            for _, segment_tokens in segments
+            for index, token in enumerate(segment_tokens)
+        ):
+            raise ValueError("cannot prove repository target across grouped cd")
+    return segments, separators
+
+
 def command_is_provably_read_only(command: str) -> bool:
     """コマンド全体が upstream write / 宛先設定変更を起こしえないと静的に証明できるか。
 
@@ -843,14 +1085,11 @@ def command_is_provably_read_only(command: str) -> bool:
     """
     if re.search(r"[$`]", command) or "<(" in command or ">(" in command:
         return False
-    for segment in re.split(r"(?:&&|\|\||;|\n)", command):
-        segment = segment.strip()
-        if not segment:
-            continue
-        try:
-            tokens = shlex.split(segment)
-        except ValueError:
-            return False
+    try:
+        segments, _separators = _shell_command_segments(command)
+    except ValueError:
+        return False
+    for _segment, tokens in segments:
         for index, token in enumerate(tokens):
             executable = Path(token).name
             if (
@@ -867,7 +1106,6 @@ def command_is_provably_read_only(command: str) -> bool:
 
 
 def validate(command: str, base: Path) -> tuple[bool, str]:
-    owner = configured_owner()
     override_reason = environment_override_blocks_write(command)
     if override_reason:
         return False, override_reason
@@ -877,6 +1115,10 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
     # 下の fail-closed 解析へ送る。
     if command_is_provably_read_only(command):
         return True, ""
+    # [2026-10-04][fix] #3529: Git 実行禁止の worker でも pwd/cat を読めるよう、
+    # 所有者照会は既存の read-only 証明後に行う。環境検査・書込検査は維持し、
+    # sandbox を緩める案や照会失敗を許可扱いにする案は採らない。
+    owner = configured_owner()
     # [2026-10-01][fix] 無害 GIT_CONFIG_* の緩和は厳格な単純形の push だけに限定する。
     # 単純形以外で git push 系を言及するコマンドは、緩和前の挙動に戻して止める。
     # 緩和が効くのは os.environ の無害2キー（またはコマンド先頭の無害2キーだけの
@@ -906,21 +1148,57 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
         return False, "repository write target may be changed inside the same command"
     current_cwd = base
     cwd_known = True
-    if re.search(r"\bcd\b", command) and re.search(r"\|\||\|", command):
-        if re.search(r"(?:^|[;&|\s])(?:[^\s/]+/)*(?:git|gh)(?:\s|$)", command):
-            return False, "cannot prove repository write target across conditional or piped cd"
-    for segment in re.split(r"(?:&&|\|\||;|\n)", command):
-        segment = segment.strip()
-        if not segment:
-            continue
-        try:
-            tokens = shlex.split(segment)
-        except ValueError:
-            if re.search(r"\b(?:git\s+push|gh\s+(?:pr\s+create|api))\b", segment):
-                return False, "ambiguous repository write command"
-            continue
+    try:
+        segments, separators = _shell_command_segments(command)
+    except ValueError:
+        return False, "ambiguous repository command or shell separator"
+    # [2026-10-04][fix] 引用された実行名でも cd とパイプを見逃さない。
+    # パイプ内の cd は他の段の cwd を変えず、; / || / 改行は cd 失敗後も
+    # 実行を続け得る。書込がある形は、静的な cd && command だけ検査する。
+    # [2026-10-04][fix] Prefix redirects/assignments can hide a real cd from
+    # the static cwd tracker. Reject this unsupported write form rather than
+    # checking origin in the old repository; argument strings named cd still pass.
+    redirects = {">", ">>", "<", "<<", "<&", ">&", "<>", ">|", "&>", "&>>"}
+    for _segment, tokens in segments:
+        prefix = 0
+        while prefix < len(tokens):
+            if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[prefix]):
+                prefix += 1
+            elif tokens[prefix].isdigit() and prefix + 1 < len(tokens) and tokens[prefix + 1] in redirects:
+                prefix += 1
+            elif tokens[prefix] in redirects:
+                prefix += 2
+            else:
+                break
+        # [2026-10-05][fix] CMS配送レビューで builtin cd の後のpushが旧cwdを使った。
+        # 送信先を確認できない移動は拒否する。builtinの新しい解析機構は追加しない。
+        # [2026-10-05][fix] command cd / builtin -- cd / builtin builtin cd も旧cwd検査を抜けた。
+        # [2026-10-05][fix] time builtin cd also executes in the parent shell; refuse it.
+        # 未解析wrapper内のcdはすべて拒否する。--や入れ子を新たに解析・推測しない。
+        # [2026-10-05][fix] pushd/popd change shell cwd without our plain-cd tracking.
+        # Reject directory-stack commands in repository operations; no new stack parser.
+        # [2026-10-05][fix] CMS全文レビューでzsh chdirが旧cwdのownerで許可された。
+        # 守る原則: 追跡できない移動で第三者宛てを誤許可しない。
+        # 他案不採用: chdirのcwd追跡やwrapper解析の追加は保守を増やす。
+        # 対応: 既存の未解析移動拒否へchdirを加える。通常引数も安全側で拒否する。
+        if any(token in {"pushd", "popd", "chdir"} for token in tokens):
+            return False, "cannot prove repository write target through unparsed directory change"
+        # [2026-10-05][fix] 同レビューの ! cd は列挙外prefixから旧cwdを使った。
+        # 本文と同じく推測で宛先を決めない。prefix列挙やcwd parserの追加はせず、
+        # git/ghの引数と通常表示以外の、未解析cd prefixを拒否する。
+        if (prefix < len(tokens) and "cd" in tokens[prefix + 1:]
+                and Path(tokens[prefix]).name not in {"git", "gh", "printf", "echo"}):
+            return False, "cannot prove repository write target through wrapped cd"
+        if 0 < prefix < len(tokens) and tokens[prefix] == "cd":
+            return False, "cannot prove repository write target through prefixed cd"
+    if any(tokens and tokens[0] == "cd" for _segment, tokens in segments) and any(
+        separator != "&&" for separator in separators
+    ):
+        return False, "cannot prove repository write target across conditional or piped cd"
+    for segment, tokens in segments:
         if tokens and tokens[0] == "cd":
-            if len(tokens) != 2:
+            if (len(tokens) != 2 or tokens[1] == "-"
+                    or tokens[1].startswith("~") or re.search(r"[$`]", tokens[1])):
                 cwd_known = False
             else:
                 target = Path(tokens[1])
@@ -928,7 +1206,10 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
             continue
         for index, token in enumerate(tokens):
             executable = Path(token).name
-            if executable in {"python", "python3", "node", "ruby", "perl", "osascript"}:
+            # [2026-10-05][fix] dash was an uninspected executable write payload.
+            # Unknown shell dialects use the existing opaque-payload rejection.
+            if executable in {"python", "python3", "node", "ruby", "perl", "osascript",
+                              "dash", "ash", "ksh", "fish", "csh", "tcsh", "nu", "pwsh", "powershell"}:
                 payload = " ".join(tokens[index + 1 :])
                 if opaque_payload_mentions_repository_write(payload):
                     return False, f"cannot prove repository target through opaque {executable} payload"
@@ -939,24 +1220,44 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
             if executable == "eval" and contains_repository_write(" ".join(tokens[index + 1 :])):
                 return False, "cannot prove repository target through eval"
             if executable in {"bash", "sh", "zsh"}:
+                # [2026-10-05][fix] -lc/-ic が既存-c再検査を抜けたため拒否する。
+                # 本人宛て証明を維持し、結合オプション解析の拡張や推測許可は採らない。
                 try:
                     shell_c_index = tokens.index("-c", index + 1)
                 except ValueError:
                     shell_c_index = -1
+                shell_options_end = shell_c_index if shell_c_index >= 0 else len(tokens)
+                if any(re.fullmatch(r"-[A-Za-z]*c[A-Za-z]*", arg)
+                       for arg in tokens[index + 1:shell_options_end]):
+                    return False, "cannot prove repository target through combined shell command options"
                 if shell_c_index >= 0:
                     if shell_c_index + 1 >= len(tokens):
                         return False, "ambiguous shell wrapper"
+                    # [2026-10-05][fix] bash -c -- skipped the actual following payload.
+                    # Refuse ambiguous option-delimited payloads rather than parsing more.
+                    if tokens[shell_c_index + 1] == "--":
+                        return False, "cannot prove repository target through option-delimited shell payload"
                     nested_allowed, nested_reason = validate(tokens[shell_c_index + 1], current_cwd)
                     if not nested_allowed:
                         return False, nested_reason
             if executable == "git":
+                if git_executable_option_is_unsafe(tokens, index):
+                    return False, "cannot prove repository target with Git executable program option"
+                if git_inline_config_is_unsafe(tokens, index):
+                    return False, "cannot prove repository target with executable or unknown Git configuration"
                 subcommand, _ = git_subcommand(tokens, index)
                 if subcommand:
-                    alias = subprocess.run(
-                        ["git", "-C", str(current_cwd), "config", "--get", f"alias.{subcommand}"],
-                        text=True,
-                        capture_output=True,
-                    ).stdout.strip()
+                    try:
+                        alias = subprocess.run(
+                            ["git", "-C", str(current_cwd), "config", "--get", f"alias.{subcommand}"],
+                            text=True,
+                            capture_output=True,
+                        ).stdout.strip()
+                    except OSError:
+                        # git が spawn できない環境（worker の隔離 sandbox）では alias
+                        # を引けないが、組込み名に alias は効かないため「alias なし」と
+                        # 同等に扱う。未知名は次の KNOWN 判定で従来どおり fail-closed。
+                        alias = ""
                     if alias:
                         return False, f"cannot prove repository target for Git alias {subcommand}"
                     if subcommand not in KNOWN_GIT_SUBCOMMANDS:
@@ -981,7 +1282,10 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
                 # オプションであり、既定リモート解決をすり替える。owner 一致
                 # 判定より前に必ず止める。VALUE(URL) は理由文字列に出さない。
                 push_args = tokens[push_index + 1 :]
-                if any(arg == "--repo" or arg.startswith("--repo=") for arg in push_args):
+                # [2026-10-05][fix] CMS配布レビューで --rep=第三者URL が既定remote検査を抜けた。
+                # 実送信先を証明できないrepo指定は省略形も止める。曖昧な短縮も許可しない。
+                # 別パーサー新設やremoteの推測は避け、既存--repo拒否条件に集約する。
+                if any(arg.split("=", 1)[0] in {"--r", "--re", "--rep", "--repo"} for arg in push_args):
                     return False, "cannot prove Git push target with --repo"
                 global_options = tokens[index + 1 : push_index]
                 if any(
@@ -999,7 +1303,7 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
                 remote = first_positional_after(tokens, push_index + 1)
                 try:
                     target_owners = [github_owner(url) for url in resolve_remote_urls(cwd, remote)]
-                except (subprocess.CalledProcessError, ValueError):
+                except (subprocess.CalledProcessError, ValueError, OSError):
                     return False, "cannot prove Git push target is the user's fork"
                 if not target_owners or any(target_owner is None or target_owner.casefold() != effective_owner.casefold() for target_owner in target_owners):
                     rendered = ",".join(target_owner or "unknown" for target_owner in target_owners) or "unknown"
@@ -1038,10 +1342,23 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
                 env_repo = environment_repo(tokens, index) or os.environ.get("GH_REPO")
                 try:
                     target_owner = github_owner_from_args(args, group, action)
+                    destination_owner = option_value(args, {"--org"}) if (group, action) == ("repo", "fork") else None
+                    # [2026-10-05][fix] CMS全文レビューでIssue移動先の第三者ownerを見落とした。
+                    # 守る原則: 移動元だけでなく実際の移動先も本人ownerに限定する。
+                    # 他案不採用: GH全parser追加や引数位置の推測は保守と誤許可を増やす。
+                    # 対応: 既知のtransfer ISSUE OWNER/REPOだけを照合し、未対応形式は拒否する。
+                    if (group, action) == ("issue", "transfer"):
+                        if (args[:2] != [group, action] or len(args) < 4
+                                or args[2].startswith("-")
+                                or not re.fullmatch(r"[^/\s]+/[^/\s]+", args[3])):
+                            raise ValueError("unproven issue transfer destination")
+                        transfer_owner = args[3].split("/", 1)[0]
+                        if transfer_owner.casefold() != effective_owner.casefold():
+                            return False, "issue transfer destination is not fork owner"
                 except ValueError:
                     return False, "cannot prove GitHub write target with duplicate repository selectors"
                 if group == "repo" and action == "fork":
-                    destination_owner = option_value(args, {"--org"}) or effective_owner
+                    destination_owner = destination_owner or effective_owner
                     if destination_owner.casefold() != effective_owner.casefold():
                         return False, f"fork destination owner {destination_owner} is not fork owner {effective_owner}"
                     continue
@@ -1052,7 +1369,7 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
                         urls = resolve_remote_urls(cwd, "origin")
                         owners = [github_owner(url) for url in urls]
                         target_owner = owners[0] if len(owners) == 1 else None
-                    except subprocess.CalledProcessError:
+                    except (subprocess.CalledProcessError, OSError):
                         return False, "cannot prove GitHub write target is the user's fork"
                 if target_owner is None or target_owner.casefold() != effective_owner.casefold():
                     return False, f"GitHub write target owner {target_owner or 'unknown'} is not fork owner {effective_owner}"
