@@ -579,12 +579,17 @@ UPSTREAM_GUARD_MSG='[hook:block-main-commit] third-party upstream への書込�
 # 同じ分類不能系へ振る。deny 自体は維持し、fork 誘導文言だけ外す（HEREDOC 静的緩和はしない）。
 UNCLASSIFIED_GIT_GUARD_MSG='[hook:block-main-commit] Git 操作の書込先を安全に証明できないため停止しました。\n\nこれは third-party upstream への書込み検査とは別です。commit メッセージは git commit -F <file>、作業ディレクトリ変更は Shell の working_directory、パイプ付き複合は分割してください。read-only の既知サブコマンドだけを複合実行するか、書き込みが必要なら単発の明確な git/gh コマンドに分けてください。'
 guard_reason=$(python3 "$SCRIPT_DIR/../lib/upstream-write-guard.py" --cwd "$CWD" --command "$COMMAND_FOR_GIT_MATCH" 2>&1) || {
+  # [2026-10-06][fix] issue #3674: 「証明不能」系の拒否を third-party upstream 文言へ
+  #   誤誘導しない。解析不能な複数行コマンド等は原因が upstream ではないため、
+  #   upstream 文言は宛先 owner を解決できた上での境界違反（fork owner 不一致 /
+  #   github.user 固定の操作 / URL rewrite 設定変更 / 同一コマンド内の宛先変更）だけに
+  #   限定し、それ以外はすべて「書込先を安全に証明できない」分類不能文言で止める。
   case "$guard_reason" in
-    *"unknown Git subcommand"*|*"Git alias"*|*"through shell substitution"*|*"through opaque"*|*"across conditional or piped cd"*|*"through env split-string"*|*"through eval"*)
-      _emit_deny_with_telemetry "$UNCLASSIFIED_GIT_GUARD_MSG\n\n検出理由: $guard_reason"
+    *"is not fork owner"*|*"github.user is fixed"*|*"Git URL rewrite configuration"*|*"may be changed inside the same command"*)
+      _emit_deny_with_telemetry "$UPSTREAM_GUARD_MSG\n\n検出理由: $guard_reason"
       ;;
     *)
-      _emit_deny_with_telemetry "$UPSTREAM_GUARD_MSG\n\n検出理由: $guard_reason"
+      _emit_deny_with_telemetry "$UNCLASSIFIED_GIT_GUARD_MSG\n\n検出理由: $guard_reason"
       ;;
   esac
 }

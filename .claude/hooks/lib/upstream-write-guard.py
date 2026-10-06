@@ -1105,7 +1105,59 @@ def command_is_provably_read_only(command: str) -> bool:
     return True
 
 
+# [2026-10-06][fix] issue #3674: git / gh を字句上含まないコマンドは書込先検査の
+# 対象外とし、セグメント解析に入る前に許可する。
+# 背景:
+#   - 依頼意図: heredoc や改行続きの複数行コマンド（例: /tmp への cat 出力の後に
+#     python3 / node / grep を改行で続ける形）が _shell_command_segments の解析失敗で
+#     「ambiguous repository command or shell separator」となり、git にも gh にも
+#     触れない一時ファイル編集まで third-party upstream 文言で誤拒否されていた。
+#   - 守るべき業務ルール: git/gh を含むコマンドの fail-closed 判定は緩めない。
+#     「含まない」の判定は引用・escape 分割偽装（g\it / g"i"t / g'i't → git）と
+#     コマンド位置の変数・置換間接指定（`$G push` 等）を考慮し、fail-open を作らない。
+#   - 他案不採用理由:
+#     1) _shell_command_segments へ heredoc 解析を追加する案 → heredoc 本文は
+#        実行コマンドではないが terminator の厳密な切り分けは本ガードの軽量
+#        字句設計を超えるため不採用。
+#     2) 解析失敗時だけ言及チェックで許可する案 → 「解析できる git 無し複合」と
+#        「解析できない git 無し複合」で扱いが分かれ、git/gh を含まないコマンドは
+#        書込先を検査しないという issue の期待を満たせないため不採用。
+_COMMAND_WORD_NAMES = frozenset({"git", "gh"})
+
+# コマンド位置（先頭・区切り直後・代入prefix列の後）にある $VAR / ${VAR} /
+# バッククォートは、展開結果が任意の実行名になりうるため言及扱いとする。
+_COMMAND_POSITION_INDIRECTION_RE = re.compile(
+    r"(?:^|[;&|({\n])[ \t]*(?:[A-Za-z_][A-Za-z0-9_]*=[^ \t;&|({]*[ \t]+)*[$`]"
+)
+
+
+def command_mentions_git_or_gh(command: str) -> bool:
+    """git / gh 実行または github.com への言及を静的に排除できないかを判定する。
+
+    クォート（' "）と escape（\\）を除去してからトークン化するため、
+    `g\\it` / `g"i"t` / `g'i't` のような分割綴りで git を騙る入力も言及とみなす。
+    basename が git / gh のトークン（/usr/bin/git 等）と、コマンド位置の
+    `$VAR` / `${VAR}` / `$(...)` / バッククォート間接指定を拾う。
+    github.com への言及は opaque payload 判定と同じ境界で解析経路へ送る。
+    引数位置の `$F`（`sed ... $F` 等）は実行名を作らないため言及に含めない。
+    """
+    collapsed = re.sub(r"[\\\"']", "", command)
+    if re.search(r"github\.com", collapsed, re.IGNORECASE):
+        return True
+    # トークン化は opaque payload 判定（opaque_payload_mentions_repository_write）と
+    # 同じ文字集合で行う。`["git","push"]` のようなコード内リテラルや
+    # `echo `git push`` のバッククォート内実行名（引数位置でも中身は実行される）も拾う。
+    for token in re.split(r"[^A-Za-z0-9_./:-]+", collapsed):
+        if Path(token).name.lower() in _COMMAND_WORD_NAMES:
+            return True
+    return bool(_COMMAND_POSITION_INDIRECTION_RE.search(collapsed))
+
+
 def validate(command: str, base: Path) -> tuple[bool, str]:
+    # [2026-10-06][fix] issue #3674: git / gh / github.com への言及が一切無い
+    # コマンドは upstream 書込みを起こしえないため、書込先検査を行わない。
+    if not command_mentions_git_or_gh(command):
+        return True, ""
     override_reason = environment_override_blocks_write(command)
     if override_reason:
         return False, override_reason
