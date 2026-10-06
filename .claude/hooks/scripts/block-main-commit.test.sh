@@ -1417,6 +1417,46 @@ expect_block "prefixed cdのgroup書込は既存guardで拒否" "$feature_repo" 
 expect_allow "read-only groupの引数pythonは実行名と混同しない" "$feature_repo" \
   "(cd $third_party_repo && printf '%s' python)"
 
+# [2026-10-06][test] issue #3674: git/gh を含まない複数行・heredoc コマンドの誤拒否を回帰固定。
+# 背景:
+#   - 依頼意図: /tmp 編集だけを行う複数行コマンドが
+#     「ambiguous repository command or shell separator」で third-party upstream 文言の
+#     誤拒否になっていた実害を固定する。
+#   - 守るべき業務ルール: git/gh 言及を含む解析不能コマンドは分類不能文言で拒否し、
+#     本物の third-party push は upstream 文言のまま（許可・拒否を対で置く）。
+#   - 他案不採用理由: 許可側だけのテストでは、言及チェックを緩めた将来の変更で
+#     git 言及コマンドの fail-closed が消えても検知できないため不採用。
+expect_allow \
+  "heredoc + python3 改行続き（git 無し）は許可" \
+  "$feature_repo" \
+  "cat > /tmp/x3674.py <<'EOF'
+print('hi')
+EOF
+python3 -c \"print(1)\""
+
+expect_allow \
+  "python3 heredoc + node 改行続き（git 無し）は許可" \
+  "$feature_repo" \
+  "python3 - <<'EOF'
+import sys
+EOF
+node /tmp/x3674.mjs"
+
+expect_allow \
+  "複数行 sed + grep（git 無し・引数の \$F）は許可" \
+  "$feature_repo" \
+  "sed -i '' -e 's/a/b/' \$F
+grep -n 'b' \$F"
+
+expect_unclassified_deny \
+  "git 言及を含む解析不能コマンドは分類不能文言で拒否（upstream 文言と混同しない）" \
+  "$feature_repo" \
+  "cat > /tmp/x3674.py <<'EOF'
+print('x')
+EOF
+git push upstream feature/test" \
+  "ambiguous repository command or shell separator"
+
 TOTAL=$((PASS + FAIL))
 printf '\n=== block-main-commit.test.sh: %d/%d PASS ===\n' "$PASS" "$TOTAL"
 

@@ -111,6 +111,7 @@ ORCAの対象はMac Studioのみ。見えない状態は不明、doneは成功�
 開始・引継ぎ時に `~/business/AGENT-HUB/agent-memory/registry/placement-policy.md` の「AI作業記憶の3層契約」を読み、Hub commit・契約版・本文SHA-256・読込時刻を確認する。更新時だけ再読する。
 AgentMemoryは引継ぎ一次記録、agent-gbrainはtech（既存技術知識・教訓）とrule（Hub同版の読取専用派生）、Hubは役割・規則・スキルの正本。詳細は上記一箇所を参照し、My GBrainの個人source `shintaro-gbrain` へ混載しない。
 参照だけのロード、本文読込、source認証、実保存を区別する。未接続・未読を全適用としない。agent-gbrainの本番writerは未提供であり、ローカル候補検査を保存成功と報告しない。
+AIが残す記憶（各AIの自動メモリ・AgentMemory・agent-gbrain・My GBrainの`remember`）は、1件ごとに「どこで知ったか」と「いつ」を付ける（例 `[source: 会話・PR・ファイル等; added: YYYY-MM-DD]`。本人指定2026-10-06）。
 
 <!-- AGENT-HUB MANAGED: global-agent-behavior END -->
 
