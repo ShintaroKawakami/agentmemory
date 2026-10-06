@@ -117,6 +117,23 @@ AI worker / CLI 委譲も同じ考え方で、Codex なら `--sandbox read-only`
 - 委譲プロンプトの冒頭に「今回の終わり：〜」を1行書く。
 - verify before return は、その終わりを確かめるのに必要な分だけにする。
 
+## 10. 外部送信（egress）を含む委譲は構造化承認を必須とする
+
+外部サービスへの送信（webhook 投稿・メール・外部 API 書き込み等の side effect / egress）を含む実装を委譲する時、
+承認証跡を**構造化フィールド**で渡す。プロンプト本文への「ユーザーが承認した」等の自然文の再掲は承認証跡にならない
+（Issue #1740 実測: 親 self-report は子レーン審査で承認として認められず反復停止した）。
+
+- AI Worker 委譲: `delegate_impl` の `egress_approval` オブジェクトに `approval_id` /
+  `destination_class` / `payload_fields` / `excluded_fields` / `execution_mode`
+  （`mock_only` / `staging` / `production`）/ `valid_until` を載せる。
+  `staging` / `production`（実送信権限）は `send_approval_id` の別承認が必須で、
+  mock-only の実装承認と実外部送信は別ゲート（Issue #1625）。
+- Task / subagent 委譲: 同じ6フィールドを委譲プロンプト内で構造化して明記する。
+- 欠落・期限切れ・scope 超過は従来どおり fail-close。委譲ゲートの拒否は
+  `missing_fields` / `invalid_fields` を機械可読で返すので、同じ payload の再送ではなく
+  不足フィールドを補って再委譲する。
+- 承認対象には実 URL・秘密値・payload 実値・個人情報を含めない（識別子と slug のみ）。
+
 ## delegate プロンプトのテンプレート・親側の verify ステップ
 
 テンプレート全文と、親セッションが `git status --porcelain` / `git diff --stat` / `git diff -- <files>` で確認する verify コマンド列は
