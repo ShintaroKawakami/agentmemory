@@ -250,6 +250,10 @@ HOOK_CWD="$(extract_field cwd)"
 
 export CURSOR_PROJECT_DIR="$PROJECT_DIR"
 export CLAUDE_PROJECT_DIR="$PROJECT_DIR"
+# [2026-10-06][feat] 呼び出し記録の AI 名。Cursor の hook はこの中継だけを通るため、ここで 1 回だけ指定する。
+# 背景: telemetry-log.sh は T_TOOL が無いと claude-code と記録し、Cursor の記録が Claude Code に混ざっていた。
+# 守る契約: 外から T_TOOL が指定されていればそれを優先する。
+export T_TOOL="${T_TOOL:-cursor}"
 export CURSOR_HOOK_INPUT="$RAW_INPUT"
 
 if [ -n "$TOOL_COMMAND" ]; then
