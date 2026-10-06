@@ -69,6 +69,38 @@ else
   fail "Skill発火でJSONLが増える" "行数が増えなかった(before=$BEFORE after=$AFTER)"
 fi
 
+# [2026-10-06][feat] skill_fire の診断情報（meta）と AI 名（T_TOOL）の回帰テスト。
+# 背景: 名前が空の skill_fire が約2割残り原因不明だったため、発火イベント名を meta に残し、
+#   名前が空のときだけ受け取った項目の「名前」を残す（値は残さない）。AI別の集計表のため T_TOOL を尊重する。
+# ── 1-b: skill_fire の meta に発火イベント名が残る ─────────────────────
+printf '{"hook_event_name":"PostToolUse","tool_name":"Skill","tool_input":{"skill":"resend"}}' \
+  | bash "$HOOK" 2>/dev/null
+if last_line | python3 -c 'import json,sys; d=json.loads(sys.stdin.read()); assert d["name"]=="resend" and d["meta"]=={"hook_event":"PostToolUse"}' 2>/dev/null; then
+  pass "skill_fireのmetaに発火イベント名が残る（名前あり）"
+else
+  fail "skill_fireのmeta" "想定外の内容: $(last_line)"
+fi
+
+# ── 1-c: 名前が空でも記録し、受け取った項目の名前だけを meta に残す（値は残さない）──
+printf '{"hook_event_name":"PostToolUse","tool_name":"Skill","tool_input":{"secret_value":"SHOULD-NOT-BE-LOGGED","args":"x"}}' \
+  | bash "$HOOK" 2>/dev/null
+EMPTY_LINE="$(last_line)"
+if printf '%s' "$EMPTY_LINE" | python3 -c 'import json,sys; d=json.load(sys.stdin); m=d["meta"]; assert d["event_type"]=="skill_fire" and d["name"]=="" and m["tool_input_keys"]==["args","secret_value"] and "tool_input" in m["payload_keys"] and m["hook_event"]=="PostToolUse"' 2>/dev/null \
+   && ! printf '%s' "$EMPTY_LINE" | grep -q 'SHOULD-NOT-BE-LOGGED'; then
+  pass "名前が空のskill_fireは項目名だけをmetaに残し値は残さない"
+else
+  fail "名前が空のskill_fire" "想定外の内容: $EMPTY_LINE"
+fi
+
+# ── 1-d: T_TOOL で AI 名を指定できる（Kimi / Cursor の中継が使う）──────────
+printf '{"hook_event_name":"PreToolUse","tool_name":"Skill","tool_input":{"skill":"brainstorm"}}' \
+  | T_TOOL=kimi-code bash "$HOOK" 2>/dev/null
+if last_line | python3 -c 'import json,sys; d=json.loads(sys.stdin.read()); assert d["tool"]=="kimi-code" and d["name"]=="brainstorm"' 2>/dev/null; then
+  pass "T_TOOLでAI名を指定できる"
+else
+  fail "T_TOOL" "想定外の内容: $(last_line)"
+fi
+
 # ── 2/3: AGENT_HUB_TELEMETRY_DISABLE=1 で何も書かず exit 0 ───────────
 BEFORE=$(count_lines)
 DISABLE_OUT="$(printf '{"hook_event_name":"PreToolUse","tool_name":"Skill","tool_input":{"name":"nope"}}' \

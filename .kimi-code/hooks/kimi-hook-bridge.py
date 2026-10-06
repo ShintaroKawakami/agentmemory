@@ -46,6 +46,10 @@ def main() -> int:
         tool_input = {}
 
     env = os.environ.copy()
+    # [2026-10-06][feat] 呼び出し記録の AI 名。Kimi の hook はこの中継だけを通るため、ここで 1 回だけ指定する。
+    # 背景: telemetry-log.sh は T_TOOL が無いと claude-code と記録し、Kimi の記録が Claude Code に混ざっていた。
+    # 守る契約: 外から T_TOOL が指定されていればそれを優先する（setdefault）。
+    env.setdefault("T_TOOL", "kimi-code")
     env["CLAUDE_PROJECT_DIR"] = first_string(payload.get("cwd"), payload.get("project_dir"), env.get("PWD"), os.getcwd())
     env["CLAUDE_FILE_PATH"] = first_string(
         tool_input.get("file_path"),

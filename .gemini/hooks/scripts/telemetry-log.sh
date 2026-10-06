@@ -74,6 +74,7 @@ ti = get_tool_input(data)
 
 event_type = ""
 name = ""
+meta = {}
 
 if hook_event == "SessionStart":
     event_type = "session_start"
@@ -96,6 +97,16 @@ elif tool_name == "Skill":
     # 守る契約: skillを正本として読み、旧name/skill_nameは互換入力として維持する。
     # 他案不採用: 旧キー専用へ戻すと現行payloadを再び欠損させるため採らない。
     name = get_string(ti, "skill", "name", "skill_name")
+    # [2026-10-06][feat]
+    # 背景: 名前が空の skill_fire が 7/23 の修正後も約2割残り（2026-10-05 実測 222件）、原因を特定できなかった。
+    #   Pre/Post のどちらで空になるかも、記録に残っていないため分からない。
+    # 守る契約: skill_fire には必ず発火したイベント名を meta に残す。名前が空のときだけ、
+    #   受け取った項目の「名前」だけを残す（値は残さない＝秘匿値・本文は記録しない）。
+    # 他案不採用: payload の全文を残す案は、個人情報・秘密を記録に混ぜる恐れがあるため採らない。
+    meta = {"hook_event": hook_event}
+    if not name:
+        meta["tool_input_keys"] = sorted(str(k) for k in ti.keys())[:12]
+        meta["payload_keys"] = sorted(str(k) for k in data.keys())[:16]
 elif tool_name in ("Task", "Agent"):
     event_type = "subagent_start"
     name = get_string(ti, "subagent_type", "subtype") or agent_type
@@ -109,7 +120,8 @@ if not event_type:
 
 # タブ区切りで shell へ返す(name にタブが含まれる可能性は低いが、念のため除去)
 name = name.replace("\t", " ").replace("\n", " ")
-print("\t".join([event_type, name, "ok"]))
+meta_json = json.dumps(meta, ensure_ascii=False, separators=(",", ":")) if meta else ""
+print("\t".join([event_type, name, "ok", meta_json]))
 PY
 )"
 
@@ -118,8 +130,13 @@ if [ -n "$parsed" ]; then
   event_type="${parsed%%$'\t'*}"
   rest="${parsed#*$'\t'}"
   name="${rest%%$'\t'*}"
-  outcome="${rest#*$'\t'}"
-  agent_hub_telemetry_log "$event_type" "$name" "$outcome" 2>/dev/null || true
+  rest="${rest#*$'\t'}"
+  outcome="${rest%%$'\t'*}"
+  meta_json=""
+  case "$rest" in
+    *$'\t'*) meta_json="${rest#*$'\t'}" ;;
+  esac
+  agent_hub_telemetry_log "$event_type" "$name" "$outcome" "$meta_json" 2>/dev/null || true
 fi
 
 exit 0
