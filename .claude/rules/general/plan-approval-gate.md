@@ -14,6 +14,16 @@
       を必須手順と「HTMLプランの中身」へ追記する。
 -->
 
+<!-- [2026-10-07][feat] v5（html-plan 形式）を既定に追加
+背景:
+  - ユーザー依頼意図: 伸太郎さんが公式 html-plan のお試し版を「かなり見やすい」と評価し、v5 を承認（2026-10-07「進めて」）。
+    プランは Orca と iPhone の Tailscale URL で見ている（同日発言）。
+  - 守るべき業務ルール: v4 の義務（出どころ・未確認なら止める・ヒアリング記録・承認3択・AI層は閉）は弱めない。
+    手順は skills/plan-approval/SKILL.md に置く二段構えを維持する。
+  - 他案不採用理由: v4 テンプレを消す案は、build-plan.py（node）が動かない環境で作れなくなるため不採用（*-v4.html で残す）。
+    CARD 文言（v4 表記）の更新は AGENTS.md 等の生成物の再生成が要るため、本変更では行わない。
+対応: 必須手順2・3と「中身」節へ v5 の作り方・届け方を足す。 -->
+
 <!-- agents-md-card:start -->
 ### CARD: plan-approval-gate — 中規模はHTML承認
 - **いつ**: 新機能・画面・データ形変更・複数ファイル実装の着手前
@@ -37,15 +47,15 @@
 ## 必須手順
 
 1. **プラン作成基準をライブ読み**: `skills/plan-approval` が `resolve-pj-prompt.py --phase plan` を実行し、PJ 別のプラン基準（`snippet-prompts/Typinator/plan/`。専用未作成 PJ は汎用 `dev-plan`）を読む。
-2. **HTML プランを作る（固定テンプレを必ず使う・独自デザイン禁止）**: 正本テンプレをコピーし中身だけ差し替える（通常=`plan-template.html`、AI worker 委譲時=`plan-template-aiworker.html`）。必須のビジュアル要素は下記「中身」節を参照。
-3. **提示して承認を待つ（両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 `open <file>` で PC ブラウザにも表示する。**タップ用ファイルカード作成と open による PC ブラウザ表示の両方を毎回必須とする**。末尾に「この実装でいいですか？（進めて / 直す / やらない）」を置き、**承認なしに実装へ進まない**。未確認・未確定が残る間は承認欄に赤で理由を出し、承認を求めない。保存規約（gitignore済み一時パス・短い slug・共有 URL は1行）は `skills/plan-approval/SKILL.md` を参照。同意の扱いは共通ルール CARD 01「承認の有効範囲」（正本: `dotfiles/global/shared/SHARED_AGENTS.md` の `global-agent-behavior` ブロック）に従う。
+2. **HTML プランを作る（固定テンプレを必ず使う・独自デザイン禁止）**: 正本テンプレをコピーし中身だけ差し替える（通常=`plan-template.html`、AI worker 委譲時=`plan-template-aiworker.html`）。v5 は `skills/plan-approval/scripts/build-plan.py` で組み立てる。build-plan.py が動かない環境は v4 テンプレ（`plan-template-v4.html` / `plan-template-aiworker-v4.html`）で作る。必須のビジュアル要素は下記「中身」節を参照。
+3. **提示して承認を待つ（両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 Orca（または `open <file>`）で PC に表示し、iPhone 向けに `skills/plan-approval/scripts/plan-share.sh` の Tailscale URL を出す（v5・2026-10-07〜。v4 で必須だったタップ用ファイルカードは必須にしない）。末尾に「この実装でいいですか？（進めて / 直す / やらない）」を置き、**承認なしに実装へ進まない**。未確認・未確定が残る間は承認欄に赤で理由を出し、承認を求めない。保存規約（gitignore済み一時パス・短い slug・共有 URL は1行）は `skills/plan-approval/SKILL.md` を参照。同意の扱いは共通ルール CARD 01「承認の有効範囲」（正本: `dotfiles/global/shared/SHARED_AGENTS.md` の `global-agent-behavior` ブロック）に従う。
 4. **承認直後に 📋 コミットメント台帳を全件タスク化する**: HTML プランの台帳の各行を、着手前に `TaskCreate` で 1 行 = 1 タスク化してから実装へ進む。台帳が全消化（実施済み or 明示保留）になるまで「完了」と宣言しない。詳細は `.claude/rules/general/plan-commitment-tracking.md`。
    - **AI worker を 1 度でも使う計画は必須**: 「AI worker 摩擦時は該当正本を worktree→PR→merge→fetch-only / detached 確認→cleanup で修正」の条項を台帳に必ず入れ、タスク化する（テンプレに既定行として焼き込み済み・消さない）。
 5. **承認後は標準パイプラインを通す**: 実装（dev-guardrails）→ codexレビュー → 実装監査 → CI → SSOT 同期確認 → 自動マージ。マージ時の人の再確認は不要（共通憲法 CARD 01「PRの自動マージ（全PJ共通）」）。本番作業を含め、未承認の高リスク変更・依頼範囲の変更だけは同CARDの「承認」に従う。
 
-## HTMLプランの中身（v4・2026-09-04〜）
+## HTMLプランの中身（v4・2026-09-04〜／v5・2026-10-07〜）
 
-構成部品一覧は `references/plan-template.html` の `parts` マニフェストと `skills/plan-approval/SKILL.md` が正本。複製しない。v4 で守る義務だけを次に置く。
+構成の正本は `skills/plan-approval/SKILL.md`（v5 は「v5 の構成」、v4 は `references/plan-template-v4.html` の `parts` マニフェスト）。複製しない。v4 で決めた次の義務は v5 でも同じで、v5 は `validate-plan-template.py` が検査する（v5 は明暗切替・既定ダーク、要約カード＋畳んだ CaD 付きコード、承認は既定値なし）。
 
 1. **図がメインで文字は補助**。文字版は `<details>` に畳む。「誰が」が2者以上いて順序がある節はレーン図（列＝人／システムの静的インライン SVG）を第一候補にする。
 2. **理由に出どころを付ける（憶測禁止）**。「今困っていること」「なぜ変えるか」の各行は `伸太郎さん発言 YYYY-MM-DD「要約」` / `G-Brain <slug>` / `未確認` の3種のいずれかを持つ。**AI の推測で理由を書かない。**
