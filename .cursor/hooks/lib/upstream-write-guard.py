@@ -963,11 +963,40 @@ def _gh_token_blocks_read_only_proof(tokens: list[str], gh_index: int) -> bool:
     return not gh_is_read_only(group, action)
 
 
+# [2026-10-07][fix] issue #2012: `\`+改行 の行継続を shell と同じく除去して連結する。
+# 背景:
+#   - 依頼意図: `gh pr create --repo <fork> \` + 改行 のような標準的な複数行
+#     コマンドが、行末 `\` を独立トークン化した non-POSIX lex 後の
+#     `shlex.split("\\")` が ValueError（No escaped character）で落ち、
+#     「ambiguous repository command or shell separator」として誤拒否されていた。
+#   - 守るべき業務ルール: `\\`+改行（偶数個の `\` の末尾）は継続ではなく、
+#     改行がそのままコマンド区切りとして残る shell セマンティクスを壊さない。
+#     ここを雑に除去すると `foo\\`+改行+`git push` が `foo\git` に連結されて
+#     git 実行名を隠す fail-open 経路になるため、`\` 連続は2個ずつ先に消費する。
+#   - 他案不採用理由: `command.replace("\\\n", "")` の素朴除去は上記 fail-open を
+#     作るため不採用。引用内の `\` は single quote でだけ字義になるが、除去しても
+#     トークン境界は増えず引数内容が結合されるだけなので安全側（fail-close）に倒れる。
+_LINE_CONTINUATION_RE = re.compile(r"\\\\|\\\n")
+
+
+def join_line_continuations(command: str) -> str:
+    r"""行末 `\`+改行（行継続）を除去して連結する。
+
+    `\\`（エスケープ済みバックスラッシュ）を先に消費するため、偶数個連続する
+    `\` の末尾に続く改行は継続とみなさず残す。
+    """
+    return _LINE_CONTINUATION_RE.sub(
+        lambda match: match.group(0) if match.group(0) == "\\\\" else "",
+        command,
+    )
+
+
 def _shell_command_segments(command: str) -> tuple[list[tuple[str, list[str]]], list[str]]:
     """Tokenize shell separators without joining a no-space pipeline to git/gh."""
     # [2026-10-04][fix] 配布レビュー: true|git push の git を見落として
     # 読取専用と早期許可していた。標準 shlex を証明と宛先検査で共用する。
     # 空白を要求する案・正規表現の追記だけの案は、別表記で再発するため採らない。
+    command = join_line_continuations(command)
     def lex(posix: bool, text: str = command) -> list[str]:
         lexer = shlex.shlex(text, posix=posix, punctuation_chars=";&|\n<>()")
         lexer.whitespace = " \t\r"
@@ -1154,6 +1183,13 @@ def command_mentions_git_or_gh(command: str) -> bool:
 
 
 def validate(command: str, base: Path) -> tuple[bool, str]:
+    # [2026-10-07][fix] issue #2012: 行継続（`\`+改行）は検査の全段で
+    #   shell が実行する連結済み形として扱う。ここで連結しないと、
+    #   `git remote set-url <third> \`+改行+`&& git push` のような形で
+    #   mutates_write_target / environment_override_blocks_write の `\n` 分割が
+    #   行末 `\` で shlex 失敗→スキップし、宛先すり替え検査をすり抜ける
+    #   fail-open 経路が残る。
+    command = join_line_continuations(command)
     # [2026-10-06][fix] issue #3674: git / gh / github.com への言及が一切無い
     # コマンドは upstream 書込みを起こしえないため、書込先検査を行わない。
     if not command_mentions_git_or_gh(command):
@@ -1202,8 +1238,11 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
     cwd_known = True
     try:
         segments, separators = _shell_command_segments(command)
-    except ValueError:
-        return False, "ambiguous repository command or shell separator"
+    except ValueError as exc:
+        # [2026-10-07][fix] issue #2012: パース失敗を「書込先が曖昧」（cannot prove
+        # ... target 系）と書き分け、検出理由から原因が分かるようにする。
+        # fail-closed 契約は変えない（解析不能な書込みは従来どおり止める）。
+        return False, f"cannot safely parse repository command: {exc}"
     # [2026-10-04][fix] 引用された実行名でも cd とパイプを見逃さない。
     # パイプ内の cd は他の段の cwd を変えず、; / || / 改行は cd 失敗後も
     # 実行を続け得る。書込がある形は、静的な cd && command だけ検査する。

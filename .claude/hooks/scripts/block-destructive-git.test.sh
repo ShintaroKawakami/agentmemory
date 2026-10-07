@@ -170,8 +170,39 @@ PY
   fi
 }
 
+# [2026-10-07][test] Issue #1916: deny メッセージがバイパス手順のSSOT（BYPASS-CONVENTION.md）
+# を指すことを固定する。文言が変わって案内先を見失う退行を防ぐ。
+expect_deny_message_points_to_bypass_ssot() {
+  local name="deny message points to BYPASS-CONVENTION.md SSOT"
+  local out
+  out="$(run_hook "git reset --hard" 2>&1)"
+  if OUT="$out" python3 - <<'PY'
+import json
+import os
+import sys
+
+try:
+    data = json.loads(os.environ["OUT"])
+except Exception as exc:
+    print(f"invalid json: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+reason = data.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
+if "hook-library/BYPASS-CONVENTION.md" not in reason:
+    sys.exit(1)
+PY
+  then
+    printf '[PASS] %s\n' "$name"
+    PASS=$((PASS + 1))
+  else
+    printf '[FAIL] %s: %s\n' "$name" "$out"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 expect_embedded_python_py39
 expect_double_quote_single_quote_scanner
+expect_deny_message_points_to_bypass_ssot
 expect_block "git reset --hard deny" "git reset --hard"
 expect_block "/usr/bin/git reset --hard deny" "/usr/bin/git reset --hard"
 expect_block "command /usr/bin/git clean -fd deny" "command /usr/bin/git clean -fd"

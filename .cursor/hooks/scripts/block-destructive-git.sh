@@ -8,6 +8,17 @@
 #   - 守るべき業務ルール: ローカル変更の破棄は、差分確認後に明示許可した復旧作業だけに限定する。
 #   - 他案不採用理由: 破壊的 git をルール文だけで禁止する案は、別セッション WIP の事故を機械的に止められないため不採用。
 # 対応: 安全な dry-run / unstage は許可し、作業ツリーを破棄する git 操作だけを PreToolUse でブロックする。
+# [2026-10-07][feat] Issue #1916
+# 背景:
+#   - ユーザー依頼意図: 横断Git整理で Codex Desktop の既存プロセスへ Terminal の export が
+#     届かず、GUI ユーザーの launchd 名前空間への設定とアプリ完全再起動が必要だった実績を受け、
+#     deny メッセージから設定・読み戻し・再起動・解除の手順正本へ到達できるようにしたい。
+#   - 守るべき業務ルール: bypass 判定ロジックは変更しない（本対応は案内文言のみ）。
+#     inline 指定が後続コマンドへ伝播しない fail-close 契約を維持する。
+#   - 他案不採用理由: hook メッセージへ手順全文を埋め込む案は、hooks-structure-rule の
+#     ファイル参照型原則（reason にチェックリスト全文を埋め込まない）に反するため不採用。
+# 対応: deny メッセージ末尾に hook-library/BYPASS-CONVENTION.md
+#   「許可変数の設定・解除手順（実行環境別）」への参照を追加する。
 
 set -uo pipefail
 
@@ -79,6 +90,11 @@ reason_lines = [
     (
         "単一ファイルを HEAD の内容へ戻すだけなら、この hook にかからない "
         "`git show HEAD:<path> > <path>` で足りることが多いです。"
+    ),
+    (
+        "設定・読み戻し・GUI アプリ（Codex Desktop 等）の完全再起動・解除の手順は、"
+        "AGENT-HUB リポジトリの hook-library/BYPASS-CONVENTION.md "
+        "「許可変数の設定・解除手順（実行環境別）」を参照してください。"
     ),
 ]
 reason = "\n".join(reason_lines)

@@ -1455,7 +1455,66 @@ expect_unclassified_deny \
 print('x')
 EOF
 git push upstream feature/test" \
-  "ambiguous repository command or shell separator"
+  "cannot safely parse repository command"
+
+# [2026-10-07][test] issue #2012: 行継続（`\`+改行）を含むコマンドの誤拒否を回帰固定。
+# 背景:
+#   - 依頼意図: `gh pr create --repo <fork> \` + 改行 が「ambiguous repository
+#     command or shell separator」として誤拒否されていた。行継続は shell の
+#     標準的な書き方なので、検査も連結後の形で行う。
+#   - 守るべき業務ルール: third-party upstream 宛の書込み・同一コマンド内の宛先
+#     すり替えは連結後も従来どおり拒否する。`\\`+改行（偶数個の `\` の末尾）は
+#     継続ではなく改行区切りとして残るため、その後の git push を必ず検査する
+#     （fail-open を作らない）。
+expect_allow \
+  "行継続を含む gh pr create（自分のfork宛）は許可" \
+  "$feature_repo" \
+  'gh pr create --repo TestOwner/feature \
+    --title "test title" \
+    --body-file /tmp/body.md'
+
+expect_allow \
+  "行継続を含む git push（自分のfork宛）は許可" \
+  "$feature_repo" \
+  'git push origin \
+    feature/test'
+
+expect_allow \
+  "行継続を含む read-only gh pr view は許可" \
+  "$feature_repo" \
+  'gh pr \
+    view 123 --repo TestOwner/feature'
+
+expect_block \
+  "行継続を含む third-party PR作成は拒否" \
+  "$feature_repo" \
+  'gh pr create --repo ThirdParty/feature \
+    --title test \
+    --body test'
+
+expect_block \
+  "行継続を挟んだ remote set-url + push の宛先すり替えは拒否" \
+  "$feature_repo" \
+  'git remote set-url origin https://github.com/ThirdParty/feature.git \
+    && git push origin feature/test'
+
+expect_block \
+  '`\\`+改行は継続ではなく後続の third-party push を検査して拒否' \
+  "$feature_repo" \
+  'true\\
+git push upstream feature/test'
+
+continued_upstream_out="$(run_hook "$feature_repo" 'git push upstream \
+    feature/test' 2>&1 || true)"
+if printf '%s' "$continued_upstream_out" | grep -q 'permissionDecision.*deny' \
+  && printf '%s' "$continued_upstream_out" | grep -q 'third-party upstream への書込みは禁止' \
+  && ! printf '%s' "$continued_upstream_out" | grep -q '書込先を安全に証明できない'; then
+  printf '[PASS] %s\n' "行継続を含む third-party push も upstream 文言で拒否"
+  PASS=$((PASS + 1))
+else
+  printf '[FAIL] %s: %s\n' "行継続を含む third-party push も upstream 文言で拒否" "$continued_upstream_out"
+  FAIL=$((FAIL + 1))
+fi
 
 TOTAL=$((PASS + FAIL))
 printf '\n=== block-main-commit.test.sh: %d/%d PASS ===\n' "$PASS" "$TOTAL"
