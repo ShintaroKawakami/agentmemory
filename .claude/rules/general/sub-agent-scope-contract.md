@@ -27,6 +27,7 @@
 - **`.claude/hooks/` / `hook-library/` のガード hook（block-main-commit 等）をデバッグ目的で一時編集しない**（deny 原因調査はログ・分割コマンド・worktree 委譲で行う。2026-08-12 jtt-system 配布インシデント再発防止）
 - **検査・テスト・受け入れ条件を通すために timestamp・実行者ID・実行していないコマンドの出力・確認内容などの値を捏造しない**。指示と検査要求が矛盾したら通す側に倒さず、報告だけで済ませず**停止**して呼び出し元へ確認する（詳細: `~/business/AGENT-HUB/skills/plan-approval/SKILL.md`。2026-08-14 実測）
 - **環境変数を調べる時は `env | cut -d= -f1` のように名前だけを出し、値を出力しない**。`env` / `printenv` をそのまま実行すると API トークン等の値が会話出力へ流出する（2026-10-03 実測 / Issue #3438）
+- **`run_in_background` / Monitor / `sleep` 等でバックグラウンド処理の完了待ちをしない**。同期実行（timeout 内）で結果を持ち帰る。待つ必要がある場合は、待たずに現状を親へ返す（サブエージェントは通知・タイマーでは起きられず、待ち状態では親の SendMessage も届かない。2026-09-05 実測3件 / Issue #2512 / Tech G-Brain `subagent-background-wait-stall`）
 - **`git stash` 系（pop / apply / drop / clear）を実行しない**。stash はリポジトリ共有であり、隔離 worktree にいても他セッションの未コミット作業を壊しうる（2026-08-15 実測: 隔離 worktree での検証中に他ブランチの stash を pop し conflict 発生。衝突しなければ気付かず消えていた）
 - 自分が作っていない**他ブランチの reflog / git config を変更しない**
 - 自分が作っていない **worktree・リモートブランチを削除しない**

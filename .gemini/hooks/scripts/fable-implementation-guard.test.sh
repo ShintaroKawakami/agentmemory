@@ -53,6 +53,9 @@ out2="$(printf '%s' "$(payload "sess-b" "us.anthropic.fable-5" "")" | CLAUDE_PRO
 echo "$out2" | grep -q '"decision"' || fail "Fable初回Editでdecision JSONが出ない: $out2"
 echo "$out2" | grep -q '"block"' || fail "Fable初回Editでblock decisionでない: $out2"
 echo "$out2" | grep -q 'Fable' || fail "reasonにFable言及が無い: $out2"
+# [2026-10-08][test] Issue #1921: 警告文に「今すぐ委譲する定型プロンプト」へのポインタ
+#   （agents.yaml fable_usage_policy.document_drafting.delegate_prompt）を含める。
+echo "$out2" | grep -q 'document_drafting' || fail "初回strictにdelegate_promptへのポインタが無い: $out2"
 
 # 3) 同一セッションの2回目は無音
 out3="$(printf '%s' "$(payload "sess-b" "us.anthropic.fable-5" "")" | CLAUDE_PROJECT_DIR="$TMP_PROJECT" bash "$HOOK")"
@@ -151,14 +154,22 @@ model_catalog:
         tier: "strict"
         runtime_match: "fable"
         after_edits: 1
+        repeat_edits: 2
     claude-opus:
       display_name: "Claude Opus"
       implementation_guard:
         tier: "soft"
         runtime_match: "opus"
         after_edits: 3
+        repeat_edits: 2
     codex-terra:
       display_name: "Codex 5.6 Terra"
+    helper-pm:
+      display_name: "Helper PM"
+      implementation_guard:
+        tier: "strict"
+        runtime_match: "helperpm"
+        after_edits: 1
 YAML
 
 guard_run() {
@@ -182,6 +193,7 @@ out12b="$(guard_run "sess-led-opus" "claude-opus-5" "$LEDGER")"
 out12c="$(guard_run "sess-led-opus" "claude-opus-5" "$LEDGER")"
 echo "$out12c" | grep -q '"decision"' || fail "soft tier の3回目で発火しない: $out12c"
 echo "$out12c" | grep -q 'Claude Opus' || fail "reasonに Claude Opus が出ない: $out12c"
+echo "$out12c" | grep -q 'document_drafting' || fail "初回softにdelegate_promptへのポインタが無い: $out12c"
 out12d="$(guard_run "sess-led-opus" "claude-opus-5" "$LEDGER")"
 [ -z "$out12d" ] || fail "soft tier が4回目にも出た（セッション内1回のはず）: $out12d"
 
@@ -233,5 +245,70 @@ echo "$out16d" | grep -q 'Claude Opus' || fail "PyYAML無しでsoft tierの3回�
 # 17) PyYAML 無しでも、台帳で対象外のモデルは無音のまま
 out17="$(guard_run_noyaml "sess-noyaml-terra" "gpt-5.6-terra")"
 [ -z "$out17" ] || fail "PyYAML無しで対象外モデルが発火した: $out17"
+
+# ---------------------------------------------------------------------------
+# [2026-10-08][test] Issue #2133: repeat_edits — 初回リマインド後も実装編集が続く場合に
+# 「緊急例外の解除確認」を N 回ごとに再リマインドする挙動の固定。
+# 背景:
+#   - 緊急PM直実装の例外が非緊急の後続作業へ惰性延長される実測が3件あり、1回きりの
+#     非ブロック警告では止まらなかった。解除条件の確認を促す再リマインドを追加したため、
+#     間隔・文面（解除確認を含むこと）・repeat_edits 未指定時の無再発火・台帳縮退時の
+#     組み込み既定（fable=5回ごと）・PyYAML 無し経路を固定する。
+#   - fixture の repeat_edits=2 は実台帳値（5）と意図的に違える（テストは台帳記述どおりに
+#     振る舞うことだけを固定し、実値の変更で壊れないようにする）。
+# ---------------------------------------------------------------------------
+
+# 18) strict + repeat_edits=2: 初回(1回目)の後、2回おきに解除確認を再リマインドする
+out18a="$(guard_run "sess-repeat-fable" "claude-fable-5" "$LEDGER")"
+echo "$out18a" | grep -q '"decision"' || fail "strict初回(1回目)で発火しない: $out18a"
+out18b="$(guard_run "sess-repeat-fable" "claude-fable-5" "$LEDGER")"
+[ -z "$out18b" ] || fail "repeat途中(2回目)で発火した: $out18b"
+out18c="$(guard_run "sess-repeat-fable" "claude-fable-5" "$LEDGER")"
+echo "$out18c" | grep -q '"decision"' || fail "repeat_edits到達(3回目)で再リマインドしない: $out18c"
+echo "$out18c" | grep -q '解除' || fail "再リマインドに解除確認が無い: $out18c"
+echo "$out18c" | grep -q 'document_drafting' || fail "再リマインドstrictにdelegate_promptへのポインタが無い: $out18c"
+out18d="$(guard_run "sess-repeat-fable" "claude-fable-5" "$LEDGER")"
+[ -z "$out18d" ] || fail "repeat途中(4回目)で発火した: $out18d"
+out18e="$(guard_run "sess-repeat-fable" "claude-fable-5" "$LEDGER")"
+echo "$out18e" | grep -q '解除' || fail "repeat_edits再々到達(5回目)で再リマインドしない: $out18e"
+
+# 19) soft + repeat_edits=2: after_edits=3 で初回、その後2回おきに解除確認
+out19a="$(guard_run "sess-repeat-opus" "claude-opus-5" "$LEDGER")"
+[ -z "$out19a" ] || fail "soft repeat fixture の1回目で発火した: $out19a"
+out19b="$(guard_run "sess-repeat-opus" "claude-opus-5" "$LEDGER")"
+[ -z "$out19b" ] || fail "soft repeat fixture の2回目で発火した: $out19b"
+out19c="$(guard_run "sess-repeat-opus" "claude-opus-5" "$LEDGER")"
+echo "$out19c" | grep -q '"decision"' || fail "soft repeat fixture の3回目で初回発火しない: $out19c"
+out19d="$(guard_run "sess-repeat-opus" "claude-opus-5" "$LEDGER")"
+[ -z "$out19d" ] || fail "soft repeat fixture の4回目で発火した: $out19d"
+out19e="$(guard_run "sess-repeat-opus" "claude-opus-5" "$LEDGER")"
+echo "$out19e" | grep -q '解除' || fail "soft tier の再リマインドに解除確認が無い: $out19e"
+echo "$out19e" | grep -q 'document_drafting' || fail "再リマインドsoftにdelegate_promptへのポインタが無い: $out19e"
+
+# 20) repeat_edits 未指定のモデルは初回以降ずっと無音（従来挙動を維持）
+out20a="$(guard_run "sess-norepeat" "helperpm-1" "$LEDGER")"
+echo "$out20a" | grep -q '"decision"' || fail "repeat未指定モデルの初回で発火しない: $out20a"
+for _i in 2 3 4 5 6; do
+  out20="$(guard_run "sess-norepeat" "helperpm-1" "$LEDGER")"
+  [ -z "$out20" ] || fail "repeat_edits 未指定なのに再リマインドした: $out20"
+done
+
+# 21) 台帳欠落の縮退でも組み込み既定（fable=strict/1回目/5回ごと）で再リマインドする
+out21a="$(guard_run "sess-fallback-repeat" "fable-5" "$TMP_PROJECT/no-such-ledger.yaml")"
+echo "$out21a" | grep -q '"decision"' || fail "縮退時の初回で発火しない: $out21a"
+for _i in 2 3 4 5; do
+  out21="$(guard_run "sess-fallback-repeat" "fable-5" "$TMP_PROJECT/no-such-ledger.yaml")"
+  [ -z "$out21" ] || fail "縮退時に repeat 間隔の途中で発火した: $out21"
+done
+out21b="$(guard_run "sess-fallback-repeat" "fable-5" "$TMP_PROJECT/no-such-ledger.yaml")"
+echo "$out21b" | grep -q '解除' || fail "縮退時の6回目で解除確認の再リマインドが出ない: $out21b"
+
+# 22) PyYAML 無しでも repeat_edits を読み、再リマインドが出る（stdlib フォールバック経路）
+out22a="$(guard_run_noyaml "sess-noyaml-repeat-fable" "claude-fable-5")"
+echo "$out22a" | grep -q '"decision"' || fail "PyYAML無しで初回が発火しない: $out22a"
+out22b="$(guard_run_noyaml "sess-noyaml-repeat-fable" "claude-fable-5")"
+[ -z "$out22b" ] || fail "PyYAML無しでrepeat途中に発火した（repeat_edits が読めていない）: $out22b"
+out22c="$(guard_run_noyaml "sess-noyaml-repeat-fable" "claude-fable-5")"
+echo "$out22c" | grep -q '解除' || fail "PyYAML無しで再リマインドが出ない: $out22c"
 
 echo "PASS: fable-implementation-guard"
