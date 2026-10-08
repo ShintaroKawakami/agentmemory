@@ -27,6 +27,31 @@
 #   上記「対応」にあった `*fable*` の直書き判定は撤去済み。現行は
 #   model_catalog.pm_models[*].implementation_guard（tier / runtime_match / after_edits）を引き、
 #   台帳が読めない時だけ fable=strict / 1回目 へ縮退して従来挙動を保つ。
+#
+# [2026-10-08][fix] Issue #2133: 初回リマインド後も実装編集が続く場合に repeat_edits 回ごとへ
+#   「緊急例外の解除確認」の再リマインドを追加。
+# 背景:
+#   - 緊急例外での PM 直実装が、障害収束後の非緊急作業へ惰性延長される逸脱が3件計測された。
+#     初回警告は発火するが1回きり・非ブロックのため止まらなかった（Issue コメント実測）。
+#   - 強制ブロック化はしない（正当な緊急対応の連続編集を止めない方針は不変）。
+#   - 間隔は台帳 implementation_guard.repeat_edits で決める（未指定・0 = 従来どおり1回だけ）。
+#     台帳が読めない縮退時は組み込み既定 fable=strict / 1回目 / 5回ごと再リマインド。
+# 対応: セッション内の実装編集回数を常にカウンタで数え、after_edits 回目で初回リマインド、
+#   それ以降は (回数 - after_edits) が repeat_edits の倍数になる度に解除確認の再リマインドを出す。
+#
+# [2026-10-08][fix] Issue #1921: 警告文に「今すぐ委譲する定型プロンプト」へのポインタを載せる
+# 背景:
+#   - 観測: 2026-08-18 Fable セッションで本 hook と delegation-routing-backstop が2回警告を
+#     出したにも関わらず、Fable が HTML 文書の整形を v1〜v4 まで自前で続けた
+#     （警告だけでは行動が変わらなかった）。
+#   - 守るべき業務ルール: 定型プロンプトの本文は agents.yaml
+#     fable_usage_policy.document_drafting.delegate_prompt が正本。hook はポインタだけを
+#     出し、本文を複製しない（reference-over-hardcode）。非ブロック方針も変えない。
+#   - 他案不採用理由: 定型プロンプト全文を MSG へ埋め込む案は、台帳変更と drift する
+#     二重正本になるため不採用。
+# 対応: 初回リマインド（strict/soft）と再リマインド（strict/soft）の4文面へ、
+#   文書の整形・反復修正は sonnet サブエージェントへ委譲する既定があることと、
+#   delegate_prompt の在り処を示す共通の1文を添える。
 
 set -uo pipefail
 
@@ -181,14 +206,15 @@ model = (os.environ.get("HOOK_MODEL_LOWER") or "").strip()
 ledger = os.environ.get("HOOK_GUARD_LEDGER") or ""
 
 
-def emit(tier: str, after_edits: str, label: str) -> None:
+def emit(tier: str, after_edits: str, repeat_edits: str, label: str) -> None:
     print(tier)
     print(after_edits)
+    print(repeat_edits)
     print(label)
 
 
-def pick(pm_models: dict) -> tuple[str, str, str] | None:
-    """Return (tier, after_edits, label) for the first model matching `model`."""
+def pick(pm_models: dict) -> tuple[str, str, str, str] | None:
+    """Return (tier, after_edits, repeat_edits, label) for the first model matching `model`."""
     for name, entry in pm_models.items():
         if not isinstance(entry, dict):
             continue
@@ -203,7 +229,18 @@ def pick(pm_models: dict) -> tuple[str, str, str] | None:
             after_edits = max(1, int(guard.get("after_edits", 1)))
         except (TypeError, ValueError):
             after_edits = 1
-        return tier, str(after_edits), str(entry.get("display_name") or name)
+        # [2026-10-08][fix] Issue #2133: 初回リマインド後の再リマインド間隔。
+        # 未指定・0・不正値は「再リマインドしない」（従来挙動）。
+        try:
+            repeat_edits = max(0, int(guard.get("repeat_edits", 0)))
+        except (TypeError, ValueError):
+            repeat_edits = 0
+        return (
+            tier,
+            str(after_edits),
+            str(repeat_edits),
+            str(entry.get("display_name") or name),
+        )
     return None
 
 
@@ -282,32 +319,37 @@ try:
     hit = pick(pm_models)
     if hit is None:
         # 台帳は読めたが該当モデルなし＝このモデルは対象外。無音にする。
-        emit("", "", "")
+        emit("", "", "", "")
     else:
         emit(*hit)
 except Exception:
     # 台帳が開けない・壊れている等。組み込み既定へ縮退する。
-    emit("FALLBACK", "", "")
+    emit("FALLBACK", "", "", "")
 PY
 }
 
 GUARD_TIER=""
 GUARD_AFTER_EDITS=""
+GUARD_REPEAT_EDITS=""
 GUARD_LABEL=""
 GUARD_RESOLVED="$(HOOK_MODEL_LOWER="$MODEL_LOWER" HOOK_GUARD_LEDGER="$GUARD_LEDGER" \
   command python3 <(FABLE_GUARD_RESOLVE_TIER_PY) 2>/dev/null)"
 {
   IFS= read -r GUARD_TIER || true
   IFS= read -r GUARD_AFTER_EDITS || true
+  IFS= read -r GUARD_REPEAT_EDITS || true
   IFS= read -r GUARD_LABEL || true
 } <<< "$GUARD_RESOLVED"
 
 if [ -z "$GUARD_TIER" ] || [ "$GUARD_TIER" = "FALLBACK" ]; then
   # 縮退: 従来どおり Fable だけを strict / 1回目で見る。
+  # [2026-10-08][fix] Issue #2133: 縮退時も初回警告で止まらないよう、組み込み既定として
+  #   5回ごとの解除確認を持たせる（台帳側の fable 既定と同じ間隔）。
   case "$MODEL_LOWER" in
     *fable*)
       GUARD_TIER="strict"
       GUARD_AFTER_EDITS="1"
+      GUARD_REPEAT_EDITS="5"
       GUARD_LABEL="Fable"
       ;;
     *) exit 0 ;;
@@ -318,6 +360,10 @@ case "$GUARD_AFTER_EDITS" in
   ''|*[!0-9]*) GUARD_AFTER_EDITS="1" ;;
 esac
 [ "$GUARD_AFTER_EDITS" -ge 1 ] || GUARD_AFTER_EDITS=1
+case "$GUARD_REPEAT_EDITS" in
+  ''|*[!0-9]*) GUARD_REPEAT_EDITS="0" ;;
+esac
+[ "$GUARD_REPEAT_EDITS" -ge 0 ] || GUARD_REPEAT_EDITS=0
 [ -n "$GUARD_LABEL" ] || GUARD_LABEL="このモデル"
 
 # 対象モデルのセッション確定。
@@ -325,25 +371,45 @@ esac
 [ -n "$SESSION_HASH" ] || exit 0
 
 MARKER="$CACHE_DIR/fable-guard-$SESSION_HASH"
-[ -f "$MARKER" ] && exit 0
+COUNTER="$CACHE_DIR/fable-guard-$SESSION_HASH.count"
+# [2026-10-08][fix] Issue #2133: tier に関わらず編集回数を常に数える。
+# 初回リマインドは after_edits 回目、それ以降は repeat_edits 回ごとに解除確認を出す
+# 判定へカウンタが要るため、従来の「after_edits>1 の時だけ数える」分岐を撤去した。
+printf 'x' >> "$COUNTER" 2>/dev/null || true
+EDITS="$(wc -c < "$COUNTER" 2>/dev/null | tr -d ' ')"
+case "$EDITS" in
+  ''|*[!0-9]*) EDITS=0 ;;
+esac
 
 # after_edits 回目の実装編集で初めて出す（soft tier 用）。1 なら従来どおり初回で出る。
-if [ "$GUARD_AFTER_EDITS" -gt 1 ]; then
-  COUNTER="$CACHE_DIR/fable-guard-$SESSION_HASH.count"
-  printf 'x' >> "$COUNTER" 2>/dev/null || true
-  EDITS="$(wc -c < "$COUNTER" 2>/dev/null | tr -d ' ')"
-  case "$EDITS" in
-    ''|*[!0-9]*) EDITS=0 ;;
-  esac
-  [ "$EDITS" -ge "$GUARD_AFTER_EDITS" ] || exit 0
+if [ "$EDITS" -lt "$GUARD_AFTER_EDITS" ]; then
+  exit 0
 fi
 
-: > "$MARKER" 2>/dev/null || true
+# [2026-10-08][fix] Issue #1921: 「今すぐ委譲する定型プロンプト」へのポインタ。
+# 本文は agents.yaml fable_usage_policy.document_drafting.delegate_prompt が正本
+# （hook へ本文を複製しない）。strict/soft・初回/再リマインドの4文面に共通で添える。
+DOC_DELEGATE_HINT="文書（HTML・スキル本文・current.md）の整形・反復修正なら、要点を箇条書きにして sonnet サブエージェントへ委譲する既定です（定型: agents.yaml task_routing.fable_usage_policy.document_drafting.delegate_prompt）。"
 
-if [ "$GUARD_TIER" = "soft" ]; then
-  MSG="💡 ${GUARD_LABEL} セッションで実装編集が続いています。${GUARD_LABEL} はなるべく頭脳（設計・診断・承認判断・検証）に使いたいモデルです。まとまった実装は AI worker（agent-dispatch）または Claude サブエージェントへ委譲できないか一度検討してください（そのまま続けても構いません）。"
+if [ "$EDITS" -eq "$GUARD_AFTER_EDITS" ]; then
+  : > "$MARKER" 2>/dev/null || true
+  if [ "$GUARD_TIER" = "soft" ]; then
+    MSG="💡 ${GUARD_LABEL} セッションで実装編集が続いています。${GUARD_LABEL} はなるべく頭脳（設計・診断・承認判断・検証）に使いたいモデルです。まとまった実装は AI worker（agent-dispatch）または Claude サブエージェントへ委譲できないか一度検討してください（そのまま続けても構いません）。${DOC_DELEGATE_HINT}"
+  else
+    MSG="⚠️ ${GUARD_LABEL} セッションで実装編集が行われました。${GUARD_LABEL} は頭脳（設計・診断・承認判断・検証）であって実装者ではありません。実装は AI worker（agent-dispatch）または Claude サブエージェントへ委譲してください（緊急時のみ利用者の明示指示で PM 直実装可）。${DOC_DELEGATE_HINT}"
+  fi
 else
-  MSG="⚠️ ${GUARD_LABEL} セッションで実装編集が行われました。${GUARD_LABEL} は頭脳（設計・診断・承認判断・検証）であって実装者ではありません。実装は AI worker（agent-dispatch）または Claude サブエージェントへ委譲してください（緊急時のみ利用者の明示指示で PM 直実装可）。"
+  # [2026-10-08][fix] Issue #2133: 初回リマインド後も実装編集が続く場合、
+  # repeat_edits 回ごとに「緊急例外（急ぎモード）はまだ有効か」の解除確認を出す。
+  # 緊急例外はタスク単位が規約（agents.yaml fable_usage_policy.emergency_exception）。
+  [ "$GUARD_REPEAT_EDITS" -ge 1 ] || exit 0
+  SINCE_FIRST=$((EDITS - GUARD_AFTER_EDITS))
+  [ $((SINCE_FIRST % GUARD_REPEAT_EDITS)) -eq 0 ] || exit 0
+  if [ "$GUARD_TIER" = "soft" ]; then
+    MSG="💡 ${GUARD_LABEL} セッションで実装編集が続いています（このセッション累計 ${EDITS} 回）。緊急例外（利用者明示の PM 直実装）で対応中なら解除条件を確認し、収束済みなら解除を宣言して以後の作業は委譲判定（use_when/use_not_when）へ戻ってください（そのまま続けても構いません）。${DOC_DELEGATE_HINT}"
+  else
+    MSG="⚠️ ${GUARD_LABEL} セッションで実装編集が続いています（このセッション累計 ${EDITS} 回）。緊急例外はタスク単位の措置です。まだ緊急なら解除条件を確認し、障害・急ぎ事由が収束していれば解除を宣言してください。解除後の新規作業は委譲判定（use_when/use_not_when）をやり直し、実装は AI worker（agent-dispatch）または Claude サブエージェントへ委譲してください。${DOC_DELEGATE_HINT}"
+  fi
 fi
 
 # lib が無い配布先でも壊れない no-op fallback（delegation-routing-backstop と同型）。

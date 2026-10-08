@@ -46,6 +46,13 @@ Owner 2026-09-22: do not create a git worktree as a direct child of $HOME.
 worktree 作成時、git 追跡外の機密ファイル（`.mcp.json` / `.env` 系）は main worktree の実体へ**自動 symlink**される（git post-checkout hook 由来）。追加操作は不要。仕組み・手動再設置手順・非破壊の詳細は
 `~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
 
+## git 管理外面への書き込み（2026-10-07 伸太郎承認）
+
+2026-07-20 の「main / primary checkout へ書き込まない」は **tracked な生成・full apply** に残す。
+**Git 管理外（gitignore 済み / untracked）の場所だけは書いてよい。書く前に `git check-ignore` を確かめる。**
+共通スキルのつなぎは絶対パスで、各 worktree の中にだけ作り、commit しない（Issue #1175）。
+診断・修復は `agent-hub status` / `agent-hub doctor --fix`。手順は `docs/worktree-operations.md`。
+
 ## Mac mini ContextEngine の索引対象（2026-09-25〜）
 
 Mac mini の ContextEngine は各 PJ の primary（main checkout）と、許可リスト

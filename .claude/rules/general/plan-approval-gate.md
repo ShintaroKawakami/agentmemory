@@ -24,11 +24,21 @@
     CARD 文言（v4 表記）の更新は AGENTS.md 等の生成物の再生成が要るため、本変更では行わない。
 対応: 必須手順2・3と「中身」節へ v5 の作り方・届け方を足す。 -->
 
+<!-- [2026-10-07][fix] CARD 文言を v5 の実態へ合わせる（Issue #3766）
+背景:
+  - ユーザー依頼意図: v5（公式 html-plan 形式）が既定になったのに、常時ロードの CARD が「固定HTMLプラン(v4)」のままで
+    AI が v4 を作る方へ誘導される。
+  - 守るべき業務ルール: CARD は「いつ／何を／できた状態／詳細」の4行。義務（出どころ必須・明示承認前に実装しない・
+    台帳の全件タスク化）は弱めない。
+  - 他案不採用理由: 手順を CARD へ足す案は、手順の正本（skills/plan-approval/SKILL.md）との二重化になるため不採用。
+対応: 「何を」「できた状態」を v5 の要点（公式 html-plan 形式・要約カード・build-plan.py で組み立て・承認に既定値なし）
+      だけに書き換える。 -->
+
 <!-- agents-md-card:start -->
 ### CARD: plan-approval-gate — 中規模はHTML承認
 - **いつ**: 新機能・画面・データ形変更・複数ファイル実装の着手前
-- **何を**: 固定HTMLプラン(v4)をWriteで作り open。図がメイン・理由に出どころ必須。明示承認前に実装しない。承認後は台帳を全件タスク化
-- **できた状態**: 未確認・未確定がゼロで「進めて」の承認があり、台帳タスク化済み
+- **何を**: v5（公式 html-plan 形式）をWriteで書き build-plan.py で組み立てて表示。要約カード先・コードは畳む・理由に出どころ必須。明示承認前に実装しない。承認後は台帳を全件タスク化
+- **できた状態**: 未確認・未確定がゼロで、既定値なしの承認欄で「進めて」が選ばれ、台帳タスク化済み
 - **詳細**: `.claude/rules/general/plan-approval-gate.md`
 <!-- agents-md-card:end -->
 
@@ -49,8 +59,9 @@
 1. **プラン作成基準をライブ読み**: `skills/plan-approval` が `resolve-pj-prompt.py --phase plan` を実行し、PJ 別のプラン基準（`snippet-prompts/Typinator/plan/`。専用未作成 PJ は汎用 `dev-plan`）を読む。
 2. **HTML プランを作る（固定テンプレを必ず使う・独自デザイン禁止）**: 正本テンプレをコピーし中身だけ差し替える（通常=`plan-template.html`、AI worker 委譲時=`plan-template-aiworker.html`）。v5 は `skills/plan-approval/scripts/build-plan.py` で組み立てる。build-plan.py が動かない環境は v4 テンプレ（`plan-template-v4.html` / `plan-template-aiworker-v4.html`）で作る。必須のビジュアル要素は下記「中身」節を参照。
 3. **提示して承認を待つ（両方の届け方を毎回使う）**: HTML プランは**必ず Write ツールで実体の `.html` ファイルとして作成する**。**禁止**: ① HTML 本文をチャットに貼り付ける、② Bash ヒアドキュメントで書き出す（どちらも iPhone で生コードになる）。作成後は毎回 Orca（または `open <file>`）で PC に表示し、iPhone 向けに `skills/plan-approval/scripts/plan-share.sh` の Tailscale URL を出す（v5・2026-10-07〜。v4 で必須だったタップ用ファイルカードは必須にしない）。末尾に「この実装でいいですか？（進めて / 直す / やらない）」を置き、**承認なしに実装へ進まない**。未確認・未確定が残る間は承認欄に赤で理由を出し、承認を求めない。保存規約（gitignore済み一時パス・短い slug・共有 URL は1行）は `skills/plan-approval/SKILL.md` を参照。同意の扱いは共通ルール CARD 01「承認の有効範囲」（正本: `dotfiles/global/shared/SHARED_AGENTS.md` の `global-agent-behavior` ブロック）に従う。
-4. **承認直後に 📋 コミットメント台帳を全件タスク化する**: HTML プランの台帳の各行を、着手前に `TaskCreate` で 1 行 = 1 タスク化してから実装へ進む。台帳が全消化（実施済み or 明示保留）になるまで「完了」と宣言しない。詳細は `.claude/rules/general/plan-commitment-tracking.md`。
+4. **承認直後に 📋 コミットメント台帳を全件タスク化する**: HTML プランの台帳の各行を、着手前に 1 行 = 1 タスク化してから実装へ進む（タスクツールがあれば使う。無い環境の逃げ道は `plan-commitment-tracking.md` 手順 7）。台帳が全消化（実施済み or 明示保留）になるまで「完了」と宣言しない。詳細は `.claude/rules/general/plan-commitment-tracking.md`。
    - **AI worker を 1 度でも使う計画は必須**: 「AI worker 摩擦時は該当正本を worktree→PR→merge→fetch-only / detached 確認→cleanup で修正」の条項を台帳に必ず入れ、タスク化する（テンプレに既定行として焼き込み済み・消さない）。
+   - **実装担当は `impl-owner` の質問で決め、台帳の担当列へ反映してから着手する**（v5.1・詳細は `skills/plan-approval/SKILL.md`）。
 5. **承認後は標準パイプラインを通す**: 実装（dev-guardrails）→ codexレビュー → 実装監査 → CI → SSOT 同期確認 → 自動マージ。マージ時の人の再確認は不要（共通憲法 CARD 01「PRの自動マージ（全PJ共通）」）。本番作業を含め、未承認の高リスク変更・依頼範囲の変更だけは同CARDの「承認」に従う。
 
 ## HTMLプランの中身（v4・2026-09-04〜／v5・2026-10-07〜）
