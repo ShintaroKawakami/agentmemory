@@ -537,6 +537,19 @@ describe("agentmemory_day", () => {
     expect(malformed).toMatchObject({ partial: true, failed_projects: [{ project: "agent-hub", code: "backend_error" }], total: 0 });
   });
 
+  it("marks same-total multi-page results as consistency unverified", async () => {
+    const backend = new FakeBackend();
+    backend.dayMemories = async (input) => input.offset === 0
+      ? { memories: [dayRow("first-view", "agent-hub", "2026-10-09T15:00:00.000Z")], total: 2, unknownEventCount: 0 }
+      : { memories: [dayRow("replacement-view", "agent-hub", "2026-10-09T16:00:00.000Z")], total: 2, unknownEventCount: 0 };
+    const result = await new ScopedMemoryService(backend, config.allowedProjects).day(
+      { project: "agent-hub", agent: "codex", readableProjects: new Set(["agent-hub"]) },
+      { start_date: "2026-10-10" },
+    );
+    expect(result).toMatchObject({ partial: true, consistency_unverified_projects: ["agent-hub"], total: 2 });
+    expect((result.results as Array<{id: string}>).map((row) => row.id)).toEqual(["first-view", "replacement-view"]);
+  });
+
   it("rejects an older backend that ignores day filters and project mismatches", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ memories: [], total: 0 })));
     vi.stubGlobal("fetch", fetchMock);

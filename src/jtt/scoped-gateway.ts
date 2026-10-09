@@ -517,12 +517,16 @@ export class ScopedMemoryService {
 
     const scopeProjects = scope.readableProjects ?? new Set([scope.project]);
     const projects = [...scopeProjects].filter((project) => this.allowedProjects.has(project)).sort();
+    const consistencyUnverified = new Set<string>();
     const byProject = await Promise.allSettled(projects.map(async (project) => {
       const records: Awaited<ReturnType<AgentMemoryBackend["dayMemories"]>>["memories"] = [];
       let total = 0;
       let unknownEventCount = 0;
       let backendOffset = 0;
+      let pageRequests = 0;
       do {
+        if (pageRequests > 0) consistencyUnverified.add(project);
+        pageRequests += 1;
         const page = await this.backend.dayMemories({ project, startAt: start, endAt: end, timeBasis, limit: 5000, offset: backendOffset });
         if (backendOffset === 0) {
           total = page.total;
@@ -598,7 +602,8 @@ export class ScopedMemoryService {
       searched_projects: succeeded.map((project) => project.project),
       failed_projects: failedProjects,
       unsearched_projects: [],
-      partial: failedProjects.length > 0 || (timeBasis === "event_at" && unknownEventCount > 0),
+      consistency_unverified_projects: projects.filter((project) => consistencyUnverified.has(project)),
+      partial: failedProjects.length > 0 || consistencyUnverified.size > 0 || (timeBasis === "event_at" && unknownEventCount > 0),
       ...(timeBasis === "event_at" ? { unknown_event_count: unknownEventCount } : {}),
       range: { start: input.start_date, end: endDate, timezone: "Asia/Tokyo" },
     };
