@@ -24,6 +24,7 @@ function portOf(server: ReturnType<typeof createServer>): number {
 describe("JTT scoped gateway over Streamable HTTP", () => {
   it("completes initialize, tools/list, and a project-bound save", async () => {
     const remembered: Array<Record<string, unknown>> = [];
+    const dayCalls: Array<{ url: string; authorization: string | undefined }> = [];
     const upstream = createServer((req, res) => {
       const chunks: Buffer[] = [];
       req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
@@ -38,6 +39,31 @@ describe("JTT scoped gateway over Streamable HTTP", () => {
         if (req.url === "/agentmemory/search") {
           res.writeHead(200, { "content-type": "application/json" });
           res.end(JSON.stringify({ results: [] }));
+          return;
+        }
+        if (req.url?.startsWith("/agentmemory/memories?")) {
+          dayCalls.push({ url: req.url, authorization: req.headers.authorization });
+          const url = new URL(req.url, "http://localhost");
+          const project = url.searchParams.get("dayProject");
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({
+            dayProject: project,
+            startAt: url.searchParams.get("startAt"),
+            endAt: url.searchParams.get("endAt"),
+            timeBasis: url.searchParams.get("timeBasis"),
+            offset: Number(url.searchParams.get("offset")),
+            limit: Number(url.searchParams.get("limit")),
+            memories: project === "agent-hub" ? [{
+              id: "mem-http-day",
+              project: "agent-hub",
+              content: `JTT_AGENTMEMORY fact agent-hub\n${JSON.stringify({ schema: "jtt-agentmemory/v1", project: "agent-hub", category: "fact", sourceAgent: "codex", content: "day read", files: [], createdAt: "2026-10-10T00:00:00.000Z" })}`,
+              saved_at: "2026-10-10T00:00:00.000Z",
+              event_at: null,
+              category: "fact",
+            }] : [],
+            total: project === "agent-hub" ? 1 : 0,
+            unknownEventCount: 0,
+          }));
           return;
         }
         res.writeHead(404).end();
@@ -74,7 +100,8 @@ describe("JTT scoped gateway over Streamable HTTP", () => {
     await client.connect(transport);
     try {
       const tools = await client.listTools();
-      expect(tools.tools).toHaveLength(4);
+      expect(tools.tools).toHaveLength(5);
+      expect(tools.tools.find((tool) => tool.name === "agentmemory_day")?.annotations?.readOnlyHint).toBe(true);
       const response = await client.callTool({
         name: "agentmemory_save",
         arguments: { content: "Warp can save scoped memory", category: "reference" },
@@ -83,6 +110,12 @@ describe("JTT scoped gateway over Streamable HTTP", () => {
       expect(remembered).toHaveLength(1);
       expect(remembered[0]?.project).toBe("agent-hub");
       expect(remembered[0]?.content).toContain('"sourceAgent":"warp"');
+      const day = await client.callTool({ name: "agentmemory_day", arguments: { start_date: "2026-10-10" } });
+      expect(day.isError).not.toBe(true);
+      expect(day.structuredContent).toMatchObject({ results: [expect.objectContaining({ id: "mem-http-day" })], partial: false });
+      expect(dayCalls).toHaveLength(2);
+      expect(dayCalls.some((call) => call.url.includes("dayProject=agent-hub") && call.url.includes("timeBasis=saved_at"))).toBe(true);
+      expect(dayCalls.every((call) => call.authorization === "Bearer upstream-test-secret")).toBe(true);
     } finally {
       await client.close();
     }

@@ -30,6 +30,7 @@ export interface GatewayConfig {
 export interface RequestScope {
   project: string;
   agent: string;
+  readableProjects?: ReadonlySet<string>;
 }
 
 
@@ -61,6 +62,14 @@ export interface AgentMemoryBackend {
     limit: number;
     project: string;
   }): Promise<SearchResponse>;
+  dayMemories(input: {
+    project: string;
+    startAt: string;
+    endAt: string;
+    timeBasis: "saved_at" | "event_at";
+    limit: number;
+    offset: number;
+  }): Promise<{ memories: Array<{ id: string; project: string; content: string; saved_at: string; event_at: string | null; category: string; domain?: unknown; status?: unknown }>; total: number; unknownEventCount: number }>;
 }
 
 export class GatewayError extends Error {
@@ -181,7 +190,7 @@ export function resolveRequestScope(headers: Headers, config: GatewayConfig): Re
     if (!config.allowedProjects.has(project)) {
       throw new GatewayError("Project is not enabled for this gateway", 403, "project_not_allowed");
     }
-    return { project, agent: resolveAgent(headers, "unknown-agent") };
+    return { project, agent: resolveAgent(headers, "unknown-agent"), readableProjects: new Set(config.allowedProjects) };
   }
   if (!mappedProject) {
     throw new GatewayError("Unauthorized", 401, "unauthorized");
@@ -190,7 +199,7 @@ export function resolveRequestScope(headers: Headers, config: GatewayConfig): Re
   if (rawProject && canonicalProject(rawProject) !== mappedProject) {
     throw new GatewayError("Project is not enabled for this gateway", 403, "project_not_allowed");
   }
-  return { project: mappedProject, agent: resolveAgent(headers, "claude-ai") };
+  return { project: mappedProject, agent: resolveAgent(headers, "claude-ai"), readableProjects: new Set([mappedProject]) };
 }
 
 export class RestAgentMemoryBackend implements AgentMemoryBackend {
@@ -247,6 +256,33 @@ export class RestAgentMemoryBackend implements AgentMemoryBackend {
       format: "full",
     });
     return result && typeof result === "object" ? (result as SearchResponse) : {};
+  }
+
+  async dayMemories(input: Parameters<AgentMemoryBackend["dayMemories"]>[0]): Promise<Awaited<ReturnType<AgentMemoryBackend["dayMemories"]>>> {
+    const query = new URLSearchParams({
+      dayProject: input.project,
+      startAt: input.startAt,
+      endAt: input.endAt,
+      timeBasis: input.timeBasis,
+      limit: String(input.limit),
+      offset: String(input.offset),
+    });
+    const response = await fetch(`${this.config.upstreamUrl}/agentmemory/memories?${query}`, {
+      headers: this.config.upstreamSecret ? { authorization: `Bearer ${this.config.upstreamSecret}` } : {},
+      signal: AbortSignal.timeout(this.config.requestTimeoutMs),
+    });
+    if (!response.ok) throw new GatewayError("AgentMemory backend is unavailable", 502, "backend_error");
+    const result = await response.json() as Record<string, unknown>;
+    if (!result || result.dayProject !== input.project || result.startAt !== input.startAt || result.endAt !== input.endAt || result.timeBasis !== input.timeBasis || result.offset !== input.offset || result.limit !== input.limit || !Array.isArray(result.memories) || !Number.isInteger(result.total) || (result.total as number) < 0 || !Number.isInteger(result.unknownEventCount) || (result.unknownEventCount as number) < 0 || result.memories.length > input.limit) {
+      throw new GatewayError("AgentMemory day lookup response is invalid", 502, "backend_error");
+    }
+    const memories = result.memories as Array<Record<string, unknown>>;
+    for (const row of memories) {
+      if (!row || row.project !== input.project || typeof row.id !== "string" || typeof row.content !== "string" || typeof row.saved_at !== "string" || !(row.event_at === null || (typeof row.event_at === "string" && Number.isFinite(Date.parse(row.event_at)))) || typeof row.category !== "string") {
+        throw new GatewayError("AgentMemory day lookup response is invalid", 502, "backend_error");
+      }
+    }
+    return { memories: memories as Awaited<ReturnType<AgentMemoryBackend["dayMemories"]>>["memories"], total: result.total as number, unknownEventCount: result.unknownEventCount as number };
   }
 }
 
@@ -466,6 +502,127 @@ export class ScopedMemoryService {
       fallbackUsed: false,
     };
   }
+
+  async day(scope: RequestScope, input: { start_date: string; end_date?: string; time_basis?: "saved_at" | "event_at"; limit?: number; offset?: number }): Promise<Record<string, unknown>> {
+    const start = parseJstDate(input.start_date);
+    const endDate = input.end_date ?? nextDate(input.start_date);
+    const end = parseJstDate(endDate);
+    if (start >= end) throw new GatewayError("Invalid date range", 400, "invalid_date_range");
+    const timeBasis = input.time_basis ?? "saved_at";
+    const limit = input.limit ?? 100;
+    const offset = input.offset ?? 0;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0) {
+      throw new GatewayError("Invalid pagination", 400, "invalid_pagination");
+    }
+
+    const scopeProjects = scope.readableProjects ?? new Set([scope.project]);
+    const projects = [...scopeProjects].filter((project) => this.allowedProjects.has(project)).sort();
+    const consistencyUnverified = new Set<string>();
+    const byProject = await Promise.allSettled(projects.map(async (project) => {
+      const records: Awaited<ReturnType<AgentMemoryBackend["dayMemories"]>>["memories"] = [];
+      let total = 0;
+      let unknownEventCount = 0;
+      let backendOffset = 0;
+      let pageRequests = 0;
+      do {
+        if (pageRequests > 0) consistencyUnverified.add(project);
+        pageRequests += 1;
+        const page = await this.backend.dayMemories({ project, startAt: start, endAt: end, timeBasis, limit: 5000, offset: backendOffset });
+        if (backendOffset === 0) {
+          total = page.total;
+          unknownEventCount = page.unknownEventCount;
+        } else if (page.total !== total || page.unknownEventCount !== unknownEventCount) {
+          throw new GatewayError("AgentMemory day lookup changed during pagination", 502, "backend_error");
+        }
+        const startMs = Date.parse(start);
+        const endMs = Date.parse(end);
+        if (page.memories.some((row) => {
+          if (row.project !== project) return true;
+          const envelope = decodeEnvelope(row.content);
+          if (!envelope || envelope.project !== project) return true;
+          const value = timeBasis === "saved_at" ? row.saved_at : row.event_at;
+          const timestamp = typeof value === "string" ? Date.parse(value) : Number.NaN;
+          return !Number.isFinite(timestamp) || timestamp < startMs || timestamp >= endMs;
+        })) throw new GatewayError("AgentMemory day lookup response is invalid", 502, "backend_error");
+        records.push(...page.memories);
+        backendOffset += page.memories.length;
+        if (page.memories.length === 0) {
+          if (backendOffset < total) throw new GatewayError("AgentMemory day lookup response is incomplete", 502, "backend_error");
+          break;
+        }
+        if (backendOffset >= total) break;
+      } while (true);
+      return { project, records, total, unknownEventCount };
+    }));
+
+    const succeeded: Array<{ project: string; records: Awaited<ReturnType<AgentMemoryBackend["dayMemories"]>>["memories"]; total: number; unknownEventCount: number }> = [];
+    const failedProjects: Array<{ project: string; code: string }> = [];
+    byProject.forEach((result, index) => {
+      if (result.status === "fulfilled") succeeded.push(result.value);
+      else failedProjects.push({ project: projects[index]!, code: "backend_error" });
+    });
+
+    const mapped = succeeded.flatMap(({ project, records }) => records.map((row) => {
+      const envelope = decodeEnvelope(row.content)!;
+      const rawEnvelope = envelope as unknown as Record<string, unknown>;
+      const metadata = rawEnvelope.metadata && typeof rawEnvelope.metadata === "object" ? rawEnvelope.metadata as Record<string, unknown> : {};
+      const eventAt = row.event_at === null ? null : new Date(row.event_at).toISOString();
+      const rawDomain = metadata.domain ?? rawEnvelope.domain;
+      const domain = rawDomain === "work" || rawDomain === "private" ? rawDomain : "unknown";
+      const rawStatus = metadata.status ?? rawEnvelope.status;
+      const status = rawStatus === "completed" || rawStatus === "planned" ? rawStatus : "unconfirmed";
+      return {
+        id: row.id,
+        project,
+        source: "agentmemory",
+        content: envelope.content,
+        event_at: eventAt,
+        saved_at: row.saved_at,
+        time_basis: timeBasis,
+        category: envelope.category,
+        domain,
+        status,
+      };
+    }));
+
+    const timeOf = (row: typeof mapped[number]) => Date.parse(timeBasis === "saved_at" ? row.saved_at : row.event_at ?? "");
+    mapped.sort((a, b) => timeOf(a) - timeOf(b) || a.project.localeCompare(b.project) || a.id.localeCompare(b.id));
+    const unknownEventCount = succeeded.reduce((sum, project) => sum + project.unknownEventCount, 0);
+    const total = succeeded.reduce((sum, project) => sum + project.total, 0);
+    const results = mapped.slice(offset, offset + limit);
+    const hasMore = offset + results.length < total;
+    return {
+      results,
+      total,
+      offset,
+      limit,
+      has_more: hasMore,
+      next_offset: hasMore ? offset + results.length : null,
+      target_project_count: projects.length,
+      searched_projects: succeeded.map((project) => project.project),
+      failed_projects: failedProjects,
+      unsearched_projects: [],
+      consistency_unverified_projects: projects.filter((project) => consistencyUnverified.has(project)),
+      partial: failedProjects.length > 0 || consistencyUnverified.size > 0 || (timeBasis === "event_at" && unknownEventCount > 0),
+      ...(timeBasis === "event_at" ? { unknown_event_count: unknownEventCount } : {}),
+      range: { start: input.start_date, end: endDate, timezone: "Asia/Tokyo" },
+    };
+  }
+}
+
+function parseJstDate(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new GatewayError("Invalid date", 400, "invalid_date");
+  const [year, month, day] = value.split("-").map(Number);
+  const instant = Date.UTC(year!, month! - 1, day!) - 9 * 60 * 60 * 1000;
+  const roundTrip = new Date(instant + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  if (roundTrip !== value) throw new GatewayError("Invalid date", 400, "invalid_date");
+  return new Date(instant).toISOString();
+}
+
+function nextDate(value: string): string {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !year || !month || !day) throw new GatewayError("Invalid date", 400, "invalid_date");
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
 }
 
 export function createScopedMcpServer(service: ScopedMemoryService, scope: RequestScope): McpServer {
@@ -554,6 +711,29 @@ export function createScopedMcpServer(service: ScopedMemoryService, scope: Reque
     async () => {
       try {
         return textResult(await service.getHandoff(scope));
+      } catch (error) {
+        return textResult(toPublicError(error), true);
+      }
+    },
+  );
+
+  server.registerTool(
+    "agentmemory_day",
+    {
+      title: "Read memories for a day",
+      description: "Read project memories in an exclusive JST date range. The readable project set is fixed by gateway authentication.",
+      inputSchema: {
+        start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        time_basis: z.enum(["saved_at", "event_at"]).default("saved_at"),
+        limit: z.number().int().min(1).max(100).default(100),
+        offset: z.number().int().min(0).default(0),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    },
+    async (input) => {
+      try {
+        return textResult(await service.day(scope, input));
       } catch (error) {
         return textResult(toPublicError(error), true);
       }
