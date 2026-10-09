@@ -17,6 +17,8 @@ class FakeBackend implements AgentMemoryBackend {
   readonly remembers: Array<Parameters<AgentMemoryBackend["remember"]>[0]> = [];
   readonly searches: Array<Parameters<AgentMemoryBackend["search"]>[0]> = [];
   searchResponse: Awaited<ReturnType<AgentMemoryBackend["search"]>> = { results: [] };
+  dayRows = new Map<string, Awaited<ReturnType<AgentMemoryBackend["dayMemories"]>>["memories"]>();
+  dayFailures = new Set<string>();
 
   readonly latestCalls: string[] = [];
   async latestHandoff(input: { project: string }) {
@@ -37,6 +39,19 @@ class FakeBackend implements AgentMemoryBackend {
   async search(input: Parameters<AgentMemoryBackend["search"]>[0]) {
     this.searches.push(input);
     return this.searchResponse;
+  }
+
+  async dayMemories(input: Parameters<AgentMemoryBackend["dayMemories"]>[0]) {
+    if (this.dayFailures.has(input.project)) throw new Error("private backend detail");
+    const all = this.dayRows.get(input.project) ?? [];
+    const unknownEventCount = input.timeBasis === "event_at" ? all.filter((row) => row.event_at === null).length : 0;
+    const start = Date.parse(input.startAt);
+    const end = Date.parse(input.endAt);
+    const rows = all.filter((row) => {
+      const timestamp = Date.parse(input.timeBasis === "saved_at" ? row.saved_at : row.event_at ?? "");
+      return Number.isFinite(timestamp) && timestamp >= start && timestamp < end;
+    });
+    return { memories: rows.slice(input.offset, input.offset + input.limit), total: rows.length, unknownEventCount };
   }
 }
 
@@ -93,11 +108,16 @@ function encoded(project: string, category: string, content: string, createdAt: 
   })}`;
 }
 
+function dayRow(id: string, project: string, savedAt: string, eventAt: string | null = null, metadata: Record<string, unknown> = {}) {
+  return { id, project, content: `JTT_AGENTMEMORY fact ${project}\n${JSON.stringify({ schema: "jtt-agentmemory/v1", project, category: "fact", sourceAgent: "codex", content: id, files: [], createdAt: "2020-01-01T00:00:00.000Z", ...metadata, ...(eventAt ? { event_at: eventAt } : {}) })}`, saved_at: savedAt, event_at: eventAt, category: "fact" };
+}
+
 describe("resolveRequestScope", () => {
   it("binds the request to an allowlisted canonical project", () => {
     expect(resolveRequestScope(headers("AGENT-HUB", "Claude-Code"), config)).toEqual({
       project: "agent-hub",
       agent: "claude-code",
+      readableProjects: new Set(config.allowedProjects),
     });
   });
 
@@ -112,6 +132,7 @@ describe("resolveRequestScope", () => {
     expect(resolveRequestScope(new Headers({ authorization: "Bearer tok-agent-hub" }), tokenMapConfig)).toEqual({
       project: "agent-hub",
       agent: "claude-ai",
+      readableProjects: new Set(["agent-hub"]),
     });
   });
 
@@ -132,7 +153,7 @@ describe("resolveRequestScope", () => {
         new Headers({ authorization: "Bearer tok-jtt-cms", "x-agentmemory-project": "JTT-CMS" }),
         tokenMapConfig,
       ),
-    ).toEqual({ project: "jtt-cms", agent: "claude-ai" });
+    ).toEqual({ project: "jtt-cms", agent: "claude-ai", readableProjects: new Set(["jtt-cms"]) });
   });
 
   it("rejects an unknown bearer token with 401", () => {
@@ -150,6 +171,7 @@ describe("resolveRequestScope", () => {
     expect(resolveRequestScope(headers("AGENT-HUB", "Claude-Code"), tokenMapConfig)).toEqual({
       project: "agent-hub",
       agent: "claude-code",
+      readableProjects: new Set(tokenMapConfig.allowedProjects),
     });
     expect(scopeError(() => resolveRequestScope(new Headers({ authorization: "Bearer test-secret" }), tokenMapConfig)))
       .toMatchObject({ statusCode: 400, code: "project_required" });
@@ -331,7 +353,7 @@ describe("ScopedMemoryService", () => {
 });
 
 describe("JTT scoped MCP surface", () => {
-  it("initializes, lists only the four safe tools, and performs a scoped save", async () => {
+  it("initializes, lists only the scoped tools, and performs a scoped save", async () => {
     const backend = new FakeBackend();
     const service = new ScopedMemoryService(backend, config.allowedProjects);
     const server = createScopedMcpServer(service, { project: "agent-hub", agent: "codex" });
@@ -346,6 +368,7 @@ describe("JTT scoped MCP surface", () => {
         "agentmemory_search",
         "agentmemory_handoff_save",
         "agentmemory_handoff_get",
+        "agentmemory_day",
       ]);
       const saved = await client.callTool({
         name: "agentmemory_save",
@@ -422,5 +445,105 @@ describe("chronological project handoff boundary", () => {
     const backend = new FakeBackend();
     backend.latestHandoff = async () => ({observation: {id: "wrong", project: "jtt-cms", narrative: encoded("jtt-cms", "implementation_handoff", "wrong", "2026-09-05T00:00:00Z")}});
     await expect(new ScopedMemoryService(backend, config.allowedProjects).getHandoff({project: "agent-hub", agent: "codex"})).rejects.toThrow(/invalid/);
+  });
+});
+
+describe("agentmemory_day", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("aggregates authorized projects and paginates after a stable global sort", async () => {
+    const backend = new FakeBackend();
+    backend.dayRows.set("agent-hub", [dayRow("hub", "agent-hub", "2026-10-09T15:00:00.000Z")]);
+    backend.dayRows.set("jtt-cms", [dayRow("cms-a", "jtt-cms", "2026-10-09T15:00:00.000Z"), dayRow("cms-b", "jtt-cms", "2026-10-09T16:00:00.000Z")]);
+    backend.dayRows.set("global/reference", [dayRow("private", "global/reference", "2026-10-09T17:00:00.000Z")]);
+    const service = new ScopedMemoryService(backend, config.allowedProjects);
+    const result = await service.day({ project: "agent-hub", agent: "codex", readableProjects: config.allowedProjects }, { start_date: "2026-10-10", limit: 2 });
+    expect(result).toMatchObject({ total: 4, offset: 0, limit: 2, has_more: true, next_offset: 2, target_project_count: 3, range: { start: "2026-10-10", end: "2026-10-11", timezone: "Asia/Tokyo" } });
+    expect((result.results as Array<{id: string}>).map((row) => row.id)).toEqual(["hub", "cms-a"]);
+  });
+
+  it("limits mapped tokens and scopes without readableProjects to the current project", async () => {
+    const backend = new FakeBackend();
+    backend.dayRows.set("agent-hub", [dayRow("hub", "agent-hub", "2026-10-09T15:00:00.000Z")]);
+    const service = new ScopedMemoryService(backend, config.allowedProjects);
+    const mapped = resolveRequestScope(new Headers({ authorization: "Bearer tok-agent-hub" }), tokenMapConfig);
+    expect((await service.day(mapped, { start_date: "2026-10-10" })).searched_projects).toEqual(["agent-hub"]);
+    expect((await service.day({ project: "agent-hub", agent: "codex" }, { start_date: "2026-10-10" })).searched_projects).toEqual(["agent-hub"]);
+    expect(scopeError(() => resolveRequestScope(new Headers({ authorization: "Bearer unknown-token" }), tokenMapConfig))).toMatchObject({ statusCode: 401, code: "unauthorized" });
+  });
+
+  it("keeps non-pj domain unknown unless an explicit domain is stored", async () => {
+    const backend = new FakeBackend();
+    backend.dayRows.set("non-pj", [
+      dayRow("explicit", "non-pj", "2026-10-09T15:00:00.000Z", null, { metadata: { domain: "work", status: "planned" } }),
+      dayRow("inferred", "non-pj", "2026-10-09T16:00:00.000Z"),
+      dayRow("explicit-private", "non-pj", "2026-10-09T17:00:00.000Z", null, { metadata: { domain: "private" } }),
+    ]);
+    const allowed = new Set([...config.allowedProjects, "non-pj"]);
+    const result = await new ScopedMemoryService(backend, allowed).day({ project: "non-pj", agent: "codex", readableProjects: new Set(["non-pj"]) }, { start_date: "2026-10-10" });
+    expect(result.results).toEqual([
+      expect.objectContaining({ id: "explicit", domain: "work", status: "planned" }),
+      expect.objectContaining({ id: "inferred", domain: "unknown", status: "unconfirmed" }),
+      expect.objectContaining({ id: "explicit-private", domain: "private", status: "unconfirmed" }),
+    ]);
+  });
+
+  it("uses JST half-open days and distinguishes save time from explicit event time", async () => {
+    const backend = new FakeBackend();
+    backend.dayRows.set("agent-hub", [
+      dayRow("start", "agent-hub", "2026-10-09T15:00:00.000Z", "2026-10-09T15:00:00.000Z"),
+      dayRow("end", "agent-hub", "2026-10-10T15:00:00.000Z", "2026-10-10T15:00:00.000Z"),
+      dayRow("saved-only", "agent-hub", "2026-10-09T16:00:00.000Z"),
+      { ...dayRow("metadata-event", "agent-hub", "2026-10-11T00:00:00.000Z", null, { metadata: { event_at: "2026-10-09T17:00:00.000Z" } }), event_at: "2026-10-09T17:00:00.000Z" },
+    ]);
+    const service = new ScopedMemoryService(backend, config.allowedProjects);
+    const scope = { project: "agent-hub", agent: "codex" };
+    const saved = await service.day(scope, { start_date: "2026-10-10" });
+    expect((saved.results as Array<{id: string; event_at: string | null}>).map((row) => row.id)).toEqual(["start", "saved-only"]);
+    expect((saved.results as Array<{event_at: string | null}>)[1]?.event_at).toBeNull();
+    const event = await service.day(scope, { start_date: "2026-10-10", time_basis: "event_at" });
+    expect((event.results as Array<{id: string}>).map((row) => row.id)).toEqual(["start", "metadata-event"]);
+    expect(event.partial).toBe(true);
+    expect(event.unknown_event_count).toBe(1);
+  });
+
+  it("sanitizes failed project details and turns project mismatches into partial failures", async () => {
+    const backend = new FakeBackend();
+    backend.dayRows.set("agent-hub", [dayRow("ok", "agent-hub", "2026-10-09T15:00:00.000Z")]);
+    backend.dayFailures.add("jtt-cms");
+    const partial = await new ScopedMemoryService(backend, config.allowedProjects).day({ project: "agent-hub", agent: "codex", readableProjects: new Set(["agent-hub", "jtt-cms"]) }, { start_date: "2026-10-10" });
+    expect(partial).toMatchObject({ partial: true, failed_projects: [{ project: "jtt-cms", code: "backend_error" }], results: [expect.objectContaining({ id: "ok" })] });
+    expect(JSON.stringify(partial)).not.toContain("private backend detail");
+    backend.dayFailures.clear();
+    backend.dayMemories = async () => ({ memories: [dayRow("wrong", "jtt-cms", "2026-10-09T15:00:00.000Z")], total: 1, unknownEventCount: 0 });
+    const mismatch = await new ScopedMemoryService(backend, config.allowedProjects).day({ project: "agent-hub", agent: "codex", readableProjects: new Set(["agent-hub"]) }, { start_date: "2026-10-10" });
+    expect(mismatch).toMatchObject({ partial: true, failed_projects: [{ project: "agent-hub", code: "backend_error" }], results: [] });
+  });
+
+  it("keeps incomplete or changing backend pages partial and refuses malformed envelopes", async () => {
+    const backend = new FakeBackend();
+    const scope = { project: "agent-hub", agent: "codex", readableProjects: new Set(["agent-hub"]) };
+    backend.dayMemories = async () => ({ memories: [], total: 1, unknownEventCount: 0 });
+    const incomplete = await new ScopedMemoryService(backend, config.allowedProjects).day(scope, { start_date: "2026-10-10" });
+    expect(incomplete).toMatchObject({ partial: true, failed_projects: [{ project: "agent-hub", code: "backend_error" }], total: 0 });
+
+    backend.dayMemories = async (input) => input.offset === 0
+      ? { memories: [dayRow("first", "agent-hub", "2026-10-09T15:00:00.000Z")], total: 2, unknownEventCount: 0 }
+      : { memories: [dayRow("second", "agent-hub", "2026-10-09T16:00:00.000Z")], total: 3, unknownEventCount: 0 };
+    const changed = await new ScopedMemoryService(backend, config.allowedProjects).day(scope, { start_date: "2026-10-10" });
+    expect(changed).toMatchObject({ partial: true, failed_projects: [{ project: "agent-hub", code: "backend_error" }], total: 0 });
+
+    backend.dayMemories = async () => ({ memories: [{ ...dayRow("malformed", "agent-hub", "2026-10-09T15:00:00.000Z"), content: "not an envelope" }], total: 1, unknownEventCount: 0 });
+    const malformed = await new ScopedMemoryService(backend, config.allowedProjects).day(scope, { start_date: "2026-10-10" });
+    expect(malformed).toMatchObject({ partial: true, failed_projects: [{ project: "agent-hub", code: "backend_error" }], total: 0 });
+  });
+
+  it("rejects an older backend that ignores day filters and project mismatches", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ memories: [], total: 0 })));
+    vi.stubGlobal("fetch", fetchMock);
+    const backend = new RestAgentMemoryBackend(config);
+    const query = { project: "agent-hub", startAt: "2026-10-09T15:00:00.000Z", endAt: "2026-10-10T15:00:00.000Z", timeBasis: "saved_at" as const, limit: 5000, offset: 0 };
+    await expect(backend.dayMemories(query)).rejects.toThrow(/invalid/);
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ dayProject: "jtt-cms", startAt: query.startAt, endAt: query.endAt, timeBasis: query.timeBasis, memories: [], total: 0, unknownEventCount: 0 })));
+    await expect(backend.dayMemories(query)).rejects.toThrow(/invalid/);
   });
 });
