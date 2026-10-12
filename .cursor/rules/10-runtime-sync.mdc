@@ -51,6 +51,7 @@ alwaysApply: true
 - `.claude/rules/general/mandate-registry.md`
 - `.claude/rules/general/mcp-key-management.md`
 - `.claude/rules/general/memory-lookups.md`
+- `.claude/rules/general/motion-first.md`
 - `.claude/rules/general/plan-approval-gate.md`
 - `.claude/rules/general/plan-commitment-tracking.md`
 - `.claude/rules/general/reference-over-hardcode.md`
@@ -59,6 +60,7 @@ alwaysApply: true
 - `.claude/rules/general/settings-protection-coexistence.md`
 - `.claude/rules/general/sub-agent-scope-contract.md`
 - `.claude/rules/general/tool-availability-resolution.md`
+- `.claude/rules/general/ui-registry-first.md`
 - `.claude/rules/general/ui-stitch-mandatory.md`
 - `.claude/rules/general/visual-progress-map.md`
 - `.claude/rules/general/worktree-rule.md`
@@ -74,6 +76,7 @@ alwaysApply: true
 - `.claude/hooks/lib/resolve-handover-path.py`
 - `.claude/hooks/lib/staff-message-policy.json`
 - `.claude/hooks/lib/storage-url-common.py`
+- `.claude/hooks/lib/ui-registry-policy.json`
 - `.claude/hooks/lib/upstream-write-guard.py`
 - `.claude/hooks/scripts/ai-worker-watch-enforce.sh`
 - `.claude/hooks/scripts/ai-worker-watch-enforce.test.sh`
@@ -116,6 +119,10 @@ alwaysApply: true
 - `.claude/hooks/scripts/telemetry-lib.sh`
 - `.claude/hooks/scripts/telemetry-log.sh`
 - `.claude/hooks/scripts/telemetry-log.test.sh`
+- `.claude/hooks/scripts/ui-registry-preflight.sh`
+- `.claude/hooks/scripts/ui-registry-preflight.test.sh`
+- `.claude/hooks/scripts/workflow-silent-skip-guard.sh`
+- `.claude/hooks/scripts/workflow-silent-skip-guard.test.sh`
 - `.claude/agents/backend-architect.md`
 - `.claude/agents/backend-developer.md`
 - `.claude/agents/chatgpt-image-creator.md`
@@ -139,6 +146,7 @@ alwaysApply: true
 - `.cursor/rules/general/mandate-registry.mdc`
 - `.cursor/rules/general/mcp-key-management.mdc`
 - `.cursor/rules/general/memory-lookups.mdc`
+- `.cursor/rules/general/motion-first.mdc`
 - `.cursor/rules/general/plan-approval-gate.mdc`
 - `.cursor/rules/general/plan-commitment-tracking.mdc`
 - `.cursor/rules/general/reference-over-hardcode.mdc`
@@ -147,6 +155,7 @@ alwaysApply: true
 - `.cursor/rules/general/settings-protection-coexistence.mdc`
 - `.cursor/rules/general/sub-agent-scope-contract.mdc`
 - `.cursor/rules/general/tool-availability-resolution.mdc`
+- `.cursor/rules/general/ui-registry-first.mdc`
 - `.cursor/rules/general/ui-stitch-mandatory.mdc`
 - `.cursor/rules/general/visual-progress-map.mdc`
 - `.cursor/rules/general/worktree-rule.mdc`
@@ -164,6 +173,7 @@ alwaysApply: true
 - `.cursor/hooks/lib/resolve-handover-path.py`
 - `.cursor/hooks/lib/staff-message-policy.json`
 - `.cursor/hooks/lib/storage-url-common.py`
+- `.cursor/hooks/lib/ui-registry-policy.json`
 - `.cursor/hooks/lib/upstream-write-guard.py`
 - `.cursor/hooks/scripts/ai-worker-watch-enforce.sh`
 - `.cursor/hooks/scripts/ai-worker-watch-enforce.test.sh`
@@ -207,6 +217,10 @@ alwaysApply: true
 - `.cursor/hooks/scripts/telemetry-lib.sh`
 - `.cursor/hooks/scripts/telemetry-log.sh`
 - `.cursor/hooks/scripts/telemetry-log.test.sh`
+- `.cursor/hooks/scripts/ui-registry-preflight.sh`
+- `.cursor/hooks/scripts/ui-registry-preflight.test.sh`
+- `.cursor/hooks/scripts/workflow-silent-skip-guard.sh`
+- `.cursor/hooks/scripts/workflow-silent-skip-guard.test.sh`
 - generated_agents:
 - `.cursor/agents/backend-architect.md`
 - `.cursor/agents/backend-developer.md`

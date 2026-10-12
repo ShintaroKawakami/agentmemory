@@ -46,6 +46,18 @@
       "timeout": 5
     },
     {
+      "event": "PreToolUse",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/ui-registry-preflight.sh\"",
+      "matcher": "Write|Edit|MultiEdit|WriteFile|StrReplaceFile",
+      "timeout": 5
+    },
+    {
+      "event": "PreToolUse",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/workflow-silent-skip-guard.sh\"",
+      "matcher": "Write|Edit|MultiEdit|WriteFile|StrReplaceFile|Bash|Shell",
+      "timeout": 10
+    },
+    {
       "event": "UserPromptSubmit",
       "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/delegation-routing-reminder.sh\"",
       "timeout": 5

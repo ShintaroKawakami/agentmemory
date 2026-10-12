@@ -27,7 +27,7 @@ paths:
 ## 0-bis. Codex 指名時の固定ルール
 
 - **`codexで実装` / `Codexで実装` / `codex実装` / `Codex実装`** と言われた時だけ、Codex 実装として扱う。
-- Codex 実装は `agents.yaml#worker_delegation.codex_model_routing` で **GPT-6 Luna・effort max** に解決する。GPT-6 Sol は PM・レビュー専用。旧世代と Spark は実装候補にしない。
+- Codex 実装は `agents.yaml#worker_delegation.codex_model_routing` で **GPT-6 Luna** に解決する。作業量・難度に応じて **medium / high / xhigh / max** を使い分ける（既定 max）。GPT-6 Sol は PM・レビュー専用。旧世代と Spark は実装候補にしない。
 - Codex の敵対的レビューは `agents.yaml#task_routing.adversarial_review` を参照する。**GPT-6 Sol は medium 既定**で、難度に応じて high / xhigh へ上げる。
 - Codex の Fast は **明示指定時だけ**許可する。自動選択では標準速度を使う。
 - 週次枠は10%を予備として残す。上限到達、残量不明、古い計測値では Codex 実装を停止し、別の利用可能な provider を選ぶ。
@@ -53,13 +53,16 @@ paths:
 [2026-08-08][feat] 境界行を追記（worker-speed プラン B）。実測（job 8714b5dc）で小タスクの往復コストが
   実装時間を上回る事例が出たため、既定の適用範囲を1行で明示する。閾値・手順の詳細は skills/agent-dispatch
   が正本（ここへ複製しない）。専用ルール新設は ctx-slim に反するため不採用。
+[2026-10-09][feat] 実装サブエージェント（Haiku / Luna / Sonnet）と effort 使い分け方針の反映。
+  Claude Code 実装サブエージェントは Haiku（現行 5.5・可変・既定 medium）を主力とし、大規模・難所は Sonnet（既定 high）。
+  Codex 実装サブエージェントは Luna（既定 max）。作業量や難度に応じて medium / high / xhigh / max を使い分ける。
 -->
 
 **既定（2026-08-08 ctx-slim）**: 実装・大量読み（リポ横断の読み込み・大規模ファイル調査）は AI worker への委譲を既定とし、Claude（PM）は設計・検証・統括に徹する。大量読みの第一候補は **Kimi（現行 K2.8 Preview・1M）**（長大 context 対応。選択条件・上限は `agents.yaml` の `kimi_model_routing` を正本とする）。目的: Claude 本体のクレジット消費を抑える（ガバナンス領域 `.claude/` `hook` 等は worker 編集不可のため従来どおり Claude が担う）。
 
-**境界（2026-08-08）**: 見積り10分未満の小実装とガバナンス領域（`.claude/` `hook` 等の worker 編集不可領域）は Claude サブエージェント内製、大タスク・並列・大量読みは worker（判定手順は `skills/agent-dispatch` が正本）。
+**境界（2026-08-08・2026-10-09 改定）**: 見積り10分未満の小実装とガバナンス領域（`.claude/` `hook` 等の worker 編集不可領域）はサブエージェント内製、大タスク・並列・大量読みは worker（判定手順は `skills/agent-dispatch` が正本）。Claude Code の実装サブエージェントは **Haiku（現行 5.5・可変・既定 medium）** を主力とし、大規模・高難度・複数ファイルは **Sonnet（既定 high）** を使う。Codex の実装サブエージェントは **Luna（既定 max）**。どちらも作業量・難度に応じて **medium / high / xhigh / max** を使い分ける。
 
-**三役の呼称**: 監督=Claude / GPT-6 Sol / Cursor（PM クライアント）／参謀=Kimi（現行 K2.8 Preview）／職人=CodeBar残量と task fit で配分する GPT-6 Luna・Kimi K2.8 Preview・GLM 5.3 系・Gemini Flash High。Codex実装はLunaのeffort max。Kimi K3は敵対的レビューに使い、実装のfallbackにはしない。OpenCode GoはAI Worker候補から除外する。現行モデルと経路の正本は `agents.yaml#model_catalog` と `worker_delegation`。
+**三役の呼称**: 監督=Claude / GPT-6 Sol / Cursor（PM クライアント）／参謀=Kimi（現行 K2.8 Preview）／職人=CodeBar残量と task fit で配分する GPT-6 Luna（量に応じ medium〜max）・Kimi K2.8 Preview・GLM 5.3 系・Gemini Flash High。Kimi K3は敵対的レビューに使い、実装のfallbackにはしない。OpenCode GoはAI Worker候補から除外する。現行モデルと経路の正本は `agents.yaml#model_catalog` と `worker_delegation`。
 
 **Fable 使用条件（2026-08-11・ctx-save）**: Fable は難所（設計・承認判断／原因不明バグの診断／ガバナンス領域編集）限定。調査・大量読み・軽作業は使わない。重い調査が主目的のセッションは、セッションモデル自体を Sonnet 既定で開始する（第二弾 2026-08-11）。正本・境界の全文は `agents.yaml` の `task_routing.fable_usage_policy`（`session_model_default` 含む）を参照（複製しない）。
 

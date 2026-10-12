@@ -55,9 +55,9 @@ MCP は job 終端時に `~/.cache/agent-hub/ai-worker-mcp/jobs/<job_id>.termina
 ~/business/AGENT-HUB/scripts/watch-cli-log.sh --pid <pid> --log <file> [--stall 300] [--deadline 1800]
 ```
 
-PR の監視開始時の head SHA を固定し、取得前後に一致を確認する。別途開始した
-`workflow_dispatch` なども完了条件に含む場合は、最初の4引数に続けて
-`--run <run_id>@<head_sha>` を必要な run ごとに指定する。指定した run の ID と head も照合する。
+PR の監視開始時の head SHA を固定し、取得前後に一致を確認する。別途開始済みの
+`workflow_dispatch` run を見張る場合は、最初の4引数に続けて
+`--run <run_id>@<head_sha>` を必要な run ごとに指定する（手動起動は完了条件ではない。下の「CI 手動起動の上限」参照）。指定した run の ID と head も照合する。
 対象外の run を一括で待たない。head が更新された場合は新しい変更内容と監視対象を確認してから起動し直す。
 
 `NO_CHECKS` は未検証、`NOT_STARTED` は指定 run の開始待ち、`RUNNING` は実行中、
@@ -71,6 +71,22 @@ PR の監視開始時の head SHA を固定し、取得前後に一致を確認�
 Claude Code なら `run_in_background: true` で起動する。ポーリングだけで無言で待たない。
 
 `merge_pull_request`（または `create_pull_request(merge_after_pr=true)`）は内部で merge-pr.py を最大 15 分走らせる。呼び出しが background に回った場合も同じく 5 分ごとに状態を確認し、無言で待たない。
+
+<!-- [2026-10-11][docs] CI 手動起動の上限（GitHub クレジット月$30以内）
+背景:
+  - ユーザー依頼意図: GitHub Actions の消費を月$30に収める。手動起動の押し直しと「手動起動が完了条件」の記述が再実行を増やしていた。
+  - 守るべき業務ルール: CI 設定（検査範囲・並列化・Supabase 等）は変えない。文章のみの変更。
+  - 他案不採用理由: 各リポに同じ文を書くと食い違うため、共通ルールの正本である本ファイルに一か所だけ書き、各リポからは参照する。
+-->
+
+## CI 手動起動の上限（全リポ共通・正本）
+
+`workflow_dispatch`（`ci.yml` など）の手動起動は、各リポの AGENTS.md / ルールからここを参照する。
+
+1. CI の手動起動は **1つのブランチで最大1回**。
+2. 失敗したら、手元で lint・テストを通してから push し、あとは PR の CI に任せる。**手動で押し直さない**。
+3. **2回目の手動起動には人の承認が要る**（承認なしに起動しない）。
+4. 手動起動は**完了条件ではない**。起動しなかったことを理由に未完了扱いにしない。
 
 ## 5 分ごとの能動確認（2026-09-03〜・義務）
 

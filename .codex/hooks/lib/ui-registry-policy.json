@@ -1,0 +1,30 @@
+{
+  "_comment": "[2026-10-11][feat] ui-registry-preflight.sh の判定データ正本（JTT共通UIレジストリ・決めごと 6A/8A）。新しい画面部品ファイルを Write で作る瞬間に、作業（セッション）ごとに1回だけ「先に探した？」と案内するための画面部品の見分け方と文言。止めない hook なので誤検知は許容するが、テスト・stories・型定義だけのファイルは外す。dir 名はパスを / で割った各要素との一致、extensions はファイル名末尾の一致。文言を変える時はこのファイルだけを直す（スクリプトへ埋め込まない）。",
+  "version": 1,
+  "component_dirs": [
+    "components",
+    "component",
+    "ui",
+    "hooks",
+    "features",
+    "screens",
+    "pages",
+    "app",
+    "src"
+  ],
+  "component_extensions": [
+    ".tsx",
+    ".jsx",
+    ".ts",
+    ".js",
+    ".vue",
+    ".svelte"
+  ],
+  "exclude_substrings": [
+    ".test.",
+    ".spec.",
+    ".stories.",
+    ".d.ts"
+  ],
+  "message": "新しい画面部品？ 先に部品さがしを：PJ内 → JTT共通カタログ（ui-registry/scripts/jtt_ui.py search）→ 契約済みの公式素材。手順の正本は skills/ui-registry/SKILL.md。この作業ではもう案内しません。"
+}

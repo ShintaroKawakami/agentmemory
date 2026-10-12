@@ -569,6 +569,112 @@ expect_block "mid-word quote cannot hide shell -c clean" "x='a|echo y' bash -c '
 expect_block "mid-word quote keeps reset visible" "x='a;b' git reset --hard"
 expect_block "mid-word quoted format then reset deny" "git branch --format='%(x)'; git reset --hard"
 
+# [2026-10-10][test] issue #1392: git を含まない複合コマンドの unresolved 誤検知を解消。
+# 背景:
+#   - ユーザー依頼意図: `f=$(ls /tmp/${j}.json | head -1)` のように代入へ癒着した
+#     置換の内側で ${...} パラメータ展開があるだけで deny され、git 非依存の
+#     ポーリング・整形処理が毎回ファイル分解を強いられていた。
+#   - 守るべき業務ルール: 許可回帰と deny 回帰を対で足し、検知力を片側にしか動かさない。
+#     ${x%)} のように展開内に ) を含む形や、置換結果が実行名を作る形は従来どおり deny。
+#   - 他案不採用理由: 許可側だけのテストは置換検査の回帰を検出できないため不採用。
+expect_allow "assign substitution with braced param arg allow" 'f=$(ls /tmp/${j}.json | head -1)'
+expect_allow "assign substitution with plain param arg allow" 'f=$(ls /tmp/$j.json | head -1)'
+expect_allow "braced param inside dq in substitution allow" 'x="$(printf %s "${HOME}")"'
+expect_allow "braced param default inside substitution allow" 'x=$(echo ${v:-default})'
+expect_allow "nested substitution argument inside substitution allow" 'x=$(printf %s $(pwd))'
+expect_allow "process substitution with braced param allow" 'cat <(echo ${x:-y})'
+expect_allow "quoted assign substitution with braced param allow" 'x="$(ls /tmp/${j})"'
+issue1392_loop='for j in a b c; do
+  f=$(ls /tmp/${j}*.json | head -1)
+  if [ -n "$f" ]; then
+    python3 - "$f" <<'"'"'PY'"'"'
+import json, sys
+print(json.load(open(sys.argv[1])).get("status"))
+PY
+  fi
+done'
+expect_allow "for loop polling with braced param heredoc allow (issue #1392)" "$issue1392_loop"
+expect_allow "until loop with substitution allow" 'until [ "$(cat /tmp/state)" = "done" ]; do sleep 1; done'
+expect_block "braced param close paren cannot hide reset" 'x=$(echo ${v%)}; git reset --hard)'
+expect_block "braced param nested substitution reset deny" 'x=$(echo ${v:-$(git reset --hard)})'
+expect_block "braced param nested substitution clean deny" 'x=$(echo "${v:-$(git clean -fd)}")'
+expect_block "glued substitution executable still fail closed" 'foo$(printf git) reset --hard'
+expect_block "dollar word then spaced brace group reset deny" 'echo a$ { git reset --hard; }'
+expect_block "braced param glued to git exec still flagged" 'git${x} reset --hard'
+expect_block "substitution at executable position still fail closed" '"$(printf git)" reset --hard'
+expect_block "braced param in -c body still fail closed" 'bash -c '\''echo "${v:-$(git reset --hard)}"'\'''
+
+# deny メッセージ: git を含まない解析不能はバイパス案内を出さず、該当箇所を示す。
+expect_unresolved_message_without_git() {
+  local name="unresolved deny without git omits bypass guidance"
+  local out
+  out="$(run_hook "eval 'echo hello'" 2>&1)"
+  if OUT="$out" python3 - <<'PY'
+import json
+import os
+import sys
+
+try:
+    data = json.loads(os.environ["OUT"])
+except Exception as exc:
+    print(f"invalid json: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+reason = data.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
+if "安全側で停止" not in reason:
+    sys.exit("missing conservative-stop explanation")
+if "eval" not in reason:
+    sys.exit("missing unresolved fragment")
+if "AGENT_HUB_ALLOW_DESTRUCTIVE_GIT" in reason:
+    sys.exit("bypass guidance must not appear for non-git commands")
+if "ファイルへ書き出" not in reason:
+    sys.exit("missing file workaround guidance")
+PY
+  then
+    printf '[PASS] %s\n' "$name"
+    PASS=$((PASS + 1))
+  else
+    printf '[FAIL] %s: %s\n' "$name" "$out"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+# deny メッセージ: git を含む解析不能は従来どおりバイパス手順と SSOT を案内する。
+expect_unresolved_message_with_git() {
+  local name="unresolved deny with git keeps bypass guidance"
+  local out
+  out="$(run_hook "eval 'git reset --hard'" 2>&1)"
+  if OUT="$out" python3 - <<'PY'
+import json
+import os
+import sys
+
+try:
+    data = json.loads(os.environ["OUT"])
+except Exception as exc:
+    print(f"invalid json: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+reason = data.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
+if "AGENT_HUB_ALLOW_DESTRUCTIVE_GIT" not in reason:
+    sys.exit("missing bypass guidance for git command")
+if "hook-library/BYPASS-CONVENTION.md" not in reason:
+    sys.exit("missing BYPASS-CONVENTION.md reference")
+if "解析に失敗した箇所" not in reason:
+    sys.exit("missing unresolved fragment")
+PY
+  then
+    printf '[PASS] %s\n' "$name"
+    PASS=$((PASS + 1))
+  else
+    printf '[FAIL] %s: %s\n' "$name" "$out"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+expect_unresolved_message_without_git
+expect_unresolved_message_with_git
+
 TOTAL=$((PASS + FAIL))
 printf '\n=== block-destructive-git.test.sh: %d/%d PASS ===\n' "$PASS" "$TOTAL"
 
