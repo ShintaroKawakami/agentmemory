@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-05T13:41:56.672253+00:00",
-  "source_commit": "67ec9214b15616490883bc83328e97fb4c5bdb23",
+  "generated_at": "2026-10-12T17:03:01.050918+00:00",
+  "source_commit": "07badd1",
   "source_rule_files": [
     ".claude/rules/general/ai-model-selection.md",
     ".claude/rules/general/ai-worker-watch.md",
@@ -12,6 +12,7 @@
     ".claude/rules/general/mandate-registry.md",
     ".claude/rules/general/mcp-key-management.md",
     ".claude/rules/general/memory-lookups.md",
+    ".claude/rules/general/motion-first.md",
     ".claude/rules/general/plan-approval-gate.md",
     ".claude/rules/general/plan-commitment-tracking.md",
     ".claude/rules/general/reference-over-hardcode.md",
@@ -20,6 +21,7 @@
     ".claude/rules/general/settings-protection-coexistence.md",
     ".claude/rules/general/sub-agent-scope-contract.md",
     ".claude/rules/general/tool-availability-resolution.md",
+    ".claude/rules/general/ui-registry-first.md",
     ".claude/rules/general/ui-stitch-mandatory.md",
     ".claude/rules/general/visual-progress-map.md",
     ".claude/rules/general/worktree-rule.md"
@@ -36,6 +38,7 @@
     ".claude/hooks/lib/resolve-handover-path.py",
     ".claude/hooks/lib/staff-message-policy.json",
     ".claude/hooks/lib/storage-url-common.py",
+    ".claude/hooks/lib/ui-registry-policy.json",
     ".claude/hooks/lib/upstream-write-guard.py",
     ".claude/hooks/scripts/ai-worker-watch-enforce.sh",
     ".claude/hooks/scripts/ai-worker-watch-enforce.test.sh",
@@ -77,7 +80,11 @@
     ".claude/hooks/scripts/takeover-preflight.test.sh",
     ".claude/hooks/scripts/telemetry-lib.sh",
     ".claude/hooks/scripts/telemetry-log.sh",
-    ".claude/hooks/scripts/telemetry-log.test.sh"
+    ".claude/hooks/scripts/telemetry-log.test.sh",
+    ".claude/hooks/scripts/ui-registry-preflight.sh",
+    ".claude/hooks/scripts/ui-registry-preflight.test.sh",
+    ".claude/hooks/scripts/workflow-silent-skip-guard.sh",
+    ".claude/hooks/scripts/workflow-silent-skip-guard.test.sh"
   ],
   "source_agent_files": [
     ".claude/agents/backend-architect.md",
@@ -105,6 +112,7 @@
     ".cursor/rules/general/mandate-registry.mdc",
     ".cursor/rules/general/mcp-key-management.mdc",
     ".cursor/rules/general/memory-lookups.mdc",
+    ".cursor/rules/general/motion-first.mdc",
     ".cursor/rules/general/plan-approval-gate.mdc",
     ".cursor/rules/general/plan-commitment-tracking.mdc",
     ".cursor/rules/general/reference-over-hardcode.mdc",
@@ -113,6 +121,7 @@
     ".cursor/rules/general/settings-protection-coexistence.mdc",
     ".cursor/rules/general/sub-agent-scope-contract.mdc",
     ".cursor/rules/general/tool-availability-resolution.mdc",
+    ".cursor/rules/general/ui-registry-first.mdc",
     ".cursor/rules/general/ui-stitch-mandatory.mdc",
     ".cursor/rules/general/visual-progress-map.mdc",
     ".cursor/rules/general/worktree-rule.mdc"
@@ -130,6 +139,7 @@
     ".cursor/hooks/lib/resolve-handover-path.py",
     ".cursor/hooks/lib/staff-message-policy.json",
     ".cursor/hooks/lib/storage-url-common.py",
+    ".cursor/hooks/lib/ui-registry-policy.json",
     ".cursor/hooks/lib/upstream-write-guard.py",
     ".cursor/hooks/scripts/ai-worker-watch-enforce.sh",
     ".cursor/hooks/scripts/ai-worker-watch-enforce.test.sh",
@@ -172,7 +182,11 @@
     ".cursor/hooks/scripts/takeover-preflight.test.sh",
     ".cursor/hooks/scripts/telemetry-lib.sh",
     ".cursor/hooks/scripts/telemetry-log.sh",
-    ".cursor/hooks/scripts/telemetry-log.test.sh"
+    ".cursor/hooks/scripts/telemetry-log.test.sh",
+    ".cursor/hooks/scripts/ui-registry-preflight.sh",
+    ".cursor/hooks/scripts/ui-registry-preflight.test.sh",
+    ".cursor/hooks/scripts/workflow-silent-skip-guard.sh",
+    ".cursor/hooks/scripts/workflow-silent-skip-guard.test.sh"
   ],
   "generated_agent_files": [
     ".cursor/agents/backend-architect.md",

@@ -73,7 +73,7 @@ alwaysApply: true
 
 ## HTMLプランの中身（v4・2026-09-04〜／v5・2026-10-07〜）
 
-構成の正本は `skills/plan-approval/SKILL.md`（v5 は「v5 の構成」、v4 は `references/plan-template-v4.html` の `parts` マニフェスト）。複製しない。v4 で決めた次の義務は v5 でも同じで、v5 は `validate-plan-template.py` が検査する（v5 は明暗切替・既定ダーク、要約カード＋畳んだ CaD 付きコード、承認は既定値なし）。
+構成の正本は `skills/plan-approval/SKILL.md`（v5 は「v5 の構成」、v4 は `references/plan-template-v4.html` の `parts` マニフェスト）。複製しない。v4 で決めた次の義務は v5 でも同じで、v5 は `validate-plan-template.py` が検査する（v5 は明暗切替・既定は明るい表示（5.2〜。5.1 までは既定ダーク）、要約カード＋畳んだ CaD 付きコード、承認は既定値なし）。
 
 1. **図がメインで文字は補助**。文字版は `<details>` に畳む。「誰が」が2者以上いて順序がある節はレーン図（列＝人／システムの静的インライン SVG）を第一候補にする。
 2. **理由に出どころを付ける（憶測禁止）**。「今困っていること」「なぜ変えるか」の各行は `伸太郎さん発言 YYYY-MM-DD「要約」` / `G-Brain <slug>` / `未確認` の3種のいずれかを持つ。**AI の推測で理由を書かない。**

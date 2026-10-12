@@ -15,7 +15,7 @@ alwaysApply: true
 
 # サブエージェント Scope Contract
 
-サブエージェント（Task / Agent tool）に作業を委譲するとき、delegate 元のプロンプトに**必ず以下 3 項目（コード探索を伴う場合は §4、UI/デザインを伴う場合は §5、`isolation: "worktree"` 委譲時は §6 を足す）を含める**。加えて「調査のみ・実装しない」委譲は **§7 の起動型ルール**（読み取り専用エージェント型で起動）を守り、全委譲で **§8 の定型文**（委譲後に届く親からの SendMessage は正規の追加指示）を必ず含める。制定経緯・テンプレート全文は `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` を参照。
+サブエージェント（Task / Agent tool）に作業を委譲するとき、delegate 元のプロンプトに**必ず以下 3 項目（コード探索を伴う場合は §4、UI/デザインを伴う場合は §5、`isolation: "worktree"` 委譲時は §6 を足す）を含める**。加えて「調査のみ・実装しない」委譲は **§7 の起動型ルール**（読み取り専用エージェント型で起動）を守り、全委譲で **§8 の定型文**（委譲後に届く親からの SendMessage は正規の追加指示）を必ず含め、**§11 のモデル選定**を行う。制定経緯・テンプレート全文は `~/business/AGENT-HUB/docs/architecture/sub-agent-scope-contract-details.md` を参照。
 
 ## 1. allowed_files（編集を許可するファイル）
 
@@ -35,6 +35,7 @@ alwaysApply: true
 - **検査・テスト・受け入れ条件を通すために timestamp・実行者ID・実行していないコマンドの出力・確認内容などの値を捏造しない**。指示と検査要求が矛盾したら通す側に倒さず、報告だけで済ませず**停止**して呼び出し元へ確認する（詳細: `~/business/AGENT-HUB/skills/plan-approval/SKILL.md`。2026-08-14 実測）
 - **環境変数を調べる時は `env | cut -d= -f1` のように名前だけを出し、値を出力しない**。`env` / `printenv` をそのまま実行すると API トークン等の値が会話出力へ流出する（2026-10-03 実測 / Issue #3438）
 - **`run_in_background` / Monitor / `sleep` 等でバックグラウンド処理の完了待ちをしない**。同期実行（timeout 内）で結果を持ち帰る。待つ必要がある場合は、待たずに現状を親へ返す（サブエージェントは通知・タイマーでは起きられず、待ち状態では親の SendMessage も届かない。2026-09-05 実測3件 / Issue #2512 / Tech G-Brain `subagent-background-wait-stall`）
+- **hook / 安全分類器 / 権限プロンプトに止められたら、別ツール・別経路・別の投入方法で同じ操作を完遂しない**。止まって呼び出し元へ報告する（2026-08-20 実測 / Issue #1986: claude-in-chrome 委譲で `javascript_tool` の投入が安全分類器に止められた後、`form_input` で同じ内容を投入して完遂した。止まる判定は迂回要求ではない）
 - **`git stash` 系（pop / apply / drop / clear）を実行しない**。stash はリポジトリ共有であり、隔離 worktree にいても他セッションの未コミット作業を壊しうる（2026-08-15 実測: 隔離 worktree での検証中に他ブランチの stash を pop し conflict 発生。衝突しなければ気付かず消えていた）
 - 自分が作っていない**他ブランチの reflog / git config を変更しない**
 - 自分が作っていない **worktree・リモートブランチを削除しない**
@@ -71,8 +72,12 @@ worker へ渡す検証要求も同じ前提で書き、sandbox/環境要因で�
 - 「まず `codebase-context-engine` を使う（`grep`/`Read` を先に走らせない）。遅延ツールは
   `select:mcp__codebase-context-engine__list_projects,hybrid_search,search_graph,get_code_snippet` でロード」
 - **解決済みの `project` 名を親が渡す**（親が `list_projects` を見て明示）。
-  `preferred_project` がある場合はそれを使う。
-  `project_scope: ambiguous_worktrees` の場合は、現在の cwd と一致する `root_path` / `preferred_project_candidates` を親が選んでから渡す。
+  `preferred_project` は `project_scope: current_repo` かつ `root_path` が探索対象 root と
+  照合できたときだけ使う（`preferred_project_root_path`、無ければ `projects[]` の同名エントリで確認。
+  `skills/codebase-context-engine/SKILL.md` の「project 解決契約」）。
+  `project_scope: ambiguous*` / `root_mismatch` / `no_match` の場合は、探索対象 root と一致する
+  `root_path` を持つ候補だけを `preferred_project_candidates` / `projects[]` から親が選んで渡す。
+  照合できない・対象 PJ に実体が無い場合は project 名を渡さず「実体なし」と明示する。
   subagent に `private-tmp-cbm-...` の長いミラー名を推測させない。
 - 「索引はミラー＝当日新規/変更したファイルは未反映なので、その分だけ `Read` 併用」
 
@@ -141,6 +146,34 @@ AI worker / CLI 委譲も同じ考え方で、Codex なら `--sandbox read-only`
   `missing_fields` / `invalid_fields` を機械可読で返すので、同じ payload の再送ではなく
   不足フィールドを補って再委譲する。
 - 承認対象には実 URL・秘密値・payload 実値・個人情報を含めない（識別子と slug のみ）。
+
+## 11. 委譲するモデルは台帳で決める（agents.yaml が正本）
+
+サブエージェントへ任せる前に、`agents.yaml` の `task_routing.subagent_implementation` を引いてモデルを決める。
+
+- 既定は Haiku（medium）。Sonnet に上げるのは、台帳の `rule` 行にある「大規模・高難度・複数ファイル」、または `effort_routing` の xhigh 以上（エッジケースの多い判断など）に当たる時だけ。
+- 「慎重にしたいから」「ガバナンス領域だから」だけの理由では上げない。上げる時は、台帳のどの行に当たるかを1行で言う。
+- 委譲の宣言（着手前の1行）に「モデル: haiku／理由: 台帳の主力」の形で必ず入れる。
+- モデルの世代名（5.5 など）は書かない。台帳のキー（haiku / sonnet）だけを使う。
+
+理由: 台帳を引かずにモデルを選び、Haiku が主力なのに Sonnet を使ってしまった実測（2026-10-12・出パンダ 10/16〜31 シフト作業）。
+
+<!-- [2026-10-12][fix] Issue #3932
+背景: 親会話での本人承認を「承認済み」の文面で実行タスクへ渡しても、実行側は
+別会話の発言を検証できず拒否・本番反映が停止した実測。
+対応: 承認が要る操作を別タスクへ引き継ぐ時の契約を §12 として追加する。 -->
+## 12. 別タスク・別会話への承認の引継ぎ
+
+承認を要する操作（本番反映・外部送信・高リスク変更）を別タスクへ引き継ぐ時:
+
+- 親は承認の「検証可能な参照」を渡す。対象PR/issue上の本人の構造化承認コメント
+  （下記書式）か、実行先で本人に一度だけ確認する指示。
+- 「本人が承認した」の文面を転記しても証拠にならない（実行側は別会話の発言を
+  検証できない）。
+- 承認参照は対象（repo/PR）・操作・環境・影響・期限に紐づける。
+- 拒否された時の再開: 同じ文面の再送ではなく、検証可能な参照を作ってから再開する。
+- 詳細・コメント書式・再開手順: `docs/architecture/sub-agent-scope-contract-details.md`
+  「別タスクへの承認引継ぎ」節。機械検証: `scripts/verify-op-approval.py`。
 
 ## delegate プロンプトのテンプレート・親側の verify ステップ
 

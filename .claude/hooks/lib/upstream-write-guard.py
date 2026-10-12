@@ -963,6 +963,125 @@ def _gh_token_blocks_read_only_proof(tokens: list[str], gh_index: int) -> bool:
     return not gh_is_read_only(group, action)
 
 
+# [2026-10-09][fix] issue #1779: セグメント内のリダイレクト演算子トークン。
+# _shell_command_segments の punctuation_chars 分割で独立トークンになる。
+_REDIRECT_TOKENS = frozenset({">", ">>", "<", "<<", "<&", ">&", "<>", ">|", "&>", "&>>"})
+
+# 実行名をそのまま露出する wrapper（command / nice / time 等）。これらが先行する
+# 場合も内側の語は実行名位置として静的に読めるが、wrapper のオプション引数まで
+# 正確に解釈しないため、wrapper 通過後の全トークンを実行名候補として保守的に見る。
+_TRANSPARENT_WRAPPER_NAMES = frozenset({"command", "builtin", "nice", "nohup", "time", "stdbuf", "!"})
+
+# 直後の語が実行名位置になるシェルキーワード（`do`/`then`/`else` 等）と
+# brace group マーカ。`for`/`in` や `done`/`fi`/`esac` は直後が実行名位置で
+# ないため含めない。
+_COMMAND_POSITION_KEYWORDS = frozenset({"do", "then", "else", "elif", "while", "until", "if", "select", "{", "}"})
+
+
+def _command_position_index(tokens: list[str]) -> int:
+    """先頭の KEY=VALUE 代入とリダイレクト列を読み飛ばした実行名の index を返す。"""
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", token):
+            index += 1
+            continue
+        if token.isdigit() and index + 1 < len(tokens) and tokens[index + 1] in _REDIRECT_TOKENS:
+            index += 1
+            continue
+        if token in _REDIRECT_TOKENS:
+            index += 2
+            continue
+        break
+    return index
+
+
+def _command_position_is_indirect(tokens: list[str]) -> bool:
+    """実行名位置（先頭の KEY=VALUE 代入・リダイレクト・透過 wrapper の後の語）が
+    `$VAR` / `${VAR}` / バッククォートの間接指定なら True。
+
+    実行名が静的に決まらない限り、その実行が write を含まないと証明できない。
+    引数位置の `$VAR`（`gh pr view "$N"` 等）は実行名を作らないため False 側。
+    """
+    index = _command_position_index(tokens)
+    wrapped = False
+    while index < len(tokens):
+        token = tokens[index]
+        if Path(token).name in _TRANSPARENT_WRAPPER_NAMES:
+            wrapped = True
+            index += 1
+            continue
+        if wrapped and token.startswith("-"):
+            index += 1
+            continue
+        if token in _COMMAND_POSITION_KEYWORDS:
+            # do / then / else 等の直後の語も実行名位置。`do gh pr view "$pr"`
+            # のように具体名ならその引数はデータのためそこで打ち切る。
+            index += 1
+            if index < len(tokens):
+                following = tokens[index]
+                if "$" in following or "`" in following:
+                    return True
+                if following in _COMMAND_POSITION_KEYWORDS or Path(following).name in _TRANSPARENT_WRAPPER_NAMES:
+                    continue
+            return False
+        if "$" in token or "`" in token:
+            return True
+        if wrapped:
+            index += 1
+            continue
+        return False
+    return False
+
+
+def _segment_has_effective_cd(tokens: list[str]) -> bool:
+    """セグメント内で cd が実際に実行される形か（表示・検査コマンドの引数は除く）。
+
+    実行名位置が cd、または git/gh/printf/echo 以外の実行名の後続に cd が
+    あれば実行されるとみなす（後述の wrapped cd 拒否と同じ判定）。
+    `printf '%s' cd` のような引数文字列は cwd を変えないため False。
+    ただし `printf() { cd /x; }` のように表示名を関数定義が騙る形では cd が
+    実行されるため、brace group の痕跡（{ } トークン）が残るセグメントでは
+    表示名の免除を適用しない。
+    """
+    index = _command_position_index(tokens)
+    if index >= len(tokens):
+        return False
+    if tokens[index] == "cd":
+        return True
+    if "cd" not in tokens[index + 1:]:
+        return False
+    if any(token in {"{", "}"} for token in tokens[index:]):
+        return True
+    return Path(tokens[index]).name not in {"git", "gh", "printf", "echo"}
+
+
+def _segment_blocks_read_only_proof(tokens: list[str]) -> bool:
+    """1セグメント内に upstream write / 宛先変更を起こしうる実行があるか。
+
+    不透明実行名（インタプリタ・シェル・wrapper）、git の push/lfs/config・
+    未知サブコマンド・alias 候補・実行書換オプション、gh の書込系・未知
+    グループ・api の非 GET/HEAD に加えて、`$(...)` / `<(` / `>(` /
+    バッククォートの置換を含むトークンと、実行名位置の間接指定は中身を
+    静的に追えないため True（証明不能側）に倒す。
+    """
+    for index, token in enumerate(tokens):
+        executable = Path(token).name
+        if (
+            token == "."
+            or executable.startswith("python")
+            or executable in _OPAQUE_EXECUTABLE_NAMES
+        ):
+            return True
+        if executable == "git" and _git_token_blocks_read_only_proof(tokens, index):
+            return True
+        if executable == "gh" and _gh_token_blocks_read_only_proof(tokens, index):
+            return True
+        if re.search(r"\$\(|<\(|>\(|`", token):
+            return True
+    return _command_position_is_indirect(tokens)
+
+
 # [2026-10-07][fix] issue #2012: `\`+改行 の行継続を shell と同じく除去して連結する。
 # 背景:
 #   - 依頼意図: `gh pr create --repo <fork> \` + 改行 のような標準的な複数行
@@ -1087,7 +1206,9 @@ def _shell_command_segments(command: str) -> tuple[list[tuple[str, list[str]]], 
         segments.append((shlex.join(tokens), tokens))
     elif pending_separator not in {None, ";", "\n"}:
         raise ValueError("missing command after shell separator")
-    if has_shell_group and any("cd" in segment_tokens for _, segment_tokens in segments):
+    # [2026-10-09][fix] issue #1779: group 内の cd 検出は実行される cd だけに限定する。
+    # `printf '%s' cd && (git push ...)` のような引数文字列の cd は cwd を変えない。
+    if has_shell_group and any(_segment_has_effective_cd(segment_tokens) for _, segment_tokens in segments):
         if any(
             (Path(token).name == "git" and _git_token_blocks_read_only_proof(segment_tokens, index))
             or (Path(token).name == "gh" and _gh_token_blocks_read_only_proof(segment_tokens, index))
@@ -1119,18 +1240,8 @@ def command_is_provably_read_only(command: str) -> bool:
     except ValueError:
         return False
     for _segment, tokens in segments:
-        for index, token in enumerate(tokens):
-            executable = Path(token).name
-            if (
-                token == "."
-                or executable.startswith("python")
-                or executable in _OPAQUE_EXECUTABLE_NAMES
-            ):
-                return False
-            if executable == "git" and _git_token_blocks_read_only_proof(tokens, index):
-                return False
-            if executable == "gh" and _gh_token_blocks_read_only_proof(tokens, index):
-                return False
+        if _segment_blocks_read_only_proof(tokens):
+            return False
     return True
 
 
@@ -1182,6 +1293,89 @@ def command_mentions_git_or_gh(command: str) -> bool:
     return bool(_COMMAND_POSITION_INDIRECTION_RE.search(collapsed))
 
 
+# [2026-10-10][fix] issue #1361 事象2: `$(...)` / `<(` / `>(` / バッククォートの
+# 検査は「置換の内側テキスト」だけに限定する。
+# 背景:
+#   - ユーザー依頼意図: `gh issue create --body "$(cat <<'EOF' ... EOF)"` のように、
+#     置換の内側に git/gh を含まないコマンドが、外側の `gh` 実行名を根拠に
+#     「cannot prove repository target through shell substitution」で誤拒否されていた。
+#   - 守るべき業務ルール: 置換の内側に git/gh 書込みが潜む形は従来どおり拒否する。
+#     外側の実行（gh 等）はこの検査ではなくセグメント解析が従来どおり検査する。
+#   - 他案不採用理由: 引用符内の `$(` だけを除外する案は、非引用位置の `$(` が
+#     内側を抱えるケースで誤判定が残るため不採用。置換領域を引用対応で走査する。
+def _substitution_inner_text(command: str) -> str | None:
+    """`$(` `<(` `>(` バッククォート領域の内側テキストを連結して返す。
+
+    解析不能（引用・括弧・エスケープが閉じない形）なら None を返し、
+    呼び出し側で「内側を証明できない=言及あり」側に倒す。
+    単引用内の `$(` はリテラルのため置換として扱わない。
+    """
+    spans: list[tuple[int, int]] = []
+    # stack の要素は (kind, resume_quote, start_index)。kind は
+    # paren（`$(`/`<(`/`>(` で開いた領域）、inner（領域内の裸の括弧）、
+    # tick（バッククォート領域）。resume_quote は領域を閉じた後に復帰する引用状態。
+    stack: list[tuple[str, str | None, int]] = []
+    quote: str | None = None
+    escaped = False
+    i = 0
+    n = len(command)
+    while i < n:
+        ch = command[i]
+        if escaped:
+            escaped = False
+            i += 1
+            continue
+        if ch == "\\" and quote != "'":
+            escaped = True
+            i += 1
+            continue
+        if quote == "'":
+            if ch == "'":
+                quote = None
+            i += 1
+            continue
+        if quote == '"':
+            if ch == '"':
+                quote = None
+            elif ch == "`":
+                stack.append(("tick", '"', i))
+                quote = None
+            elif ch == "$" and i + 1 < n and command[i + 1] == "(":
+                stack.append(("paren", '"', i))
+                quote = None
+                i += 1
+            i += 1
+            continue
+        # 非引用（コマンド文脈。置換領域の内側も同じ文脈として走査する）
+        if ch == "'":
+            quote = "'"
+        elif ch == '"':
+            quote = '"'
+        elif ch == "`":
+            if stack and stack[-1][0] == "tick":
+                _kind, resume, start = stack.pop()
+                spans.append((start, i + 1))
+                quote = resume
+            else:
+                stack.append(("tick", None, i))
+        elif ch in "$<>" and i + 1 < n and command[i + 1] == "(":
+            stack.append(("paren", None, i))
+            i += 1
+        elif ch == "(":
+            if stack and stack[-1][0] in {"paren", "inner"}:
+                stack.append(("inner", None, i))
+        elif ch == ")":
+            if stack:
+                kind, resume, start = stack.pop()
+                if kind == "paren":
+                    spans.append((start, i + 1))
+                    quote = resume
+        i += 1
+    if stack or quote is not None or escaped:
+        return None
+    return " ".join(command[start:end] for start, end in spans)
+
+
 def validate(command: str, base: Path) -> tuple[bool, str]:
     # [2026-10-07][fix] issue #2012: 行継続（`\`+改行）は検査の全段で
     #   shell が実行する連結済み形として扱う。ここで連結しないと、
@@ -1230,8 +1424,14 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
     env_split_match = re.search(r"(?:^|[;&|\s])env\s+(?:-S|--split-string)\S*\s*", command)
     if env_split_match and opaque_payload_mentions_repository_write(command[env_split_match.end() :]):
         return False, "cannot prove repository target through env split-string wrapper"
-    if ("$(" in command or "`" in command or "<(" in command or ">(" in command) and re.search(r"\b(?:git|gh)\b", command):
-        return False, "cannot prove repository target through shell substitution"
+    # [2026-10-10][fix] issue #1361: 置換の「内側」だけを検査する。外側の
+    #   `gh issue create --body "$(cat <<'EOF' ...)"` の gh 自身は置換の中身では
+    #   ないため拒否根拠にしない（外側の実行はセグメント解析が検査する）。
+    #   解析不能な置換領域は証明不能として従来どおり拒否する。
+    if "$(" in command or "`" in command or "<(" in command or ">(" in command:
+        inner_text = _substitution_inner_text(command)
+        if inner_text is None or re.search(r"\b(?:git|gh)\b", inner_text):
+            return False, "cannot prove repository target through shell substitution"
     if contains_repository_write(command) and mutates_write_target(command):
         return False, "repository write target may be changed inside the same command"
     current_cwd = base
@@ -1243,49 +1443,55 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
         # ... target 系）と書き分け、検出理由から原因が分かるようにする。
         # fail-closed 契約は変えない（解析不能な書込みは従来どおり止める）。
         return False, f"cannot safely parse repository command: {exc}"
+    # [2026-10-09][fix] issue #1779: cd 構造の拒否は、コマンド内に upstream
+    #   write / 宛先変更を起こしうる実行が1つでもある場合だけ適用する。
+    #   背景:
+    #     - 依頼意図: `cd <repo> && gh pr view "$N" | cat` や for ループ内の
+    #       `cd "$d" && git fetch` のような own-repo read-only 複合が、
+    #       引数位置の `$VAR` で read-only 証明を落ちた後、「across conditional
+    #       or piped cd」「wrapped cd」で誤拒否されていた。
+    #     - 守るべき業務ルール: cd 追跡は write の宛先証明のためだけに必要。
+    #       push / lfs / config・gh 書込系・未知サブコマンド・不透明実行・
+    #       実行名位置の `$VAR` 間接指定・`$(...)` 系置換を含むコマンドでは
+    #       従来どおり全ての cd 拒否を維持する（fail-open を作らない）。
+    #     - 他案不採用理由: `$` の事前排除を緩める案は実行名間接指定の
+    #       fail-open 経路になるため不採用。cd の追跡規則自体を緩める案は
+    #       書込み側の証明を弱めるため不採用。
+    segments_may_write = any(_segment_blocks_read_only_proof(tokens) for _segment, tokens in segments)
     # [2026-10-04][fix] 引用された実行名でも cd とパイプを見逃さない。
     # パイプ内の cd は他の段の cwd を変えず、; / || / 改行は cd 失敗後も
     # 実行を続け得る。書込がある形は、静的な cd && command だけ検査する。
     # [2026-10-04][fix] Prefix redirects/assignments can hide a real cd from
     # the static cwd tracker. Reject this unsupported write form rather than
     # checking origin in the old repository; argument strings named cd still pass.
-    redirects = {">", ">>", "<", "<<", "<&", ">&", "<>", ">|", "&>", "&>>"}
-    for _segment, tokens in segments:
-        prefix = 0
-        while prefix < len(tokens):
-            if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[prefix]):
-                prefix += 1
-            elif tokens[prefix].isdigit() and prefix + 1 < len(tokens) and tokens[prefix + 1] in redirects:
-                prefix += 1
-            elif tokens[prefix] in redirects:
-                prefix += 2
-            else:
-                break
-        # [2026-10-05][fix] CMS配送レビューで builtin cd の後のpushが旧cwdを使った。
-        # 送信先を確認できない移動は拒否する。builtinの新しい解析機構は追加しない。
-        # [2026-10-05][fix] command cd / builtin -- cd / builtin builtin cd も旧cwd検査を抜けた。
-        # [2026-10-05][fix] time builtin cd also executes in the parent shell; refuse it.
-        # 未解析wrapper内のcdはすべて拒否する。--や入れ子を新たに解析・推測しない。
-        # [2026-10-05][fix] pushd/popd change shell cwd without our plain-cd tracking.
-        # Reject directory-stack commands in repository operations; no new stack parser.
-        # [2026-10-05][fix] CMS全文レビューでzsh chdirが旧cwdのownerで許可された。
-        # 守る原則: 追跡できない移動で第三者宛てを誤許可しない。
-        # 他案不採用: chdirのcwd追跡やwrapper解析の追加は保守を増やす。
-        # 対応: 既存の未解析移動拒否へchdirを加える。通常引数も安全側で拒否する。
-        if any(token in {"pushd", "popd", "chdir"} for token in tokens):
-            return False, "cannot prove repository write target through unparsed directory change"
-        # [2026-10-05][fix] 同レビューの ! cd は列挙外prefixから旧cwdを使った。
-        # 本文と同じく推測で宛先を決めない。prefix列挙やcwd parserの追加はせず、
-        # git/ghの引数と通常表示以外の、未解析cd prefixを拒否する。
-        if (prefix < len(tokens) and "cd" in tokens[prefix + 1:]
-                and Path(tokens[prefix]).name not in {"git", "gh", "printf", "echo"}):
-            return False, "cannot prove repository write target through wrapped cd"
-        if 0 < prefix < len(tokens) and tokens[prefix] == "cd":
-            return False, "cannot prove repository write target through prefixed cd"
-    if any(tokens and tokens[0] == "cd" for _segment, tokens in segments) and any(
-        separator != "&&" for separator in separators
-    ):
-        return False, "cannot prove repository write target across conditional or piped cd"
+    if segments_may_write:
+        for _segment, tokens in segments:
+            prefix = _command_position_index(tokens)
+            # [2026-10-05][fix] CMS配送レビューで builtin cd の後のpushが旧cwdを使った。
+            # 送信先を確認できない移動は拒否する。builtinの新しい解析機構は追加しない。
+            # [2026-10-05][fix] command cd / builtin -- cd / builtin builtin cd も旧cwd検査を抜けた。
+            # [2026-10-05][fix] time builtin cd also executes in the parent shell; refuse it.
+            # 未解析wrapper内のcdはすべて拒否する。--や入れ子を新たに解析・推測しない。
+            # [2026-10-05][fix] pushd/popd change shell cwd without our plain-cd tracking.
+            # Reject directory-stack commands in repository operations; no new stack parser.
+            # [2026-10-05][fix] CMS全文レビューでzsh chdirが旧cwdのownerで許可された。
+            # 守る原則: 追跡できない移動で第三者宛てを誤許可しない。
+            # 他案不採用: chdirのcwd追跡やwrapper解析の追加は保守を増やす。
+            # 対応: 既存の未解析移動拒否へchdirを加える。通常引数も安全側で拒否する。
+            if any(token in {"pushd", "popd", "chdir"} for token in tokens):
+                return False, "cannot prove repository write target through unparsed directory change"
+            # [2026-10-05][fix] 同レビューの ! cd は列挙外prefixから旧cwdを使った。
+            # 本文と同じく推測で宛先を決めない。prefix列挙やcwd parserの追加はせず、
+            # git/ghの引数と通常表示以外の、未解析cd prefixを拒否する。
+            if (prefix < len(tokens) and "cd" in tokens[prefix + 1:]
+                    and Path(tokens[prefix]).name not in {"git", "gh", "printf", "echo"}):
+                return False, "cannot prove repository write target through wrapped cd"
+            if 0 < prefix < len(tokens) and tokens[prefix] == "cd":
+                return False, "cannot prove repository write target through prefixed cd"
+        if any(tokens and tokens[0] == "cd" for _segment, tokens in segments) and any(
+            separator != "&&" for separator in separators
+        ):
+            return False, "cannot prove repository write target across conditional or piped cd"
     for segment, tokens in segments:
         if tokens and tokens[0] == "cd":
             if (len(tokens) != 2 or tokens[1] == "-"

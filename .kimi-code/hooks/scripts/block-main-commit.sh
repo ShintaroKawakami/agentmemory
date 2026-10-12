@@ -203,8 +203,16 @@ set -euo pipefail
 #        main 保護の目的を満たせないため不採用。
 #   対応: スクリプト先頭に共通定数 GIT_GLOBAL_OPTS を定義し、値あり/値なしの代表的な
 #     git グローバルオプションを消費してから push/commit/switch/checkout を検知する。
+# [2026-10-09][fix] issue #2240: git グローバルオプションの値は引用符付き（空白を含む）
+#   1トークンも受理する。`git -C "a b" commit` のように引用済み空白を含む値があると
+#   `[^[:space:]]+` で値が前半だけに止まり GIT_CMD 全体が不一致になり、commit/push 自体が
+#   未検出=無条件許可（fail-open）になっていた穴を塞ぐ。二重引用内の $ ` \ は実行時展開を
+#   含みうるため、path 解決側（single_unquoted_git_c_path / effective_target_dir）で
+#   改めて解決不能へ倒す。
+# git グローバルオプションの値を受理する共通パターン（非引用/単一引用/二重引用の1トークン）。
+readonly GIT_ARG_VALUE="(\"([^\"\\\\]|\\\\.)*\"|'[^']*'|[^[:space:]]+)"
 # git グローバルオプションを 0個以上許容する共通パターン。
-readonly GIT_GLOBAL_OPT='(-C[[:space:]]+[^[:space:]]+|-c[[:space:]]+[^[:space:]]+|--config-env[[:space:]]+[^[:space:]]+|--git-dir(=[^[:space:]]+|[[:space:]]+[^[:space:]]+)|--work-tree(=[^[:space:]]+|[[:space:]]+[^[:space:]]+)|--namespace(=[^[:space:]]+|[[:space:]]+[^[:space:]]+)|--exec-path(=[^[:space:]]+|[[:space:]]+[^[:space:]]+)?|--super-prefix[[:space:]]+[^[:space:]]+|--paginate|--no-pager|--no-replace-objects|--bare|--literal-pathspecs|--glob-pathspecs|--noglob-pathspecs|--icase-pathspecs|--help|--version|--html-path|--man-path|--info-path|-p)'
+readonly GIT_GLOBAL_OPT="(-C[[:space:]]+${GIT_ARG_VALUE}|-c[[:space:]]+${GIT_ARG_VALUE}|--config-env[[:space:]]+${GIT_ARG_VALUE}|--git-dir(=${GIT_ARG_VALUE}|[[:space:]]+${GIT_ARG_VALUE})|--work-tree(=${GIT_ARG_VALUE}|[[:space:]]+${GIT_ARG_VALUE})|--namespace(=${GIT_ARG_VALUE}|[[:space:]]+${GIT_ARG_VALUE})|--exec-path(=${GIT_ARG_VALUE}|[[:space:]]+${GIT_ARG_VALUE})?|--super-prefix[[:space:]]+${GIT_ARG_VALUE}|--paginate|--no-pager|--no-replace-objects|--bare|--literal-pathspecs|--glob-pathspecs|--noglob-pathspecs|--icase-pathspecs|--help|--version|--html-path|--man-path|--info-path|-p)"
 readonly GIT_GLOBAL_OPTS="([[:space:]]+${GIT_GLOBAL_OPT})*"
 readonly GIT_ENV_VALUE="([^[:space:];&|()'\"]+|'[^']*'|\"([^\"\\\\]|\\\\.)*\")+"
 readonly GIT_ENV_ASSIGN="[A-Za-z_][A-Za-z0-9_]*=${GIT_ENV_VALUE}"
@@ -556,6 +564,287 @@ for start, end, raw in tokens:
     if value.startswith("-m") and len(value) > 2 and not value.startswith("--"):
         for position in range(start, end):
             mask[position] = True
+
+# [2026-10-10][fix] issue #1361 事象2: heredoc 本体（<<'EOF' ... EOF）は
+#   実行コマンドではなく stdin データ。`cat <<'EOF'` や
+#   `gh issue create --body "$(cat <<'EOF' ... EOF)"` の本文に git/gh の
+#   文字列があっても実行されないため、判定用コピーから空白化する。
+#   ただし本体が「実行されるプログラム」になりうる形は残す:
+#   - 同一パイプラインに python3/sh/bash/node 等の不透明実行名、または
+#     $VAR 等の特定不能な実行名がある（body がその stdin プログラムになる）
+#   - 非引用デリミタ（<<EOF）で本体に $(...) / バッククォートがある（実行される）
+import re
+
+_OPAQUE_SINKS = {
+    "node", "nodejs", "ruby", "perl", "php", "lua", "osascript", "expect",
+    "eval", "env", "xargs", "source", ".",
+    "bash", "sh", "zsh", "dash", "ksh", "fish", "ash", "csh", "tcsh",
+    "nu", "pwsh", "powershell",
+    "ssh", "sudo", "make", "just", "rake", "bundle",
+    "npm", "npx", "yarn", "pnpm", "pipenv", "poetry", "cargo", "go",
+    "docker", "kubectl", "watch", "parallel", "tmux", "screen",
+}
+_COMMAND_KEYWORDS = {
+    "for", "do", "done", "if", "then", "else", "elif", "fi",
+    "while", "until", "case", "esac", "select", "{", "}",
+}
+_ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+n = len(text)
+
+
+def read_cmd_word(start):
+    """実行名位置の1語を読み、(デコード済み語, 特定不能フラグ, 終端index) を返す。"""
+    out = []
+    j = start
+    q = None
+    esc = False
+    indeterminate = False
+    while j < n:
+        c = text[j]
+        if esc:
+            out.append(c)
+            esc = False
+            j += 1
+            continue
+        if q:
+            if c == q:
+                q = None
+            else:
+                out.append(c)
+            j += 1
+            continue
+        if c == "\\":
+            esc = True
+            j += 1
+            continue
+        if c in "'\"":
+            q = c
+            j += 1
+            continue
+        if c in " \t\r\n;&|()<>":
+            break
+        if c in "$`":
+            indeterminate = True
+        out.append(c)
+        j += 1
+    return "".join(out), indeterminate, j
+
+
+def parse_heredoc_delim(k):
+    """<< 直後のデリミタを読み (delim, quoted, end_index) を返す。読めなければ None。
+    引用符・バックスラッシュを1つでも含むデリミタは本体が展開されない quoted 扱い。"""
+    if k >= n or text[k] in " \t\n;&|()<>":
+        return None
+    if text[k] == "'":
+        e = text.find("'", k + 1)
+        return None if e < 0 else (text[k + 1:e], True, e + 1)
+    if text[k] == '"':
+        e = text.find('"', k + 1)
+        return None if e < 0 else (text[k + 1:e], True, e + 1)
+    out = []
+    quoted = False
+    j = k
+    while j < n and text[j] not in " \t\n;&|()<>":
+        c = text[j]
+        if c == "\\" and j + 1 < n:
+            out.append(text[j + 1])
+            quoted = True
+            j += 2
+            continue
+        if c in "'\"":
+            e = text.find(c, j + 1)
+            if e < 0:
+                return None
+            out.append(text[j + 1:e])
+            quoted = True
+            j = e + 1
+            continue
+        out.append(c)
+        j += 1
+    if not out:
+        return None
+    return ("".join(out), quoted, j)
+
+
+def consume_heredoc_bodies(start):
+    """pending の heredoc 本体行（終端行を含む）を消費して新しい index を返す。
+    パイプラインに不透明実行が無く、本体に置換が無いものだけ mask する。"""
+    cur = start
+    for delim, strip_mode, quoted in pending:
+        body_start = cur
+        danger = False
+        end = None
+        scan = cur
+        while scan <= n:
+            nl = text.find("\n", scan)
+            line = text[scan:] if nl < 0 else text[scan:nl]
+            if strip_mode == "tabs":
+                check = line.lstrip("\t")
+            elif strip_mode == "all":
+                check = line.lstrip(" \t")
+            else:
+                check = line
+            if check == delim:
+                end = (nl + 1) if nl >= 0 else n
+                break
+            if not quoted and ("$(" in line or "`" in line):
+                danger = True
+            if nl < 0:
+                break
+            scan = nl + 1
+        if end is None:
+            end = n
+        if not group_opaque and not danger:
+            for pos in range(body_start, end):
+                mask[pos] = True
+        cur = end
+    pending.clear()
+    return cur
+
+
+# 引用・$(...)・バッククォートを追跡しながら、コマンド文脈にある << を探す。
+# pending: 当該行で見つけた heredoc デリミタのキュー。group_opaque: 現在の
+# パイプライン(| で繋がる一群)に不透明/特定不能の実行名が1つでもあるか。
+stack = []
+pending = []
+group_opaque = False
+cmd_pos = True
+i = 0
+quote = None
+escaped = False
+in_backtick = False
+while i < n:
+    ch = text[i]
+    if escaped:
+        escaped = False
+        i += 1
+        continue
+    if in_backtick:
+        if ch == "\\":
+            escaped = True
+        elif ch == "`":
+            in_backtick = False
+            quote = stack.pop() if stack else None
+            cmd_pos = False
+        i += 1
+        continue
+    if quote == "'":
+        if ch == "'":
+            quote = None
+        i += 1
+        continue
+    if quote == '"':
+        if ch == '"':
+            quote = None
+        elif ch == "\\":
+            escaped = True
+        elif ch == "`":
+            stack.append('"')
+            in_backtick = True
+            cmd_pos = True
+            group_opaque = False
+        elif ch == "$" and i + 1 < n and text[i + 1] == "(":
+            stack.append('"')
+            quote = None
+            cmd_pos = True
+            group_opaque = False
+            i += 1
+        i += 1
+        continue
+    if ch == "\\":
+        escaped = True
+        i += 1
+        continue
+    if ch in "'\"":
+        quote = ch
+        i += 1
+        continue
+    if ch == "`":
+        stack.append(None)
+        in_backtick = True
+        cmd_pos = True
+        group_opaque = False
+        i += 1
+        continue
+    if ch == "$" and i + 1 < n and text[i + 1] == "(":
+        stack.append(None)
+        cmd_pos = True
+        group_opaque = False
+        i += 2
+        continue
+    if ch == "(":
+        stack.append(None)
+        cmd_pos = True
+        group_opaque = False
+        i += 1
+        continue
+    if ch == ")":
+        quote = stack.pop() if stack else None
+        cmd_pos = False
+        i += 1
+        continue
+    if ch == "\n":
+        if pending:
+            i = consume_heredoc_bodies(i + 1)
+            continue
+        cmd_pos = True
+        group_opaque = False
+        i += 1
+        continue
+    if ch in ";&":
+        nxt = text[i + 1] if i + 1 < n else ""
+        cmd_pos = True
+        group_opaque = False
+        i += 2 if nxt == ch else 1
+        continue
+    if ch == "|":
+        cmd_pos = True
+        if i + 1 < n and text[i + 1] == "|":
+            group_opaque = False
+            i += 2
+        else:
+            i += 1
+        continue
+    if ch == "<":
+        j = i + 1
+        while j < n and text[j] == "<":
+            j += 1
+        if j - i == 2:
+            k = j
+            strip_mode = None
+            if k < n and text[k] in "-~":
+                strip_mode = "tabs" if text[k] == "-" else "all"
+                k += 1
+            while k < n and text[k] in " \t":
+                k += 1
+            parsed = parse_heredoc_delim(k)
+            if parsed is not None:
+                delim, quoted_delim, end = parsed
+                pending.append((delim, strip_mode, quoted_delim))
+                i = end
+                continue
+        i += 1
+        continue
+    if ch in " \t\r>":
+        i += 1
+        continue
+    if cmd_pos:
+        word, indeterminate, wend = read_cmd_word(i)
+        if word:
+            if _ASSIGN_RE.match(word):
+                cmd_pos = True   # 代入 prefix の後も実行名位置が続く
+            elif word == "in":
+                cmd_pos = False  # in の直後は列挙値で、; / do で実行名位置へ復帰する
+            elif word in _COMMAND_KEYWORDS:
+                cmd_pos = True   # do/then/else/done/fi/esac/{/} の後は実行名位置
+            else:
+                base = word.rsplit("/", 1)[-1].lower()
+                if indeterminate or base in _OPAQUE_SINKS or base.startswith("python"):
+                    group_opaque = True
+                cmd_pos = False
+            i = wend
+            continue
+    i += 1
 
 print("".join(" " if mask[position] else char for position, char in enumerate(text)), end="")
 PY
@@ -1054,6 +1343,11 @@ command_targets_other_dir() {
       [ -z "$match" ] && continue
       # 最後のフィールド = path（先頭の空白と -C を除去）
       c_path=$(echo "$match" | awk '{print $NF}')
+      # [2026-10-09][fix] issue #2240: 引用符付きパスの no-op 判定用に外側の1組だけ剥がす
+      case "$c_path" in
+        \"*\") c_path="${c_path#\"}"; c_path="${c_path%\"}" ;;
+        \'*\') c_path="${c_path#\'}"; c_path="${c_path%\'}" ;;
+      esac
       case "$c_path" in
         "."|"./") ;;  # no-op
         *) return 0 ;;
@@ -1069,17 +1363,27 @@ command_targets_other_dir() {
   fi
   # cd <path> && git ... / cd <path> ; git ... (複合コマンドで実効 cwd を変える)
   # `cd .` / `cd ./` は no-op のため除外する。
-  local cd_paths cd_path
-  cd_paths=$(echo "$COMMAND_FOR_GIT_MATCH" | grep -oE '(^|[;&|])[[:space:]]*cd[[:space:]]+[^[:space:];&|]+' || true)
+  # [2026-10-09][fix] issue #2240:
+  #   - cd の引数は非引用/単一引用/二重引用の1トークン（空白を含む引用パスも拾う）。
+  #   - subshell 先頭の `( cd <main> && git commit )` も拾うため境界に `(` を足す。
+  #   - `cd <path>` 改行 `git ...` の改行区切りも後続に効くため、行末を終端として受理する。
+  local cd_paths cd_path cd_unquoted
+  cd_paths=$(echo "$COMMAND_FOR_GIT_MATCH" | grep -oE '(^|[;&|(])[[:space:]]*cd[[:space:]]+("([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"'|[^[:space:];&|()]+)' || true)
   if [ -n "$cd_paths" ]; then
     while IFS= read -r match; do
       [ -z "$match" ] && continue
-      cd_path=$(echo "$match" | awk '{print $NF}')
-      case "$cd_path" in
+      # 先頭の区切り文字・空白・cd を取り除いて引数だけにする（引用符は保持）
+      cd_path=$(printf '%s' "$match" | sed -E 's/^[\;&|(]?[[:space:]]*cd[[:space:]]+//')
+      cd_unquoted="$cd_path"
+      case "$cd_unquoted" in
+        \"*\") cd_unquoted="${cd_unquoted#\"}"; cd_unquoted="${cd_unquoted%\"}" ;;
+        \'*\') cd_unquoted="${cd_unquoted#\'}"; cd_unquoted="${cd_unquoted%\'}" ;;
+      esac
+      case "$cd_unquoted" in
         "."|"./") ;;  # no-op
         *)
-          # cd の後に && または ; があり git が続くことを確認
-          if echo "$COMMAND_FOR_GIT_MATCH" | grep -qE "cd[[:space:]]+$(printf '%s' "$cd_path" | sed 's/[[\.*^$/]/\\&/g')[[:space:]]*[;&]"; then
+          # cd の後に && / ; / 行末(改行区切り)があることを確認（raw token で再検索）
+          if echo "$COMMAND_FOR_GIT_MATCH" | grep -qE "cd[[:space:]]+$(printf '%s' "$cd_path" | sed 's/[[\.*^$/]/\\&/g')[[:space:]]*([;&]|$)"; then
             return 0
           fi
           ;;
@@ -1115,21 +1419,49 @@ effective_target_dir() {
   echo "$COMMAND_FOR_GIT_MATCH" | grep -qE '(^|[[:space:]])(sh|bash|zsh|dash|ksh)[[:space:]]+-[A-Za-z]*c([[:space:]]|$)' && return 0
   # コマンド位置(^ / ; & | 直後・サブシェル ( 直後)の cd を数える。複数あれば実効 cwd が曖昧 → 解決不能。
   #   サブシェル `( cd /main && git commit )` の隠れた cd も ( を境界に含めることで検出する。
+  # [2026-10-09][fix] issue #2240: cd の引数は非引用/単一引用/二重引用の1トークン
+  #   （空白を含む引用パスも拾う）。後続の区切りは && / ; / 行末(改行区切り)を受理する。
+  local cd_arg='"([^"\\]|\\.)*"|'"'"'[^'"'"']*'"'"'|[^[:space:];&|()]+'
   local cds dir
-  cds=$(echo "$COMMAND_FOR_GIT_MATCH" | grep -oE '(^|[;&|(])[[:space:]]*cd[[:space:]]+[^[:space:];&|()]+' || true)
+  cds=$(echo "$COMMAND_FOR_GIT_MATCH" | grep -oE "(^|[;&|(])[[:space:]]*cd[[:space:]]+($cd_arg)" || true)
   [ "$(printf '%s\n' "$cds" | grep -c .)" -ne 1 ] && return 0
-  # その単一 cd が「先頭」かつ「&& / ; で後続に効く」形であること（背景 & / パイプ | は対象外）。
-  echo "$COMMAND_FOR_GIT_MATCH" | grep -qE '^[[:space:]]*cd[[:space:]]+[^[:space:];&|()]+[[:space:]]*(&&|;)' || return 0
+  # その単一 cd が「先頭」かつ「&& / ; / 改行で後続に効く」形であること（背景 & / パイプ | は対象外）。
+  echo "$COMMAND_FOR_GIT_MATCH" | grep -qE "^[[:space:]]*cd[[:space:]]+($cd_arg)[[:space:]]*(&&|;|$)" || return 0
   # [2026-06-16][fix] COMMAND が複数行(heredoc / 改行入りコミットメッセージ等)のとき、
   #   sed が行単位で処理し非マッチ行(2 行目以降のメッセージ本文)を素通しするため dir がゴミ文字列化し、
   #   git -C "$dir" が失敗 → 正当な worktree commit/push が誤 deny されていた。cd は先頭行(上の L427 で
   #   先頭 + &&/; を保証済)にあるため、1 行目だけから抽出する（複数行は安全に L1 のみを見る）。
-  dir=$(printf '%s' "$COMMAND" | sed -nE '1s/^[[:space:]]*cd[[:space:]]+([^[:space:];&|()]+).*/\1/p')
+  dir=$(printf '%s' "$COMMAND" | sed -nE "1s/^[[:space:]]*cd[[:space:]]+($cd_arg).*/\\1/p")
+  # [2026-10-09][fix] issue #2240: 引用符を剥がしてから正規化する。
+  #   二重引用内の $ ` \ は実行時展開/エスケープを含みうるため解決不能(空)に倒す。
+  #   引用符内では ~ 展開も起きないため、引用符付きの ~ は literal の相対パスとして扱う。
+  local dir_quoted=0
+  case "$dir" in
+    \"*\")
+      dir_quoted=1
+      dir="${dir#\"}"
+      dir="${dir%\"}"
+      case "$dir" in
+        *'$'*|*'`'*|*'\'*) return 0 ;;
+      esac
+      ;;
+    \'*\')
+      dir_quoted=1
+      dir="${dir#\'}"
+      dir="${dir%\'}"
+      ;;
+  esac
   # ~ 展開 / 相対パスは $CWD(JSON の cwd) 基準で正規化（git -C が hook プロセスの cwd で解決するのを防ぐ）。
   case "$dir" in
     ""|"."|"./") return 0 ;;
-    "~") dir="$HOME" ;;
-    "~/"*) dir="${HOME}/${dir#\~/}" ;;
+  esac
+  if [ "$dir_quoted" = "0" ]; then
+    case "$dir" in
+      "~") dir="$HOME" ;;
+      "~/"*) dir="${HOME}/${dir#\~/}" ;;
+    esac
+  fi
+  case "$dir" in
     /*) ;;
     *) dir="$CWD/$dir" ;;
   esac
@@ -1202,6 +1534,23 @@ while i < len(text):
             j = i + 2
             while j < len(text) and text[j] in " \t":
                 j += 1
+            if j < len(text) and text[j] in "'\"":
+                # [2026-10-09][fix] issue #2240: 引用符付き -C パスを解決対象にする。
+                #   内容は閉じる引用符の内側。二重引用で $ ` \ を含む値は実行時展開を
+                #   含みうるため、パスとして採用せず解決不能(空)側へ倒す。
+                #   引用符内では ~ も展開されない（literal の ~ ディレクトリ名を指す）ため、
+                #   resolve_git_c_dir の ~ 展開と乖離する ~ 先頭パスも解決不能へ倒す。
+                q = text[j]
+                k = j + 1
+                while k < len(text) and text[k] != q:
+                    k += 1
+                if k < len(text):
+                    inner = text[j + 1:k]
+                    if inner and not inner.startswith("~") \
+                            and not (q == '"' and any(c in inner for c in "$`\\")):
+                        paths.append(inner)
+                    i = k + 1
+                    continue
             if j < len(text) and text[j] not in " \t\n;'\"|&()":
                 start = j
                 while j < len(text) and text[j] not in " \t\n;'\"|&()":
@@ -1264,6 +1613,23 @@ while i < len(text):
             j = i + 2
             while j < len(text) and text[j] in " \t":
                 j += 1
+            if j < len(text) and text[j] in "'\"":
+                # [2026-10-09][fix] issue #2240: 引用符付き -C パスを解決対象にする。
+                #   内容は閉じる引用符の内側。二重引用で $ ` \ を含む値は実行時展開を
+                #   含みうるため、パスとして採用せず解決不能(空)側へ倒す。
+                #   引用符内では ~ も展開されない（literal の ~ ディレクトリ名を指す）ため、
+                #   resolve_git_c_dir の ~ 展開と乖離する ~ 先頭パスも解決不能へ倒す。
+                q = text[j]
+                k = j + 1
+                while k < len(text) and text[k] != q:
+                    k += 1
+                if k < len(text):
+                    inner = text[j + 1:k]
+                    if inner and not inner.startswith("~") \
+                            and not (q == '"' and any(c in inner for c in "$`\\")):
+                        paths.append(inner)
+                    i = k + 1
+                    continue
             if j < len(text) and text[j] not in " \t\n;'\"|&()":
                 start = j
                 while j < len(text) and text[j] not in " \t\n;'\"|&()":
@@ -1461,6 +1827,20 @@ def extract_c_path(segment):
                 j = i + 2
                 while j < len(segment) and segment[j] in " \t":
                     j += 1
+                if j < len(segment) and segment[j] in "'\"":
+                    # [2026-10-09][fix] issue #2240: 引用符付き -C パス（空白含み）を
+                    #   解決対象にする。二重引用内の $ ` \ は展開を含みうるため、
+                    #   生トークンを返して「別ターゲット=不一致=解決不能」側へ倒す。
+                    q = segment[j]
+                    k = j + 1
+                    while k < len(segment) and segment[k] != q:
+                        k += 1
+                    if k < len(segment):
+                        inner = segment[j + 1:k]
+                        if q == '"' and any(c in inner for c in "$`\\"):
+                            return segment[j:k + 1]
+                        return inner
+                    return None
                 if j < len(segment) and segment[j] not in " \t\n;'\"|&()":
                     start = j
                     while j < len(segment) and segment[j] not in " \t\n;'\"|&()":
@@ -1507,6 +1887,158 @@ single_git_c_target_dir() {
   printf '%s' "$dir"
 }
 
+# [2026-10-09][fix] issue #2240: 「書込先を解決してから判定」するための第4 resolver。
+# 背景:
+#   - 依頼意図: `git -C <repo> status && git commit` / `git -C <repo> log | git commit`
+#     のように -C が read 系だけに付く複合コマンドでは、書込(commit/push/add)が dir 差し替えを
+#     持たず session cwd 宛てと証明できる。これを解決不能として一律拒否すると、feature 上の
+#     正当な確定まで止まる。
+#   - 守るべき業務ルール: 書込セグメントに -C/--git-dir/--work-tree/--namespace/GIT_*=
+#     や cd が残る形、subshell・command substitution・eval/exec/シェル -c・wrapper を
+#     含む形は静的に追えないため解決不能(空)に倒し、従来どおり fail-closed で拒否する。
+#   - 他案不採用理由:
+#     1) 複合形を全部解決不能=deny にする案: read 系 -C と cwd 宛て書込の混在という正当な
+#        形まで止まり、issue の「通常確定は許可」条件に反するため不採用。
+#     2) セグメントごとの実効 dir を完全復元する案: 相対 cd の累積や条件分岐まで追うのは
+#        複雑で誤許可リスクが高いため不採用。「書込に差し替えが無い」の一点だけを証明する。
+# 対応: 引用を追跡してセグメント分割し、全 write セグメントが dir 差し替えを持たず、
+#   コマンド位置に cd / eval 系 / subshell / 展開が無いときだけ $CWD を返す。
+session_cwd_target_dir() {
+  if COMMAND_TEXT="$COMMAND" python3 - <<'PY' 2>/dev/null
+import os
+import re
+import shlex
+import sys
+
+text = os.environ.get("COMMAND_TEXT", "")
+
+# 引用を追跡しながら && ; | 単体 & 改行 でセグメントに分割する。
+# 引用外の ( ) ` $ と heredoc は静的に追えないため即 fail-closed。
+segments = []
+buf = []
+quote = None
+escaped = False
+fail = False
+i = 0
+
+def flush():
+    seg = "".join(buf).strip()
+    if seg:
+        segments.append(seg)
+
+while i < len(text):
+    ch = text[i]
+    if escaped:
+        escaped = False
+        i += 1
+        continue
+    if ch == "\\" and quote != "'":
+        escaped = True
+        i += 1
+        continue
+    if quote == "'":
+        if ch == "'":
+            quote = None
+        i += 1
+        continue
+    if quote == '"':
+        if ch == '"':
+            quote = None
+        elif ch == "`" or (ch == "$" and i + 1 < len(text) and text[i + 1] == "("):
+            fail = True
+        i += 1
+        continue
+    if ch in ("'", '"'):
+        quote = ch
+        i += 1
+        continue
+    if ch == "&" and i + 1 < len(text) and text[i + 1] == "&":
+        flush()
+        buf = []
+        i += 2
+        continue
+    if ch in ";&|\n":
+        flush()
+        buf = []
+        i += 1
+        continue
+    if ch in "()":
+        fail = True
+        i += 1
+        continue
+    if ch == "`" or ch == "$":
+        # コマンド置換・変数展開の結果は静的に読めない（-C 注入もありうる）
+        fail = True
+        i += 1
+        continue
+    if ch == "<" and i + 1 < len(text) and text[i + 1] == "<":
+        # heredoc 本体はコマンド列に見えるため解析しない
+        fail = True
+        i += 1
+        continue
+    if ch in "<>":
+        # リダイレクトは書込先ディレクトリに無関係。演算子/fd 複写部分だけ読み飛ばす。
+        direction = ch
+        while i + 1 < len(text) and text[i + 1] == direction:
+            i += 1
+        if i + 1 < len(text) and text[i + 1] == "&":
+            i += 1
+            while i + 1 < len(text) and (text[i + 1].isdigit() or text[i + 1] == "-"):
+                i += 1
+        i += 1
+        continue
+    buf.append(ch)
+    i += 1
+flush()
+
+if fail or quote is not None or escaped:
+    sys.exit(1)
+
+WRITE_WORDS = {"commit", "push", "add"}
+ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+WRAPPERS = {"command", "builtin", "nice", "nohup", "time", "stdbuf", "xargs"}
+SHELLS = {"eval", "exec", "sh", "bash", "zsh", "dash", "ksh"}
+
+for seg in segments:
+    try:
+        toks = shlex.split(seg)
+    except ValueError:
+        sys.exit(1)
+    if not toks:
+        continue
+    # 先頭の VAR= 代入と env オプションを剥がしてコマンド名を取る
+    j = 0
+    while j < len(toks) and ASSIGN_RE.match(toks[j]):
+        j += 1
+    if j < len(toks) and toks[j] == "env":
+        j += 1
+        while j < len(toks) and (toks[j].startswith("-") or ASSIGN_RE.match(toks[j])):
+            j += 1
+    if j >= len(toks):
+        continue
+    cmd = toks[j]
+    if cmd == "cd" or cmd in SHELLS or cmd in WRAPPERS:
+        # cd / eval / exec / <shell> -c / wrapper 経由は実効 dir を静的に追わない
+        sys.exit(1)
+    # git の write セグメントに dir 差し替えが残っていないか
+    if "git" in toks and any(t in WRITE_WORDS for t in toks):
+        for t in toks:
+            if t == "-C" or t.startswith("-C") \
+               or t.startswith("--git-dir") or t.startswith("--work-tree") \
+               or t.startswith("--namespace"):
+                sys.exit(1)
+            if re.match(r"^(GIT_DIR|GIT_WORK_TREE|GIT_NAMESPACE)=", t):
+                sys.exit(1)
+sys.exit(0)
+PY
+  then
+    printf '%s' "$CWD"
+    return 0
+  fi
+  # 証明不能(rc=1)も interpreter 起動失敗も同じく空=解決不能に倒す。
+  return 0
+}
+
 # [2026-08-13][fix] issue #1672: `git push origin --delete <branch>` を main 直 push と誤判定しない
 # 背景:
 #   - ユーザー依頼意図: merge 済みリモート枝の cleanup（`git push origin --delete …`）が
@@ -1546,6 +2078,67 @@ push_is_safe_remote_branch_deletion() {
       continue
     fi
     return 1
+  done <<< "$segs"
+  return 0
+}
+
+# [2026-10-10][feat] issue #1361 事象1: 全 refspec が明示的 refs/tags/<name> の
+# tag push を main 直 push と誤判定しない。
+# 背景:
+#   - ユーザー依頼意図: jtt-cms 等の本番リリース正規手順（production HEAD への
+#     r-v* タグ push）を main checkout から実行すると、「push を含む」だけで
+#     最終 deny が発火し、`git tag r-v1.31.0 <sha> && git push origin refs/tags/r-v1.31.0`
+#     の正規経路が塞がれていた。
+#   - 守るべき業務ルール: タグ push は main ブランチの HEAD を一切動かさないため
+#     main 保護の趣旨（レビューなし変更の防止）に抵触しない。ただし:
+#     - 短縮形（refs/tags/ プレフィックスなしのタグ名）は同名 branch と区別できず
+#       曖昧なので従来どおり fail-closed で拒否する（運用は refs/tags/ 形式に統一）。
+#     - --tags / --follow-tags / --all / --mirror / --delete / -d や、コロン付き
+#       refspec（src:dst）・複数 ref・値を取るオプションは対象外（従来どおり deny）。
+#     - commit サブコマンド同梱時は呼び出し側で早期許可しない（commit 側の判定へ）。
+#   - 他案不採用理由:
+#     1) 短縮タグ名も許可する案: `git push origin v1` が branch v1 と区別できず、
+#        branch push を誤許可しうるため不採用（issue 本文の判断と同じ）。
+#     2) main cwd のときだけ許可する案: refs/tags/* だけの push はどのブランチでも
+#        main に触れないため不採用。
+# 対応: push セグメントの位置引数が「remote + 1個以上の refs/tags/<name>」だけだと
+#   静的に証明できる場合のみ真を返す。証明できない形は従来どおり fail-closed。
+push_is_only_explicit_tag_refspecs() {
+  local segs seg
+  segs=$(echo "$COMMAND_FOR_GIT_MATCH" | grep -oE "${GIT_CMD}[[:space:]]+push[^;&|]*" || true)
+  [ -n "$segs" ] || return 1
+  while IFS= read -r seg; do
+    [ -z "$seg" ] && continue
+    local args remote_seen=0 tag_refs=0
+    args=$(printf '%s' "$seg" | sed -E 's/^.*[[:space:]]push([[:space:]]|$)/ /')
+    # glob 展開を抑止して push 引数をトークン化（refspec 内の * がファイル展開されないように）。
+    set -f
+    # shellcheck disable=SC2086
+    set -- $args
+    set +f
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        # リダイレクトトークンは無視（has_unsafe_push と同じ扱い）。
+        *'>'*|*'<'*) ;;
+        # 値を取らない安全フラグのみ消費。--tags/--follow-tags/--all/--mirror/
+        #   --delete/-d/-o 等はここに含めず、下の -* で証明不能側へ倒す。
+        -u|--set-upstream|-f|--force|--force-with-lease|-q|--quiet|-v|--verbose|-n|--dry-run|--no-verify|--porcelain|--progress|--atomic) ;;
+        refs/tags/*)
+          # コロン・ワイルドカードを含まない完全な refs/tags/<name> 形式だけを認める。
+          echo "$1" | grep -qE '^refs/tags/[A-Za-z0-9._/-]+$' || return 1
+          tag_refs=$((tag_refs + 1)) ;;
+        -*) return 1 ;;   # 未知/値を取るオプション・一括系 → 証明不能
+        *)
+          # 最初の位置引数は remote。remote 以外の非 refs/tags 位置引数が1つでも
+          # あれば tag-only ではない（remote 自体が refs/tags/* 形のときは上の
+          # case が先に消費するため remote_seen が立たず、ここには来ない）。
+          if [ "$remote_seen" = 0 ]; then remote_seen=1
+          else return 1; fi ;;
+      esac
+      shift
+    done
+    # remote + 1個以上の refs/tags/* refspec が両方ある場合だけ許可側。
+    [ "$remote_seen" = 1 ] && [ "$tag_refs" -ge 1 ] || return 1
   done <<< "$segs"
   return 0
 }
@@ -1625,6 +2218,12 @@ if push_is_safe_remote_branch_deletion && ! echo "$COMMAND_FOR_GIT_MATCH" | grep
   exit 0
 fi
 
+# issue #1361 事象1: 本番リリース正規手順。全 refspec が明示的 refs/tags/<name> の
+# tag push は main の HEAD を動かさないため許可（commit 同梱時は下流で deny）。
+if push_is_only_explicit_tag_refspecs && ! echo "$COMMAND_FOR_GIT_MATCH" | grep -qE "${GIT_CMD}[[:space:]]+commit"; then
+  exit 0
+fi
+
 # 複合コマンド: checkout/switch main && commit/push を検知
 if echo "$COMMAND_FOR_GIT_MATCH" | grep -qE "${GIT_CMD}[[:space:]]+(switch|checkout)([[:space:]]+-[^[:space:]]+)*[[:space:]]+main([[:space:]]|$).*${GIT_CMD}[[:space:]]+(commit|push)([[:space:]]|$)"; then
   if echo "$COMMAND_FOR_GIT_MATCH" | grep -qE "${GIT_CMD}[[:space:]]+commit"; then
@@ -1676,108 +2275,134 @@ if command_uses_env_chdir; then
   _emit_deny_with_telemetry "$DENY_MSG"
 fi
 
-if [ -z "$BRANCH" ]; then
-  exit 0
-fi
-
-# mainブランチの場合 — AI hook 経由では軽量変更でも commit / push を許可しない
-if [ "$BRANCH" = "main" ]; then
-  # [2026-06-14][fix] worktree(別ディレクトリ・feature ブランチ)への commit / 非 main push を許可。
-  # 背景:
-  #   依頼意図: ハーネスが Bash cwd を毎回 main 直下に戻すため、worktree 運用は
-  #     `cd <worktree> && git commit/push` になる。従来は $CWD(main) の枝で fail-closed deny し、
-  #     worktree(feature) への正当なコミット・PR push まで弾けて worktree 並行開発が成立しなかった。
-  #   守るべき業務ルール: 実効ターゲット(先頭の単一 cd 先)のブランチが main 以外で、かつ main への push を
-  #     含まないなら、本番デプロイ(=main push/merge)に一切影響しないため許可する。
-  #   他案不採用理由:
-  #     1) 何もしない案: worktree 並行開発(ユーザーの主要フロー)が不能のままで不便。
-  #     2) commit/push を全面許可する案: main push の fail-open を生むため不可。実効ブランチ判定 +
-  #        has_unsafe_push ガードで main 保護を厳密に保つ（曖昧/全ref/wildcard/main 宛て push は早期許可しない）。
-  #     3) 実効 cwd を完全復元する案: 複数 cd・env トリック・サブシェル・-c まで追うのは複雑で誤許可リスク。
-  #        先頭の単一 cd のみ解決し（-C は git 1 回しか効かないため不採用＝deny）、env トリック/複数 cd/
-  #        サブシェル/eval/-c シェルは effective_target_branch が空を返す=従来 deny。
-  #     注: 本フックは「権限ルールの実体(SSOT)」そのもの。別途の権限ドキュメント同期は不要（ここが正本）。
-  # [2026-08-27][fix] issue: block-main-commit-deny-message
-  # 背景:
-  #   依頼意図: `git -C <feature-worktree> push -u origin feature/x 2>&1 | tail -6` のように
-  #     パイプ付き複合コマンドで -C の書込先を安全に証明できず deny になったケースが、
-  #     下の最終 deny で main 保護と同じ DENY_MSG（「main ブランチへの直接コミット/プッシュは
-  #     ブロックされました。git checkout -b feature/xxx でブランチを作成…」）を返していた。
-  #     既に feature branch で作業している AI がこの文面を読んで「main を直接触った」と
-  #     誤解し、人間へブランチ作成を手作業で依頼する誤誘導が実際に発生した。
-  #   守るべき業務ルール: 止める条件・許可条件は 1 文字も変えない（既存 exit 0 の位置・条件は不変）。
-  #     変えるのは「止めた理由の説明文」だけ。3 つの解決関数（effective_target_dir /
-  #     single_git_c_target_dir / consistent_git_c_target_dir）が全て空を返した（＝真に書込先を
-  #     証明できなかった）場合だけ UNCLASSIFIED_GIT_GUARD_MSG（分類不能文言）を使う。
-  #     いずれか 1 つでも解決できていた（例: refspec に `:` を含み has_unsafe_push が unsafe 判定した
-  #     ケース＝ eff_dir 自体は解決済み）場合は、従来どおり main 保護の DENY_MSG のまま。
-  #   他案不採用理由:
-  #     1) 3 関数とも同じ変数 `eff_dir` へ代入したまま「最後の eff_dir が空か」だけで判定する案:
-  #        1 つの戻り値しか見ていない実装でもテストが偶然緑になり、正しさの証明にならないため不採用。
-  #        3 つを別変数（eff_dir_a/b/c）へ保持し、明示的 OR で「3 つとも空」を判定する。
-  #     2) `command_targets_other_dir` ブロックの内側だけで判定変数を宣言する案: `set -euo pipefail`
-  #        (190行目) 下で -C を含まない main 直 commit（ブロック非到達）のとき unbound variable で
-  #        クラッシュし deny の JSON すら返せなくなる（＝保護が消える）ため、ブロック手前で
-  #        必ず初期化してから判定する。
-  # 対応: `unresolved_git_target` をブロック手前で 0 初期化し、3 つの解決結果が全て空のときだけ 1 を立てる。
-  #   最終 deny はこのフラグだけで DENY_MSG / UNCLASSIFIED_GIT_GUARD_MSG を振り分ける。
-  # [2026-10-03][fix] #3103: `resolved_eff_dir` も同じくブロック手前で空初期化する
-  #   （set -u 下で unset 参照によるクラッシュを防ぐ）。解決できた dir が
-  #   session cwd と別リポジトリ/別worktree のときだけ最終 deny を
-  #   OTHER_TARGET_GIT_GUARD_MSG へ振り分ける。
-  unresolved_git_target=0
-  resolved_eff_dir=""
-  if command_targets_other_dir; then
-    eff_dir_a="$(effective_target_dir)"
-    if [ -n "$eff_dir_a" ]; then
-      eff_branch="$(git -C "$eff_dir_a" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-      if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir_a"; then
-        exit 0  # 別 worktree/別リポの feature への commit / 安全な非 main push（refspec 省略含む）→ 許可
-      fi
-    fi
-    eff_dir_b="$(single_git_c_target_dir)"
-    if [ -n "$eff_dir_b" ]; then
-      eff_branch="$(git -C "$eff_dir_b" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-      if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir_b"; then
-        exit 0  # 単発 `git -C <feature> commit/push` は -C が対象 git へだけ効くため許可
-      fi
-    fi
-    eff_dir_c="$(consistent_git_c_target_dir)"
-    if [ -n "$eff_dir_c" ]; then
-      eff_branch="$(git -C "$eff_dir_c" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-      if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir_c"; then
-        exit 0  # 同一 -C 先への add && commit 等の複合（issue #1672）
-      fi
-    fi
-    resolved_eff_dir="${eff_dir_a:-${eff_dir_b:-${eff_dir_c:-}}}"
-    if [ -z "$eff_dir_a" ] && [ -z "$eff_dir_b" ] && [ -z "$eff_dir_c" ]; then
-      unresolved_git_target=1  # 3関数とも解決不能＝真に書込先を証明できなかった（パイプ等）
+# [2026-10-09][fix] issue #2240: 書込先を解決してから判定する。
+# 背景:
+#   - 依頼意図: session cwd の branch で判定していたため、対象 workdir が別リポジトリの
+#     feature branch でも親の main checkout を見て「main 扱い」で誤拒否していた
+#     （workdir alias 対応で session cwd 側の修正は済み）。さらに逆方向にも穴があり、
+#     session が feature のとき `git -C <main> commit` / `cd <main> && git commit` /
+#     `(cd <main> && git commit)` / 改行区切りの cd が BRANCH 判定をすり抜けて素通りしていた。
+#   - 守るべき業務ルール: 実効書込先が非 main と証明できる確定だけを許可する。
+#     main・解決不能・unsafe push は session cwd の branch に関係なく fail-closed で拒否する。
+#   - 他案不採用理由: cwd が main のときだけ別ターゲット解決を回す従来構造を維持する案は、
+#     「cwd が feature なら別ターゲットを見ない」対称性の欠落が残り fail-open になるため不採用。
+# 対応: 書込先解決（先頭の単一 cd 先 / 単発 -C 先 / 同一 -C 複合 / 書込が dir 差し替えを
+#   持たない場合の session cwd）を branch 判定の前に常に実行し、解決結果の branch で
+#   許可・拒否を決める。実効ターゲットのブランチが main 以外で、かつ main への push を
+#   含まないなら、本番デプロイ(=main push/merge)に一切影響しないため許可する。
+#   env トリック/複数 cd/サブシェル/eval/-c シェルは解決不能=従来どおり deny。
+#   注: 本フックは「権限ルールの実体(SSOT)」そのもの。別途の権限ドキュメント同期は不要（ここが正本）。
+# [2026-06-14][fix] worktree(別ディレクトリ・feature ブランチ)への commit / 非 main push を許可。
+# 背景:
+#   依頼意図: ハーネスが Bash cwd を毎回 main 直下に戻すため、worktree 運用は
+#     `cd <worktree> && git commit/push` になる。従来は $CWD(main) の枝で fail-closed deny し、
+#     worktree(feature) への正当なコミット・PR push まで弾けて worktree 並行開発が成立しなかった。
+#   守るべき業務ルール: 実効ターゲット(先頭の単一 cd 先)のブランチが main 以外で、かつ main への push を
+#     含まないなら、本番デプロイ(=main push/merge)に一切影響しないため許可する。
+#   他案不採用理由:
+#     1) 何もしない案: worktree 並行開発(ユーザーの主要フロー)が不能のままで不便。
+#     2) commit/push を全面許可する案: main push の fail-open を生むため不可。実効ブランチ判定 +
+#        has_unsafe_push ガードで main 保護を厳密に保つ（曖昧/全ref/wildcard/main 宛て push は早期許可しない）。
+#     3) 実効 cwd を完全復元する案: 複数 cd・env トリック・サブシェル・-c まで追うのは複雑で誤許可リスク。
+#        先頭の単一 cd のみ解決し（-C は git 1 回しか効かないため不採用＝deny）、env トリック/複数 cd/
+#        サブシェル/eval/-c シェルは effective_target_branch が空を返す=従来 deny。
+#     注: 本フックは「権限ルールの実体(SSOT)」そのもの。別途の権限ドキュメント同期は不要（ここが正本）。
+# [2026-08-27][fix] issue: block-main-commit-deny-message
+# 背景:
+#   依頼意図: `git -C <feature-worktree> push -u origin feature/x 2>&1 | tail -6` のように
+#     パイプ付き複合コマンドで -C の書込先を安全に証明できず deny になったケースが、
+#     下の最終 deny で main 保護と同じ DENY_MSG（「main ブランチへの直接コミット/プッシュは
+#     ブロックされました。git checkout -b feature/xxx でブランチを作成…」）を返していた。
+#     既に feature branch で作業している AI がこの文面を読んで「main を直接触った」と
+#     誤解し、人間へブランチ作成を手作業で依頼する誤誘導が実際に発生した。
+#   守るべき業務ルール: 止める条件・許可条件は 1 文字も変えない（既存 exit 0 の位置・条件は不変）。
+#     変えるのは「止めた理由の説明文」だけ。3 つの解決関数（effective_target_dir /
+#     single_git_c_target_dir / consistent_git_c_target_dir）が全て空を返した（＝真に書込先を
+#     証明できなかった）場合だけ UNCLASSIFIED_GIT_GUARD_MSG（分類不能文言）を使う。
+#     いずれか 1 つでも解決できていた（例: refspec に `:` を含み has_unsafe_push が unsafe 判定した
+#     ケース＝ eff_dir 自体は解決済み）場合は、従来どおり main 保護の DENY_MSG のまま。
+#   他案不採用理由:
+#     1) 3 関数とも同じ変数 `eff_dir` へ代入したまま「最後の eff_dir が空か」だけで判定する案:
+#        1 つの戻り値しか見ていない実装でもテストが偶然緑になり、正しさの証明にならないため不採用。
+#        3 つを別変数（eff_dir_a/b/c）へ保持し、明示的 OR で「3 つとも空」を判定する。
+#     2) `command_targets_other_dir` ブロックの内側だけで判定変数を宣言する案: `set -euo pipefail`
+#        (190行目) 下で -C を含まない main 直 commit（ブロック非到達）のとき unbound variable で
+#        クラッシュし deny の JSON すら返せなくなる（＝保護が消える）ため、ブロック手前で
+#        必ず初期化してから判定する。
+# 対応: `unresolved_git_target` をブロック手前で 0 初期化し、3 つの解決結果が全て空のときだけ 1 を立てる。
+#   最終 deny はこのフラグだけで DENY_MSG / UNCLASSIFIED_GIT_GUARD_MSG を振り分ける。
+# [2026-10-03][fix] #3103: `resolved_eff_dir` も同じくブロック手前で空初期化する
+#   （set -u 下で unset 参照によるクラッシュを防ぐ）。解決できた dir が
+#   session cwd と別リポジトリ/別worktree のときだけ最終 deny を
+#   OTHER_TARGET_GIT_GUARD_MSG へ振り分ける。
+unresolved_git_target=0
+resolved_eff_dir=""
+if command_targets_other_dir; then
+  eff_dir_a="$(effective_target_dir)"
+  if [ -n "$eff_dir_a" ]; then
+    eff_branch="$(git -C "$eff_dir_a" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir_a"; then
+      exit 0  # 別 worktree/別リポの feature への commit / 安全な非 main push（refspec 省略含む）→ 許可
     fi
   fi
+  eff_dir_b="$(single_git_c_target_dir)"
+  if [ -n "$eff_dir_b" ]; then
+    eff_branch="$(git -C "$eff_dir_b" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir_b"; then
+      exit 0  # 単発 `git -C <feature> commit/push` は -C が対象 git へだけ効くため許可
+    fi
+  fi
+  eff_dir_c="$(consistent_git_c_target_dir)"
+  if [ -n "$eff_dir_c" ]; then
+    eff_branch="$(git -C "$eff_dir_c" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir_c"; then
+      exit 0  # 同一 -C 先への add && commit 等の複合（issue #1672）
+    fi
+  fi
+  # 第4 resolver: 書込セグメントに dir 差し替えが無い複合（read 系だけに -C が付く形等）なら
+  #   書込先は session cwd と証明できる。$CWD を返すので以降は cwd の branch で判定される。
+  eff_dir_d="$(session_cwd_target_dir)"
+  if [ -n "$eff_dir_d" ]; then
+    eff_branch="$(git -C "$eff_dir_d" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    if [ -n "$eff_branch" ] && [ "$eff_branch" != "main" ] && ! has_unsafe_push "$eff_dir_d"; then
+      exit 0  # 書込は session cwd(非 main)宛てと証明できた → 許可
+    fi
+  fi
+  resolved_eff_dir="${eff_dir_a:-${eff_dir_b:-${eff_dir_c:-${eff_dir_d:-}}}}"
+  if [ -z "$eff_dir_a" ] && [ -z "$eff_dir_b" ] && [ -z "$eff_dir_c" ] && [ -z "$eff_dir_d" ]; then
+    unresolved_git_target=1  # 4関数とも解決不能＝真に書込先を証明できなかった（パイプ等）
+  fi
+fi
 
-  # [2026-05-30][fix] PR #229 codex review NO-GO 追加修正
-  # 背景: BRANCH==main かつ $CWD が軽量だけのとき、`git -C /other push`（refspec なし）等で
-  #   実効 cwd が /other に切り替わるコマンドが CWD の軽量差分で素通りしていた（line 309 残存fail-open）。
-  # 対応: command_targets_other_dir なら CWD ベース判定を信頼せず、main 向けは fail-closed。
-  #   `git -C /other push origin feature` (CWD=main) など希少な workflow を deny する副作用は
-  #   メイン保護のため許容（自然なワークフローは /other へ cd して実行）。
-  if echo "$COMMAND_FOR_GIT_MATCH" | grep -qE "${GIT_CMD}[[:space:]]+(commit|push)"; then
-    # [2026-08-27][fix] unresolved_git_target=1（3関数とも解決不能）のときだけ分類不能文言。
-    #   それ以外（cwd=main の直接操作、-C 先は解決できたが main 向け/曖昧refspecだった等）は
-    #   従来どおり main 保護の DENY_MSG。
-    if [ "$unresolved_git_target" = "1" ]; then
-      _emit_deny_with_telemetry "$UNCLASSIFIED_GIT_GUARD_MSG\n\n検出理由: cannot prove -C/cd write target through piped or compound command"
+# [2026-05-30][fix] PR #229 codex review NO-GO 追加修正
+# 背景: BRANCH==main かつ $CWD が軽量だけのとき、`git -C /other push`（refspec なし）等で
+#   実効 cwd が /other に切り替わるコマンドが CWD の軽量差分で素通りしていた（line 309 残存fail-open）。
+# 対応: command_targets_other_dir なら CWD ベース判定を信頼せず、main 向けは fail-closed。
+#   `git -C /other push origin feature` (CWD=main) など希少な workflow を deny する副作用は
+#   メイン保護のため許容（自然なワークフローは /other へ cd して実行）。
+if echo "$COMMAND_FOR_GIT_MATCH" | grep -qE "${GIT_CMD}[[:space:]]+(commit|push)"; then
+  # [2026-08-27][fix] unresolved_git_target=1（解決関数が全て空）のときだけ分類不能文言。
+  #   それ以外（cwd=main の直接操作、-C 先は解決できたが main 向け/曖昧refspecだった等）は
+  #   従来どおり main 保護の DENY_MSG。
+  if [ "$unresolved_git_target" = "1" ]; then
+    _emit_deny_with_telemetry "$UNCLASSIFIED_GIT_GUARD_MSG\n\n検出理由: cannot prove -C/cd write target through piped or compound command"
+  fi
+  # [2026-10-03][fix] #3103: 書込先は解決できたが session cwd とは別リポジトリ/別worktreeの
+  #   場合（cwd ずれ・colon refspec 等で unsafe 判定・-C 先が main）は main 文言を使わず、
+  #   作業場所のずれが分かる別ターゲット文言で止める。許可/拒否の条件は不変。
+  if [ -n "$resolved_eff_dir" ]; then
+    target_top="$(git -C "$resolved_eff_dir" rev-parse --show-toplevel 2>/dev/null || true)"
+    cwd_top="$(git -C "$CWD" rev-parse --show-toplevel 2>/dev/null || true)"
+    if [ -n "$target_top" ] && [ -n "$cwd_top" ] && [ "$target_top" != "$cwd_top" ]; then
+      _emit_deny_with_telemetry "$OTHER_TARGET_GIT_GUARD_MSG\n\n書込先: ${target_top}\nセッション cwd: ${cwd_top}"
     fi
-    # [2026-10-03][fix] #3103: 書込先は解決できたが session cwd とは別リポジトリ/別worktreeの
-    #   場合（cwd ずれ・colon refspec 等で unsafe 判定・-C 先が main）は main 文言を使わず、
-    #   作業場所のずれが分かる別ターゲット文言で止める。許可/拒否の条件は不変。
-    if [ -n "$resolved_eff_dir" ]; then
-      target_top="$(git -C "$resolved_eff_dir" rev-parse --show-toplevel 2>/dev/null || true)"
-      cwd_top="$(git -C "$CWD" rev-parse --show-toplevel 2>/dev/null || true)"
-      if [ -n "$target_top" ] && [ -n "$cwd_top" ] && [ "$target_top" != "$cwd_top" ]; then
-        _emit_deny_with_telemetry "$OTHER_TARGET_GIT_GUARD_MSG\n\n書込先: ${target_top}\nセッション cwd: ${cwd_top}"
-      fi
-    fi
+    # 解決できたのに早期許可されなかった = 書込先が main / branch 解決不能 / unsafe push。
+    # session cwd と同一リポジトリなら従来どおり main 保護の DENY_MSG で止める。
+    _emit_deny_with_telemetry "$DENY_MSG"
+  fi
+  # 書込先の差し替えが無い（または書込が session cwd 宛てと証明できた）場合は、
+  # 従来どおり session cwd の branch で判定する。
+  if [ "$BRANCH" = "main" ]; then
     _emit_deny_with_telemetry "$DENY_MSG"
   fi
 fi

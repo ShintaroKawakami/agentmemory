@@ -19,7 +19,7 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `9bcde9be71d4d0b37b47b55c5089ca27c8a49a5b690ee8bf1780173067734bf2`
+- effective hash: `75418f65bc836ca5f8a1c1eb56cbe47baecbfbd2f4bb2d937b723210102a3193`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `gbrain-md` (selected_by=`global`, inheritance_id=`de26219fcac2c60c`)
@@ -41,6 +41,7 @@ Claude Code on the web（`CLAUDE_CODE_REMOTE=true`）で、`.claude/skills` に 
 - `.claude/rules/general/mandate-registry.md` — 常時参照 (asset_id=`mandate-registry` inheritance_id=`373f1e4126f00846`)
 - `.claude/rules/general/mcp-key-management.md` — 常時参照 (asset_id=`mcp-key-management` inheritance_id=`a56034441d19874e`)
 - `.claude/rules/general/memory-lookups.md` — 常時参照 (asset_id=`memory-lookups` inheritance_id=`0d5b4aa7828a34bb`)
+- `.claude/rules/general/motion-first.md` — 条件に該当する時だけ参照 (asset_id=`motion-first` inheritance_id=`5da6f37055ab220f`)
 - `.claude/rules/general/plan-approval-gate.md` — 常時参照 (asset_id=`plan-approval-gate` inheritance_id=`57a7362c64d21737`)
 - `.claude/rules/general/plan-commitment-tracking.md` — 条件に該当する時だけ参照 (asset_id=`plan-commitment-tracking` inheritance_id=`8f72268d42864cdc`)
 - `.claude/rules/general/reference-over-hardcode.md` — 条件に該当する時だけ参照 (asset_id=`reference-over-hardcode` inheritance_id=`c11ada1d33cda872`)
@@ -49,6 +50,7 @@ Claude Code on the web（`CLAUDE_CODE_REMOTE=true`）で、`.claude/skills` に 
 - `.claude/rules/general/settings-protection-coexistence.md` — 条件に該当する時だけ参照 (asset_id=`settings-protection-coexistence` inheritance_id=`b2c20a61aba97c16`)
 - `.claude/rules/general/sub-agent-scope-contract.md` — 常時参照 (asset_id=`sub-agent-scope-contract` inheritance_id=`2df0dc7f3e0e83f2`)
 - `.claude/rules/general/tool-availability-resolution.md` — 常時参照 (asset_id=`tool-availability-resolution` inheritance_id=`24858e26fca6d353`)
+- `.claude/rules/general/ui-registry-first.md` — 条件に該当する時だけ参照 (asset_id=`ui-registry-first` inheritance_id=`6d5ac0bda0c232fe`)
 - `.claude/rules/general/ui-stitch-mandatory.md` — 条件に該当する時だけ参照 (asset_id=`ui-stitch-mandatory` inheritance_id=`7c625ee9b414e7b8`)
 - `.claude/rules/general/visual-progress-map.md` — 常時参照 (asset_id=`visual-progress-map` inheritance_id=`60f192120744a171`)
 - `.claude/rules/general/worktree-rule.md` — 常時参照 (asset_id=`worktree-rule` inheritance_id=`3ac270c246d5b02e`)

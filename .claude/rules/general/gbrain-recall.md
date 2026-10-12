@@ -42,7 +42,7 @@
 
 - `shintaro-gbrain` — 伸太郎さんが**別の会社を経営していても**まだ正しい（判断軸・好み）
 - `jtt-gbrain` — **株式会社ジェイティティが無くなったら**意味を失う（人・取引先・PJ・会社としての戦略）
-- `tech-gbrain` — **JTT と無関係のどのプロジェクトでも**使える（技術の知見）
+- `tech-gbrain-shared` — **JTT と無関係のどのプロジェクトでも**使える（技術の知見）
 
 判断に迷う場合は検索する側に倒す（誤爆コストは低く、未検索コストは高い）。
 
@@ -51,12 +51,11 @@
 <!-- [2026-10-04][fix] 本人指定でMy GBrainを共通入口にする。旧2接続の必須化は廃止し、必要sourceの読取は保つ。 -->
 
 My GBrainの可用性は `.claude/rules/general/tool-availability-resolution.md` の証拠順序とstatusで判定する。
-未配布環境の旧接続は harness type 依存であり、登録を推測しない。
-接続・sourceの選び方、未配布環境のlegacy readは `.claude/skills/agentmemory-routing/SKILL.md`（HUB正本: `skills/agentmemory-routing/SKILL.md`） の共通入口に従う。
+MCPは `my-gbrain` 1本に一本化されており、旧接続（`tech-gbrain`, `jtt-gbrain`）は退役済み。
+接続・sourceの選び方は `.claude/skills/agentmemory-routing/SKILL.md`（HUB正本: `skills/agentmemory-routing/SKILL.md`） の共通入口に従う。
 
 相談・直し・判断で必須なのは、source `shintaro-gbrain` と `tech-gbrain-shared` の根拠確認。
-旧 `shintaro-gbrain` / `tech-gbrain` の2接続が同時に見えることを条件にしない。
-許可sourceを指定して読み、返却sourceを照合する。全sourceの上位検索に片方が出なかっただけで、両方を確認済みとしない。
+旧接続の存在を条件とせず、`my-gbrain` の中で許可sourceを指定して読み、返却sourceを照合する。全sourceの上位検索に片方が出なかっただけで、両方を確認済みとしない。
 
 - `AVAILABLE`: 認可された必要sourceを読んでから応答する。同じ根拠は別接続で読み直さない。
 - `RUNTIME_UNAVAILABLE`: 読めない内容を推測で補わず、復旧を案内する。

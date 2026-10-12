@@ -108,6 +108,71 @@ print(json.dumps({
 PY
 }
 
+# [2026-10-10][fix] unresolved の deny メッセージを実情に合わせる（issue #1392）。
+# 背景:
+#   - ユーザー依頼意図: git を含まないコマンドが解析不能で止まった際も
+#     「destructive git command blocked」と AGENT_HUB_ALLOW_DESTRUCTIVE_GIT=1 の案内が
+#     出て、破壊的 git 許可フラグへの誤誘導と毎回の切り分けコストが発生していた。
+#   - 守るべき業務ルール: fail-closed 判定は変えない。コマンドが git 文字列を含む場合は
+#     従来のバイパス手順を残し、含まない場合は解析失敗であること・該当箇所・
+#     ファイル書き出し回避策だけを案内する。
+#   - 他案不採用理由: git の有無だけで判定を allow へ倒す案は、$(g${x}t 型や変数経由の
+#     難読化を素通りさせるため不採用（issue 本文の案2も「要検証」で保留）。
+block_unresolved_json() {
+  local detail="$1"
+  # telemetry(harness-checkup): label は従来どおり固定文字列で記録する。
+  agent_hub_telemetry_log hook_deny block-destructive-git deny '{"label":"unresolved command wrapper"}' 2>/dev/null || true
+  local has_git=0
+  if printf '%s' "${command}" | grep -qi 'git'; then
+    has_git=1
+  fi
+  HOOK_DETAIL="${detail}" HOOK_HAS_GIT="${has_git}" python3 - <<'PY'
+import json
+import os
+
+detail = os.environ.get("HOOK_DETAIL", "").strip()
+has_git = os.environ.get("HOOK_HAS_GIT", "0") == "1"
+reason_lines = [
+    "[hook:block-destructive-git] コマンド形状を静的に解析できなかったため、"
+    "安全側で停止しました（unresolved command wrapper）。",
+]
+if detail:
+    reason_lines.append(f"解析に失敗した箇所: {detail}")
+reason_lines.append(
+    "このコマンドが破壊的 git 操作（git reset --hard / git clean / "
+    "git checkout -- <path> / git restore <path> 等の作業ツリー破棄）を含まないなら、"
+    "コマンドをファイルへ書き出してそのファイルを実行してください"
+    "（heredoc・パイプ・ループを含む複合コマンドは分割しても回避できます）。"
+)
+if has_git:
+    reason_lines.extend([
+        "このコマンドには git が含まれるため、破壊的 git 操作の可能性があります。",
+        (
+            "実行が必要な場合は、利用者にこのセッションの環境変数として "
+            "AGENT_HUB_ALLOW_DESTRUCTIVE_GIT=1 を設定してもらってください"
+            "（コマンド行の先頭に書くだけでは効きません。AI は自分では設定できません）。"
+        ),
+        (
+            "単一ファイルを HEAD の内容へ戻すだけなら、この hook にかからない "
+            "`git show HEAD:<path> > <path>` で足りることが多いです。"
+        ),
+        (
+            "設定・読み戻し・GUI アプリ（Codex Desktop 等）の完全再起動・解除の手順は、"
+            "AGENT-HUB リポジトリの hook-library/BYPASS-CONVENTION.md "
+            "「許可変数の設定・解除手順（実行環境別）」を参照してください。"
+        ),
+    ])
+reason = "\n".join(reason_lines)
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": reason,
+    }
+}, ensure_ascii=False))
+PY
+}
+
 if [ -z "${command}" ]; then
   allow_json
   exit 0
@@ -661,6 +726,97 @@ def shell_lex_words(text: str, punctuation: str):
     return tokens
 
 
+# [2026-10-10][fix] 語中に癒着した置換 opener を segment 境界として扱う（issue #1392）。
+# 背景:
+#   - ユーザー依頼意図: `f=$(ls /tmp/${j}.json | head -1)` のように代入へ置換が癒着する
+#     コマンドで、置換内部の引数（/tmp/${j}.json）が flat な字句解析では executable 位置に
+#     誤配置され、未解決実行名として deny される誤検知を直したい。
+#     git を含まないポーリング / 整形パイプラインで実測された摩擦。
+#   - 守るべき業務ルール: executable 先頭の置換（`$(...) cmd` 等・置換結果が実行名を作る
+#     形）は従来どおり未解決として fail-closed に残す。`= value` などデータ位置に癒着した
+#     opener と、既に開いた置換の内側にある opener だけを境界化する。prefix 癒着による
+#     実行名合成（`/...$(x)` → basename git 化）は緩めない。
+#   - 他案不採用理由: opener を無条件に境界化する案は `foo$(printf git) reset --hard` の
+#     ような実行名の動的合成経路を緩めるため不採用。完全な置換コンテキスト解析は
+#     decode 済みパーサ側（emit_segment_line）の責務であり、本関数は raw の事前フィルタ
+#     として最小の位置修正に留める。
+SUBSTITUTION_OPENERS = ("$" + "(", "<" + "(", ">" + "(")
+
+def split_substitution_openers(tokens):
+    """Split glued substitution openers into standalone boundary tokens.
+
+    ``f=$(ls ...)`` merges an assignment and the inner executable into one
+    word, so the flat ``;&|`` scan shifts the next argument into the executable slot.
+    Emitting the opener as a boundary restores ``ls`` as the segment head.
+    An opener only splits when it is provably inside data: the piece before it
+    contains ``=`` (assignment / option value), or a substitution is already
+    open in this token stream. An opener at index 0 or glued to a non-``=``
+    prefix can synthesize the executable name itself and stays glued so the
+    existing unresolved-expansion check keeps it fail-closed.
+    """
+    result = []
+    depth = 0
+    for token in tokens:
+        quote = None
+        start = 0
+        index = 0
+        split_done = False
+        piece_inside = depth > 0
+        length = len(token)
+
+        def emit_word(end: int) -> None:
+            piece = token[start:end]
+            if not piece:
+                return
+            if piece_inside:
+                # Text inside a substitution may carry quote-glued whitespace
+                # (e.g. the inner command of x="$(printf %s ...)"). Split it so
+                # the inner executable becomes the segment head; only the
+                # executable slot is inspected, so over-splitting args is safe.
+                result.extend(piece.split())
+            else:
+                result.append(piece)
+
+        while index < length:
+            char = token[index]
+            if quote == "'":
+                if char == "'":
+                    quote = None
+                index += 1
+                continue
+            if char == "\\":
+                index += 2
+                continue
+            if quote == '"' and char == '"':
+                quote = None
+                index += 1
+                continue
+            if quote is None and char in {"'", '"'}:
+                quote = char
+                index += 1
+                continue
+            if depth > 0 and char == ")":
+                depth -= 1
+                index += 1
+                continue
+            if (
+                index > 0
+                and token[index:index + 2] in SUBSTITUTION_OPENERS
+                and (depth > 0 or split_done or "=" in token[start:index])
+            ):
+                emit_word(index)
+                result.append(token[index:index + 2])
+                index += 2
+                start = index
+                depth += 1
+                split_done = True
+                piece_inside = True
+                continue
+            index += 1
+        emit_word(length)
+    return result
+
+
 def has_unresolved_command_start(text: str) -> bool:
     """Inspect raw command-start words without evaluating shell syntax."""
     # Keep parentheses inside words so `$(...)`, extglob, and zsh qualifiers
@@ -669,10 +825,15 @@ def has_unresolved_command_start(text: str) -> bool:
     tokens = shell_lex_words(text, ";&|")
     if tokens is None:
         return True
+    tokens = split_substitution_openers(tokens)
 
     segment: list[str] = []
     for token in tokens + [";"]:
-        if token in {"(", ")", "{", "}"} or (token and all(char in ";&|" for char in token)):
+        if (
+            token in {"(", ")", "{", "}"}
+            or token in SUBSTITUTION_OPENERS
+            or (token and all(char in ";&|" for char in token))
+        ):
             if segment:
                 executable_index = command_executable_index(segment)
                 if executable_index == UNRESOLVED_WRAPPER:
@@ -688,14 +849,69 @@ def has_unresolved_command_start(text: str) -> bool:
             segment.append(token)
     return False
 
+# [2026-10-10][fix] decode 済み token 列で ${parameter...} 断片を元の語へ戻す
+# （issue #1392）。
+# 背景:
+#   - ユーザー依頼意図: `ls /tmp/${j}*.json` のように引数内のパラメータ展開が
+#     punctuation_chars の `{` `}` で断片化し、`*.json` が executable 位置へ
+#     落ちて glob 未解決として deny される誤検知を直したい。
+#   - 守るべき業務ルール: `$` で終わる語に `{` が直結する形だけを再結合し、
+#     閉じ `}` が無い不均衡はそのまま残して既存の fail-closed を維持する。
+#     brace group `{ ...; }` との混同は、`$` 接尾辞の無い `{` を触らないことで回避する。
+#   - 他案不採用理由: `{` `}` を punctuation から外す案は brace group /
+#     function body の segment 境界を失い検知力を下げるため不採用。
+def merge_parameter_expansions(tokens):
+    """Glue ``${...}`` fragments back into the word they came from."""
+    merged = []
+    index = 0
+    length = len(tokens)
+    while index < length:
+        token = tokens[index]
+        if token == "{" and merged and merged[-1].endswith("$"):
+            depth = 1
+            scan = index + 1
+            collected = []
+            closed = False
+            while scan < length:
+                piece = tokens[scan]
+                # `${...}` 内部にコマンド区切りが来る形は brace group との
+                # 混同になり得る（`a$ { git reset --hard; }`）ため再結合しない。
+                # ネストした `{` `}` だけは深さ追跡で許可する。
+                if piece and all(ch in ";&|(){}" for ch in piece) and piece not in {"{", "}"}:
+                    break
+                collected.append(piece)
+                if piece == "{":
+                    depth += 1
+                elif piece == "}":
+                    depth -= 1
+                    if depth == 0:
+                        closed = True
+                        scan += 1
+                        break
+                scan += 1
+            if closed:
+                glued = merged[-1] + "{" + "".join(collected)
+                if scan < length and tokens[scan] and not all(
+                    ch in ";&|(){}" for ch in tokens[scan]
+                ):
+                    glued += tokens[scan]
+                    scan += 1
+                merged[-1] = glued
+                index = scan
+                continue
+        merged.append(token)
+        index += 1
+    return merged
+
+
 def emit_segment_line(text: str) -> None:
     if has_unresolved_command_start(text):
-        print("__UNRESOLVED_COMMAND_WRAPPER__")
+        print_unresolved(text)
     try:
         lexer = shlex.shlex(text, posix=True, punctuation_chars=";&|(){}")
         lexer.commenters = ""
         lexer.whitespace_split = True
-        tokens = list(lexer)
+        tokens = merge_parameter_expansions(list(lexer))
     except Exception:
         for segment in re.split(r"[;&|(){}]+", text):
             segment = segment.strip()
@@ -713,7 +929,7 @@ def emit_segment_line(text: str) -> None:
             parser_segment = [re.sub(r"\s+", "__ARG_SPACE__", token) for token in segment]
             executable_index = command_executable_index(parser_segment, decoded=True)
             if executable_index == UNRESOLVED_WRAPPER:
-                print("__UNRESOLVED_COMMAND_WRAPPER__")
+                print_unresolved(" ".join(segment))
                 segment.clear()
                 return
             # [2026-08-02][fix] grouping 構文の内側でも動的 executable を fail-closed にする。
@@ -737,7 +953,7 @@ def emit_segment_line(text: str) -> None:
                 # The decoded parser also sees command starts inside brace/paren
                 # groups and function bodies that the outer raw segment begins
                 # with grouping syntax rather than the eventual executable.
-                print("__UNRESOLVED_COMMAND_WRAPPER__")
+                print_unresolved(" ".join(segment))
                 segment.clear()
                 return
             if (
@@ -766,12 +982,32 @@ def emit_segment_line(text: str) -> None:
 #     receiver 集合の漏れで再帰検査されず素通りしていた（PR #1343 の codex-review が検出）。
 #     ※このコメントに here-doc 演算子そのものを書かないこと: 本 Python は bash の $( ) 置換内の
 #       quoted heredoc に埋まっており、bash の置換パーサはコメント内でも演算子を解釈して壊れる。
+#       同じ理由で、コメント・docstring 内の ASCII 括弧も対応を保つこと（例: ${x%）} のように
+#       半角閉じ括弧だけを書くと外側の $( ) 対応が崩れて bash -n が失敗する）。
 #   - 守るべき業務ルール: shell として本文を実行する受け手は全て同じ fail-close 再帰へ送る。
 #   - 他案不採用理由: 任意の実行ファイルを receiver 扱いする案は、非 shell の cat/tee まで
 #     本文をコマンド検査して誤検知を増やすため不採用（shell 実体の列挙を維持し不足だけ足す）。
 shells = {"sh", "bash", "zsh", "dash", "ksh"}
 MAX_SHELL_DEPTH = 4
 UNRESOLVED_COMMAND_MARKER = "__UNRESOLVED_COMMAND_WRAPPER__"
+
+# [2026-10-10][fix] marker に解析不能箇所の断片を載せる（issue #1392）。
+# 背景:
+#   - ユーザー依頼意図: deny メッセージだけでは「どのトークンで解決に失敗したか」が
+#     分からず、git を含まないコマンドまで毎回ファイル分解の試行錯誤が必要だった。
+#   - 守るべき業務ルール: marker 行は marker prefix + TAB + 1行に正規化した断片。
+#     下流の検出は prefix 一致で行い、断片が誤って git 判定へ流れないよう
+#     改行は空白へ潰す。
+#   - 他案不採用理由: deny メッセージへコマンド全文を載せる案は長大化と秘匿値混入の
+#     リスクがあるため、先頭120文字の1行断片に留める。
+def print_unresolved(context: str) -> None:
+    detail = re.sub(r"\s+", " ", context or "").strip()
+    if len(detail) > 120:
+        detail = detail[:117] + "..."
+    if detail:
+        print(UNRESOLVED_COMMAND_MARKER + "\t" + detail)
+    else:
+        print(UNRESOLVED_COMMAND_MARKER)
 
 # [2026-08-02][fix] 引用内改行で論理行を分断しない（issue #1313 誤検知ファミリー）。
 # 背景:
@@ -1122,9 +1358,11 @@ def shell_substitution_bodies(text: str):
                     position += 1
                     continue
                 if char == "$" and position + 1 < len(text) and text[position + 1] == "{":
-                    # Parameter expansion patterns may legally contain `)` and
-                    # make a hand-written parenthesis matcher terminate early.
-                    return None
+                    param_end = param_expansion_end(position + 1)
+                    if param_end is None:
+                        return None
+                    position = param_end
+                    continue
                 if char == "$" and position + 1 < len(text) and text[position + 1] == "(":
                     nested_end = paren_end(position + 1)
                     if nested_end is None:
@@ -1170,7 +1408,11 @@ def shell_substitution_bodies(text: str):
                 position = nested_end + 1
                 continue
             if char == "$" and position + 1 < len(text) and text[position + 1] == "{":
-                return None
+                param_end = param_expansion_end(position + 1)
+                if param_end is None:
+                    return None
+                position = param_end
+                continue
             if char == "<" and position + 1 < len(text) and text[position + 1] == "<":
                 # Skip a here-doc inside `$()` so a later `)` / command remains visible.
                 # Example: `$(cat <<EOF` ... `EOF` then destructive git then `)` must still
@@ -1195,6 +1437,91 @@ def shell_substitution_bodies(text: str):
                 depth -= 1
                 if depth == 0:
                     return position
+            position += 1
+        return None
+
+    # [2026-10-10][fix] 置換内の ${parameter...} を対応する } まで読み飛ばす（issue #1392）。
+    # 背景:
+    #   - ユーザー依頼意図: `f=$(ls /tmp/${j}.json | head -1)` のように置換内部の
+    #     パラメータ展開があるだけでスキャナ全体が bail し、git を含まないコマンドが
+    #     unresolved command wrapper で deny されていた。
+    #   - 守るべき業務ルール: ${x%）} のように展開内へ合法に閉じ括弧を含められるのが
+    #     従来の bail 理由だったため、{ } のネスト・引用・内側の置換を追跡して
+    #     対応する閉じ brace まで確実に読み飛ばす。不均衡・未終端は従来どおり
+    #     None（fail-closed）を返す。
+    #   - 他案不採用理由: 「{ を見たら次の } まで無条件 skip」は内側の引用や
+    #     入れ子展開で境界を誤るため不採用。
+    def param_expansion_end(open_index: int):
+        """Return the index just past the closing ``}`` of ``${`` at open_index.
+
+        ``${...}`` words may legally embed closing parens (``${x%）}`` style
+        patterns), nested ``$( )`` / ``${ }``, quotes, and backticks, which
+        used to force the whole substitution scan to bail out as unresolved.
+        Anything unbalanced returns ``None`` so callers keep the fail-closed
+        contract.
+        """
+        depth = 1
+        quote = None
+        position = open_index + 1
+        while position < len(text):
+            char = text[position]
+            if quote == "'":
+                if char == "'":
+                    quote = None
+                position += 1
+                continue
+            if char == "\\":
+                position += 2
+                continue
+            if quote == '"':
+                if char == '"':
+                    quote = None
+                    position += 1
+                    continue
+                if char == "$" and position + 1 < len(text) and text[position + 1] == "(":
+                    nested_end = paren_end(position + 1)
+                    if nested_end is None:
+                        return None
+                    position = nested_end + 1
+                    continue
+                if char == chr(96):
+                    nested_end = backtick_end(position)
+                    if nested_end is None:
+                        return None
+                    position = nested_end + 1
+                    continue
+                position += 1
+                continue
+            if char in {"'", '"'}:
+                quote = char
+                position += 1
+                continue
+            if char == chr(96):
+                nested_end = backtick_end(position)
+                if nested_end is None:
+                    return None
+                position = nested_end + 1
+                continue
+            if char == "$" and position + 1 < len(text) and text[position + 1] == "(":
+                nested_end = paren_end(position + 1)
+                if nested_end is None:
+                    return None
+                position = nested_end + 1
+                continue
+            if char == "$" and position + 1 < len(text) and text[position + 1] == "{":
+                depth += 1
+                position += 2
+                continue
+            if char == "{":
+                depth += 1
+                position += 1
+                continue
+            if char == "}":
+                depth -= 1
+                if depth == 0:
+                    return position + 1
+                position += 1
+                continue
             position += 1
         return None
 
@@ -1696,7 +2023,7 @@ def emit_segments(text: str, depth: int = 0) -> None:
     becomes an unresolved marker instead of silently bypassing the hook.
     """
     if depth > MAX_SHELL_DEPTH:
-        print(UNRESOLVED_COMMAND_MARKER)
+        print_unresolved(text)
         return
 
     text = collapse_shell_line_continuations(text)
@@ -1709,7 +2036,7 @@ def emit_segments(text: str, depth: int = 0) -> None:
     # into fake top-level commands. Shell receivers still re-inspect the body.
     stripped, shell_heredocs, unquoted_heredocs = extract_heredocs(text)
     if stripped is None:
-        print(UNRESOLVED_COMMAND_MARKER)
+        print_unresolved(text)
         return
     text = stripped
 
@@ -1717,7 +2044,7 @@ def emit_segments(text: str, depth: int = 0) -> None:
     # 未終端の引用・置換は None → 従来どおり unresolved で fail-closed。
     lines = split_shell_logical_lines(text)
     if lines is None:
-        print(UNRESOLVED_COMMAND_MARKER)
+        print_unresolved(text)
         return
     if not lines:
         emit_segment_line(text)
@@ -1733,27 +2060,27 @@ def emit_segments(text: str, depth: int = 0) -> None:
     for heredoc_body in unquoted_heredocs:
         expansion_bodies = shell_substitution_bodies(heredoc_body)
         if expansion_bodies is None:
-            print(UNRESOLVED_COMMAND_MARKER)
+            print_unresolved(heredoc_body)
             return
         for body in expansion_bodies:
             emit_segments(body, depth + 1)
 
     substitution_bodies = shell_substitution_bodies(text)
     if substitution_bodies is None:
-        print(UNRESOLVED_COMMAND_MARKER)
+        print_unresolved(text)
         return
     for body in substitution_bodies:
         emit_segments(body, depth + 1)
 
     segments = segment_tokens(text)
     if segments is None:
-        print(UNRESOLVED_COMMAND_MARKER)
+        print_unresolved(text)
         return
     if depth > 0 and not text.strip():
-        print(UNRESOLVED_COMMAND_MARKER)
+        print_unresolved(text)
         return
     if depth > 0 and text.strip() and not segments:
-        print(UNRESOLVED_COMMAND_MARKER)
+        print_unresolved(text)
         return
 
     for segment in segments:
@@ -1770,13 +2097,13 @@ def emit_segments(text: str, depth: int = 0) -> None:
                 if command_index < len(tokens) and tokens[command_index] == "--":
                     command_index += 1
                 if command_index >= len(tokens):
-                    print(UNRESOLVED_COMMAND_MARKER)
+                    print_unresolved(" ".join(segment))
                     break
                 try:
                     nested_command = decode_shell_command(tokens[command_index])
                 except Exception:
                     # A malformed nested shell argument must fail closed.
-                    print(UNRESOLVED_COMMAND_MARKER)
+                    print_unresolved(" ".join(segment))
                     break
                 if has_unresolved_shell_expansion(nested_command):
                     # Do not evaluate shell variables/substitutions in the hook. The body may
@@ -1800,7 +2127,7 @@ def emit_segments(text: str, depth: int = 0) -> None:
                     #     git 文字列の有無だけの判定は変数 executable を素通りさせるため不採用
                     #     （安全証明は nested_body_safely_non_git に集約）。
                     if not nested_body_safely_non_git(nested_command):
-                        print(UNRESOLVED_COMMAND_MARKER)
+                        print_unresolved(nested_command)
                     break
                 emit_segments(nested_command, depth + 1)
                 break
@@ -1813,8 +2140,11 @@ emit_segments(cmd)
 PY
 )"
 
-if printf '%s\n' "${command_segments}" | grep -Fqx '__UNRESOLVED_COMMAND_WRAPPER__'; then
-  block_json "unresolved command wrapper"
+# marker 行は `__UNRESOLVED_COMMAND_WRAPPER__` + TAB + 解析不能箇所の断片を伴う。
+# prefix 一致で検出し、断片は deny メッセージの「どこで解析を諦めたか」へ渡す。
+unresolved_line="$(printf '%s\n' "${command_segments}" | grep -E '^__UNRESOLVED_COMMAND_WRAPPER__' | head -1 || true)"
+if [ -n "${unresolved_line}" ]; then
+  block_unresolved_json "${unresolved_line#__UNRESOLVED_COMMAND_WRAPPER__}"
   exit 0
 fi
 

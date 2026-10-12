@@ -1221,13 +1221,22 @@ fi
 #   - 他案不採用理由: HEREDOC commit の静的許可は fail-open リスクがあるため今回やらない。
 # 注: expect_unclassified_deny 関数の定義は 2026-08-27 に共通ヘルパー群（run_hook 等の直後）へ移動済み。
 #   ②(-C push + パイプ)の検査でも同ヘルパーを使うため、bash の「呼び出し前に定義済み」制約に合わせた。
-expect_unclassified_deny \
-  "shell substitution 付き commit は分類不能メッセージで拒否" \
+# [2026-10-10][test] issue #1361 事象2: upstream-write-guard の shell substitution
+#   検査が「置換の内側テキスト」だけを見る判定に変わったため、置換の内側が
+#   `cat <<'EOF'` だけだと証明できる commit は許可側へ移動した。
+#   置換の内側に git が残る形（次の対テスト）は従来どおり拒否する。
+expect_allow \
+  "置換の内側が cat heredoc だけの commit は許可" \
   "$feature_repo" \
   'git commit -m "$(cat <<'\''EOF'\''
 docs only
 EOF
-)"' \
+)"'
+
+expect_unclassified_deny \
+  "置換の内側に git push が残る commit は従来どおり拒否" \
+  "$feature_repo" \
+  'git commit -m "$(git push origin main)"' \
   "through shell substitution"
 
 expect_unclassified_deny \
@@ -1448,14 +1457,23 @@ expect_allow \
   "sed -i '' -e 's/a/b/' \$F
 grep -n 'b' \$F"
 
-expect_unclassified_deny \
-  "git 言及を含む解析不能コマンドは分類不能文言で拒否（upstream 文言と混同しない）" \
-  "$feature_repo" \
-  "cat > /tmp/x3674.py <<'EOF'
+# [2026-10-10][test] issue #1361: quoted heredoc 本体を空白化した結果、
+#   heredoc 後の `git push upstream` は解析不能ではなく third-party upstream 宛てと
+#   静的に分類できるようになった。分類不能文言ではなく upstream 文言で拒否する
+#   ことを固定する（deny 自体は不変・文言の分類がより正確になった）。
+upstream_after_heredoc_out="$(run_hook "$feature_repo" "cat > /tmp/x3674.py <<'EOF'
 print('x')
 EOF
-git push upstream feature/test" \
-  "cannot safely parse repository command"
+git push upstream feature/test" 2>&1 || true)"
+if printf '%s' "$upstream_after_heredoc_out" | grep -q 'permissionDecision.*deny' \
+  && printf '%s' "$upstream_after_heredoc_out" | grep -q 'third-party upstream への書込みは禁止' \
+  && ! printf '%s' "$upstream_after_heredoc_out" | grep -q '書込先を安全に証明できない'; then
+  printf '[PASS] %s\n' "heredoc 後の third-party push は upstream 文言で拒否"
+  PASS=$((PASS + 1))
+else
+  printf '[FAIL] %s: %s\n' "heredoc 後の third-party push は upstream 文言で拒否" "$upstream_after_heredoc_out"
+  FAIL=$((FAIL + 1))
+fi
 
 # [2026-10-07][test] issue #2012: 行継続（`\`+改行）を含むコマンドの誤拒否を回帰固定。
 # 背景:
@@ -1515,6 +1533,293 @@ else
   printf '[FAIL] %s: %s\n' "行継続を含む third-party push も upstream 文言で拒否" "$continued_upstream_out"
   FAIL=$((FAIL + 1))
 fi
+
+# [2026-10-09][test] issue #2240: 書込先を解決してから判定する回帰固定。
+# 背景:
+#   - 依頼意図: 判定が session cwd の branch に依存していたため、Codex の workdir 指定で
+#     別リポジトリの feature branch への通常確定が親の main 扱いで誤拒否され、
+#     逆に session が feature のとき `git -C <main> commit` / `cd <main> && git commit` 等が
+#     素通りしていた（fail-open）。「対象 repository と現在 branch を解決してから判定」を固定する。
+#   - 守るべき業務ルール: 解決先が非 main で安全なら許可し、解決先が main /
+#     解決不能 / 別 worktree 宛ての不安全 push は session cwd の branch に関係なく拒否する。
+#   - 他案不採用理由: 許可側だけのテストでは fail-open 側（feature cwd → main 宛て書込）の
+#     回帰を検知できないため不採用。許可・拒否を対で置く。
+space_repo="$tmp/f with space"
+non_repo_dir="$tmp/non-repo"
+mkdir -p "$space_repo" "$non_repo_dir"
+git -C "$space_repo" init -q
+git -C "$space_repo" checkout -q -b feature/space
+git -C "$space_repo" config user.email test@example.com
+git -C "$space_repo" config user.name "Test User"
+git -C "$space_repo" remote add origin git@github.com:TestOwner/space.git
+echo init > "$space_repo/README.md"
+git -C "$space_repo" add README.md
+git -C "$space_repo" commit -q -m init
+
+# 許可側: 解決できる feature 宛ては引用符・空白含みでも許可する
+expect_allow \
+  "main cwd + 二重引用 -C feature commit は許可" \
+  "$main_repo" \
+  "git -C \"$feature_repo\" commit -m x"
+expect_allow \
+  "main cwd + 単一引用 -C feature commit は許可" \
+  "$main_repo" \
+  "git -C '$feature_repo' commit -m x"
+expect_allow \
+  "main cwd + 二重引用 cd feature && commit は許可" \
+  "$main_repo" \
+  "cd \"$feature_repo\" && git commit -m x"
+expect_allow \
+  "main cwd + 単一引用 cd feature && commit は許可" \
+  "$main_repo" \
+  "cd '$feature_repo' && git commit -m x"
+expect_allow \
+  "main cwd + 空白含み引用 -C feature commit は許可" \
+  "$main_repo" \
+  "git -C \"$space_repo\" commit -m x"
+expect_allow \
+  "main cwd + 空白含み引用 cd feature && commit は許可" \
+  "$main_repo" \
+  "cd \"$space_repo\" && git commit -m x"
+expect_allow \
+  "main cwd + 改行区切り cd feature + commit は許可" \
+  "$main_repo" \
+  "$(printf 'cd %s\ngit commit -m x' "$feature_repo")"
+# 書込が dir 差し替えを持たない複合は session cwd(feature) 宛てと証明できるため許可
+expect_allow \
+  "feature cwd + read系 -C + 素の commit は cwd 宛てで許可" \
+  "$feature_repo" \
+  "git -C $main_repo status && git commit -m x"
+expect_allow \
+  "feature cwd + read系 -C パイプ + 素の commit は cwd 宛てで許可" \
+  "$feature_repo" \
+  "git -C $main_repo log | git commit -m x"
+expect_allow \
+  "非repo cwd + -C feature commit は許可" \
+  "$non_repo_dir" \
+  "git -C $feature_repo commit -m x"
+
+# 拒否側: 解決先が main / 解決不能なら session cwd が feature でも拒否する
+expect_other_target_deny \
+  "feature cwd + -C main commit は拒否" \
+  "$feature_repo" \
+  "git -C $main_repo commit -m x"
+expect_other_target_deny \
+  "feature cwd + cd main && commit は拒否" \
+  "$feature_repo" \
+  "cd $main_repo && git commit -m x"
+expect_other_target_deny \
+  "feature cwd + 改行区切り cd main + commit は拒否" \
+  "$feature_repo" \
+  "$(printf 'cd %s\ngit commit -m x' "$main_repo")"
+expect_other_target_deny \
+  "feature cwd + -C main push feature は拒否" \
+  "$feature_repo" \
+  "git -C $main_repo push origin feature/test"
+expect_unclassified_deny \
+  "feature cwd + subshell 内 cd main commit は解決不能で拒否" \
+  "$feature_repo" \
+  "(cd $main_repo && git commit -m x)" \
+  "cannot prove -C/cd write target"
+expect_unclassified_deny \
+  "feature cwd + write側に別 -C が混在する複合は解決不能で拒否" \
+  "$feature_repo" \
+  "git -C $feature_repo status && git -C $main_repo commit -m x" \
+  "cannot prove -C/cd write target"
+expect_unclassified_deny \
+  "feature cwd + 変数展開を含む -C commit は解決不能で拒否" \
+  "$feature_repo" \
+  'git -C "$BMC_TARGET" commit -m x' \
+  "cannot prove -C/cd write target"
+expect_main_branch_deny \
+  "非repo cwd + -C main commit は拒否" \
+  "$non_repo_dir" \
+  "git -C $main_repo commit -m x"
+
+# [2026-10-09][test] issue #1779: own-repo read-only の piped/複合 cd 誤拒否を回帰固定。
+# 背景:
+#   - ユーザー依頼意図: `cd <repo> && gh pr view "$N" | cat` や for ループ内の
+#     `cd "$d" && git fetch` のような read-only 複合が、引数位置の $VAR で
+#     read-only 証明を落ちた後「conditional or piped cd」「wrapped cd」で
+#     誤拒否され、調査コマンドの分割を強いられていた（#1746 の再発）。
+#   - 守るべき業務ルール: write を起こしうる形（push・gh 書込系・実行名位置の
+#     $VAR 間接指定・`$(...)` 置換・不透明実行）を含む cd 複合と、group 内で
+#     実際に実行される cd は従来どおり拒否する（fail-open を作らない）。
+#   - 他案不採用理由: 許可側だけのテストでは、将来 write 判定のゲートを緩めた
+#     ときに deny 回帰を検知できないため不採用（許可・拒否を対で置く）。
+expect_allow \
+  "cd + 引数変数の gh pr view をパイプしても許可" \
+  "$feature_repo" \
+  "cd $feature_repo && gh pr view \"\$PR_NUM\" | cat"
+
+expect_allow \
+  "cd + git log を変数パターンの grep にパイプしても許可" \
+  "$feature_repo" \
+  "cd $feature_repo && git log --oneline | grep \"\$PAT\""
+
+expect_allow \
+  "for ループ内の cd + git fetch は許可" \
+  "$feature_repo" \
+  "for d in $feature_repo $main_repo; do cd \"\$d\" && git fetch origin; done"
+
+expect_allow \
+  "cd + for ループの gh pr view をパイプしても許可" \
+  "$feature_repo" \
+  "cd $feature_repo && for pr in 1 2; do gh pr view \"\$pr\"; done | cat"
+
+expect_unclassified_deny \
+  "cd + gh pr create のパイプは従来どおり拒否" \
+  "$feature_repo" \
+  "cd $feature_repo && gh pr create --title x | cat" \
+  "across conditional or piped cd"
+
+expect_unclassified_deny \
+  "for ループ内の cd + git push は従来どおり拒否" \
+  "$feature_repo" \
+  "for d in $feature_repo; do cd \"\$d\" && git push origin feature/test; done" \
+  "wrapped cd"
+
+expect_unclassified_deny \
+  "実行名が変数の piped cd 複合は従来どおり拒否" \
+  "$feature_repo" \
+  "cd $feature_repo | \$G push" \
+  "across conditional or piped cd"
+
+expect_unclassified_deny \
+  "cd + 置換内の git push は従来どおり拒否" \
+  "$feature_repo" \
+  "cd $feature_repo && cat \$(git push)" \
+  "through shell substitution"
+
+# [2026-10-10][test] issue #1361 事象1: 本番リリース正規手順の tag push を回帰固定。
+# 背景:
+#   - ユーザー依頼意図: `git tag r-v1.31.0 <sha> && git push origin refs/tags/r-v1.31.0`
+#     （本番リリース正規手順）が main checkout から「main 直 push」として誤 deny
+#     されていた。tag push は main の HEAD を動かさないため許可する。
+#   - 守るべき業務ルール: 短縮タグ名（branch との曖昧性）・--tags/--follow-tags・
+#     colon refspec・main 混在・commit 同梱・third-party upstream 宛ては従来どおり
+#     拒否する（fail-closed は緩めない）。
+#   - 他案不採用理由: 許可側だけのテストでは、将来 tag-only 判定を緩めたときに
+#     deny 回帰を検知できないため不採用（許可・拒否を対で置く）。
+expect_allow \
+  "main cwd で git tag 作成 + refs/tags push（リリース正規手順）は許可" \
+  "$main_repo" \
+  "git tag r-v1.31.0 HEAD && git push origin refs/tags/r-v1.31.0"
+
+expect_allow \
+  "main cwd で単発 refs/tags push は許可" \
+  "$main_repo" \
+  "git push origin refs/tags/r-v1.31.0"
+
+expect_allow \
+  "main cwd で複数 refs/tags push は許可" \
+  "$main_repo" \
+  "git push origin refs/tags/v1 refs/tags/v2"
+
+expect_allow \
+  "feature cwd で refs/tags push は従来どおり許可" \
+  "$feature_repo" \
+  "git push origin refs/tags/v1"
+
+expect_main_branch_deny \
+  "main cwd で短縮タグ名 push は拒否（branch名と区別不能）" \
+  "$main_repo" \
+  "git push origin r-v1.31.0"
+
+expect_main_branch_deny \
+  "main cwd で --tags 一括 push は拒否" \
+  "$main_repo" \
+  "git push origin --tags"
+
+expect_main_branch_deny \
+  "main cwd で --follow-tags は拒否" \
+  "$main_repo" \
+  "git push origin --follow-tags"
+
+expect_main_branch_deny \
+  "main cwd で refs/tags と main 混在 push は拒否" \
+  "$main_repo" \
+  "git push origin refs/tags/v1 main"
+
+expect_main_branch_deny \
+  "main cwd で colon 付き refs/tags refspec は拒否" \
+  "$main_repo" \
+  "git push origin refs/tags/v1:refs/tags/v2"
+
+expect_main_branch_deny \
+  "main cwd で tag push + commit 同梱は拒否" \
+  "$main_repo" \
+  "git push origin refs/tags/v1 && git commit --allow-empty -m x"
+
+expect_block \
+  "feature cwd で upstream への refs/tags push は拒否" \
+  "$feature_repo" \
+  "git push upstream refs/tags/v1"
+
+# [2026-10-10][test] issue #1361 事象2: heredoc 本文内の git 文字列を回帰固定。
+# 背景:
+#   - ユーザー依頼意図: `cat <<'EOF'` や `gh issue create --body "$(cat <<'EOF' ...)"`
+#     の heredoc 本文に git/gh 文字列があるだけで誤 deny されていた。heredoc 本体は
+#     stdin データであり実行されないため許可する。
+#   - 守るべき業務ルール: 本体が実行プログラムになる形（python3/sh 等の不透明実行が
+#     同じパイプラインにいる、非引用デリミタ内の $(...) は実行されうる）は従来どおり
+#     拒否する（fail-closed は緩めない）。
+#   - 他案不採用理由: 許可側だけのテストでは、将来 heredoc 走査を緩めたときに
+#     deny 回帰を検知できないため不採用（許可・拒否を対で置く）。
+expect_allow \
+  "cat heredoc 本文内の git push 文字列は許可" \
+  "$main_repo" \
+  "cat > $tmp/body1361.md <<'EOF'
+release steps: git push origin main / gh pr list
+EOF"
+
+expect_allow \
+  "gh --body の heredoc 内 git push 文字列は許可" \
+  "$main_repo" \
+  'gh issue create --body "$(cat <<'"'"'EOF'"'"'
+release note
+
+run: git push origin main
+EOF
+)"'
+
+expect_allow \
+  "quoted heredoc 内の literal \$(git push) 文字列は許可" \
+  "$main_repo" \
+  "cat <<'EOF'
+literal \$(git push origin main)
+EOF"
+
+expect_unclassified_deny \
+  "python3 heredoc 本文の git 文字列は実行プログラムのため拒否" \
+  "$main_repo" \
+  "python3 - <<'PYEOF'
+print('git push origin main')
+PYEOF" \
+  "through opaque"
+
+expect_main_branch_deny \
+  "sh heredoc 内の git push は実行されるため拒否" \
+  "$main_repo" \
+  "sh <<'EOF'
+git push origin main
+EOF"
+
+expect_unclassified_deny \
+  "非引用 heredoc 内の \$(git push) は置換実行のため拒否" \
+  "$feature_repo" \
+  'cat <<EOF
+$(git push origin main)
+EOF' \
+  "through shell substitution"
+
+expect_main_branch_deny \
+  "heredoc 後の実 git push は拒否" \
+  "$main_repo" \
+  "cat <<'EOF'
+body
+EOF
+git push origin main"
 
 TOTAL=$((PASS + FAIL))
 printf '\n=== block-main-commit.test.sh: %d/%d PASS ===\n' "$PASS" "$TOTAL"

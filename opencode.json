@@ -36,6 +36,18 @@
         "X-API-Key": "{env:CODEBASE_CONTEXT_ENGINE_MCP_API_KEY}"
       }
     },
+    "motion": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "npx",
+        "-y",
+        "https://api.motion.dev/registry.tgz?package=motion-studio-mcp&version=latest"
+      ],
+      "environment": {
+        "TOKEN": "{env:MOTION_MCP_TOKEN}"
+      }
+    },
     "stitch": {
       "type": "remote",
       "enabled": true,
@@ -43,17 +55,6 @@
       "headers": {
         "X-Goog-Api-Key": "{env:STITCH_API_KEY}"
       }
-    },
-    "tech-gbrain": {
-      "type": "local",
-      "enabled": true,
-      "command": [
-        "/bin/bash",
-        "/Users/shintaro/business/AGENT-HUB/scripts/gbrain-mcp-preregistered-client.sh",
-        "https://gbrain-mcp.jtt.cafe/mcp",
-        "GBRAIN_MCP_CLIENT_ID_TECH",
-        "GBRAIN_MCP_CLIENT_SECRET_TECH"
-      ]
     }
   }
 }
