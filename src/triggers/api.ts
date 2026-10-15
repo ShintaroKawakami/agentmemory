@@ -6,7 +6,7 @@ import { StateKV } from "../state/kv.js";
 import { getLatestHealth } from "../health/monitor.js";
 import type { MetricsStore } from "../eval/metrics-store.js";
 import type { ResilientProvider } from "../providers/resilient.js";
-import { selectLatestProjectHandoff } from "../jtt/stored-envelope.js";
+import { decodeEnvelope, selectLatestProjectHandoff } from "../jtt/stored-envelope.js";
 import { VERSION } from "../version.js";
 import { timingSafeCompare } from "../auth.js";
 import { isSlotsEnabled, isReflectEnabled } from "../functions/slots.js";
@@ -1941,6 +1941,57 @@ export function registerApiTriggers(
           return { status_code: 400, body: { error: "exact handoff project required" } };
         }
         return { status_code: 200, body: { handoff: selectLatestProjectHandoff(filtered, handoffProject) } };
+      }
+
+      const dayProject = req.query_params?.["dayProject"];
+      if (dayProject !== undefined) {
+        const startAt = req.query_params?.["startAt"];
+        const endAt = req.query_params?.["endAt"];
+        const timeBasis = req.query_params?.["timeBasis"];
+        const dayLimit = req.query_params?.["limit"];
+        const dayOffset = req.query_params?.["offset"];
+        const startMs = typeof startAt === "string" ? Date.parse(startAt) : Number.NaN;
+        const endMs = typeof endAt === "string" ? Date.parse(endAt) : Number.NaN;
+        const limitNumber = typeof dayLimit === "string" ? Number(dayLimit) : Number.NaN;
+        const offsetNumber = typeof dayOffset === "string" ? Number(dayOffset) : Number.NaN;
+        if (typeof dayProject !== "string" || !/^[a-z0-9][a-z0-9._/-]{0,127}$/.test(dayProject) || dayProject.includes("..") || dayProject.includes("//") || !Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs || (timeBasis !== "saved_at" && timeBasis !== "event_at") || !Number.isInteger(limitNumber) || limitNumber < 1 || limitNumber > 5000 || !Number.isInteger(offsetNumber) || offsetNumber < 0) {
+          return { status_code: 400, body: { error: "invalid day query" } };
+        }
+        const projectMemories = filtered.flatMap((memory) => {
+          const envelope = decodeEnvelope(memory.content);
+          const memoryProject = (memory as import("../types.js").Memory & { project?: string }).project;
+          if (memoryProject !== dayProject) return [];
+          if (!envelope || envelope.project !== dayProject) throw new Error("invalid day memory envelope");
+          let eventAt: string | null = null;
+          const separator = memory.content.indexOf("\n");
+          if (separator >= 0) {
+            try {
+              const raw = JSON.parse(memory.content.slice(separator + 1)) as Record<string, unknown>;
+              const metadata = raw.metadata && typeof raw.metadata === "object" ? raw.metadata as Record<string, unknown> : {};
+              const candidate = raw.event_at ?? raw.eventAt ?? metadata.event_at ?? metadata.eventAt;
+              if (typeof candidate === "string" && Number.isFinite(Date.parse(candidate))) eventAt = new Date(candidate).toISOString();
+            } catch { /* malformed extras have no event date */ }
+          }
+          return [{ memory, envelope, eventAt }];
+        });
+        const unknownEventCount = timeBasis === "event_at" ? projectMemories.filter((item) => item.eventAt === null).length : 0;
+        const inRange = projectMemories.filter(({ memory, eventAt }) => {
+          const value = timeBasis === "saved_at" ? memory.createdAt : eventAt;
+          const timestamp = typeof value === "string" ? Date.parse(value) : Number.NaN;
+          return Number.isFinite(timestamp) && timestamp >= startMs && timestamp < endMs;
+        });
+        const rows = inRange.slice(offsetNumber, offsetNumber + limitNumber).map(({ memory, envelope, eventAt }) => ({
+          id: memory.id,
+          project: dayProject,
+          content: memory.content,
+          saved_at: memory.createdAt,
+          event_at: eventAt,
+          category: envelope.category,
+        }));
+        return {
+          status_code: 200,
+          body: { dayProject, startAt, endAt, timeBasis, memories: rows, total: inRange.length, unknownEventCount, offset: offsetNumber, limit: limitNumber },
+        };
       }
 
       // viewer + `agentmemory status` were hitting this endpoint to

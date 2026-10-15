@@ -708,6 +708,18 @@ iii.trigger({
 
 Worked example: [`examples/python/`](examples/python/) (quickstart + observation/recall flow). REST on `:3111` remains available for hosts without an iii runtime.
 
+### JTT scoped gateway
+
+The JTT fork exposes a small project-bound MCP gateway. Its read-only
+`agentmemory_day` tool accepts `start_date`, optional exclusive `end_date`,
+`time_basis` (`saved_at` or `event_at`), `limit` and `offset`; dates use
+Asia/Tokyo. A shared gateway credential can read every project in
+`AGENTMEMORY_ALLOWED_PROJECTS`. A mapped bearer token is restricted to its
+single configured project. When a project requires multiple backend pages,
+the response sets `partial: true` and lists it in
+`consistency_unverified_projects`, because the backend offers no snapshot.
+See [the gateway contract](docs/jtt-scoped-gateway.md).
+
 ### From source
 
 ```bash

@@ -2,12 +2,13 @@
 
 This fork adds a deliberately small MCP surface for JTT's multi-agent workflow.
 The upstream AgentMemory daemon remains the storage and search engine. The JTT
-gateway only enforces project binding and exposes four tools:
+gateway enforces project binding and exposes five tools:
 
 - `agentmemory_save`
 - `agentmemory_search`
 - `agentmemory_handoff_save`
 - `agentmemory_handoff_get`
+- `agentmemory_day` (read-only)
 
 ## Safety contract
 
@@ -16,6 +17,9 @@ gateway only enforces project binding and exposes four tools:
 - `AGENTMEMORY_ALLOWED_PROJECTS` is a fail-closed allowlist.
 - Cross-project search requires `referenceProjects` or
   `includeGlobalReference: true`; every result includes its source project.
+- Day reads enumerate only the authenticated readable set: the existing
+  allowlist for a shared gateway credential, or one project for a mapped token.
+  Names and counts of unauthorized projects are never returned.
 - `agentmemory_handoff_get` reads the exact current project only and returns
   `fallbackUsed: false`. It never selects the latest session from another repo.
 - `global/reference` is valid for Hermes conversations, but cannot store or
@@ -25,6 +29,29 @@ gateway only enforces project binding and exposes four tools:
 - If the central daemon is unavailable, a memory tool returns an error. It does
   not create a second local memory store. The calling agent can continue its
   normal work without memory.
+
+## Day range lookup
+
+`agentmemory_day(start_date, end_date?, time_basis?, limit?, offset?)` reads a
+JST half-open date range. `end_date` is exclusive and defaults to the next day;
+`time_basis` defaults to `saved_at`, `limit` to 100 (1–100), and `offset` to 0.
+The authenticated core's existing `GET /agentmemory/memories` accepts opt-in
+`dayProject`, `startAt`, `endAt`, `timeBasis`, `limit`, and `offset`. It checks
+both row and envelope projects, applies existing agent isolation, filters by
+time before pagination, and echoes query bounds plus `total` and
+`unknownEventCount`. The gateway rejects ignored filters or malformed responses.
+
+Results retain separate `event_at` (only explicitly recorded) and `saved_at`
+(stored row `createdAt`). Unknown event times are not inferred from envelope
+creation. Domain and status require explicit metadata; even `non-pj` stays
+`unknown` without it. The gateway returns `target_project_count`,
+`searched_projects`, `failed_projects`, `unsearched_projects`, `partial`, and
+combined `total` / `has_more` / `next_offset` after stable time/project/ID sorting.
+Failed projects are omitted from successful records. Unknown event times in
+event queries and inconsistent responses produce partial results. Multiple
+backend pages have no snapshot guarantee, so `consistency_unverified_projects`
+lists those authorized projects and `partial` is true, even if counts stay equal.
+No additional store or saved snapshot is created.
 
 ## Latest project handoff lookup
 
