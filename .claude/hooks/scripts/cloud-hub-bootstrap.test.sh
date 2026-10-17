@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# [2026-09-05][test] cloud-hub-bootstrap.sh の単体テスト（11ケース）。
+# [2026-09-05][test] cloud-hub-bootstrap.sh の単体テスト（16ケース。Test 12〜16 は 2026-10-15 のリポジトリ内実物つなぎ）。
 # 背景:
 #   - ユーザー依頼意図:
 #     1) CLAUDE_CODE_REMOTE 未設定・false（ローカル）では常に無音・exit 0 であること。
@@ -293,6 +293,117 @@ EXIT=$?
 [ "$EXIT" -eq 0 ] || fail "Test 11: exit 0 にならない（exit=${EXIT}）"
 echo "$OUT" | grep -q "PyYAML が見つからないため" || fail "Test 11: PyYAML無し警告が出ない: $OUT"
 echo "$OUT" | grep -q "project: google-review" || fail "Test 11: ブロックスタイルのフォールバック解決ができない: $OUT"
+
+# --- Test 12: [2026-10-15] 版記録あり＋リポジトリ内の実物スキル → 実物だけを .claude/skills へ
+#     相対 symlink でつなぎ、取得経路（fetch）には入らない。PJ所有 symlink・SKILL.md 無し・
+#     不正名のエントリは飛ばす。BROKEN 設定なので、取得へ進めば添付案内が出て検出できる ---
+PJ12="$TMP_DIR/pj12-repo-local/jtt-system"
+mkdir -p "$PJ12/.agents/skills/skill-a" "$PJ12/.agents/skills/skill-b" \
+  "$PJ12/.agents/skills/no-skill-md" "$PJ12/.agents/skills/bad name" "$TMP_DIR/pj12-elsewhere"
+echo "A" > "$PJ12/.agents/skills/skill-a/SKILL.md"
+echo "B" > "$PJ12/.agents/skills/skill-b/SKILL.md"
+echo "x" > "$PJ12/.agents/skills/bad name/SKILL.md"
+echo "{}" > "$PJ12/.agents/skills/.hub-snapshot.json"
+ln -s "$TMP_DIR/pj12-elsewhere" "$PJ12/.agents/skills/pj-owned-link"
+OUT="$(GIT_CONFIG_GLOBAL="$BROKEN_GITCONFIG" CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$PJ12" bash "$TARGET_SCRIPT" 2>&1)"
+EXIT=$?
+[ "$EXIT" -eq 0 ] || fail "Test 12: exit 0 にならない（exit=${EXIT}）"
+if echo "$OUT" | grep -q "取得に失敗"; then fail "Test 12: 実物があるのに取得経路へ進んだ: $OUT"; fi
+[ "$(readlink "$PJ12/.claude/skills/skill-a")" = "../../.agents/skills/skill-a" ] || fail "Test 12: skill-a のつなぎ先が違う"
+[ "$(readlink "$PJ12/.claude/skills/skill-b")" = "../../.agents/skills/skill-b" ] || fail "Test 12: skill-b のつなぎ先が違う"
+[ -f "$PJ12/.claude/skills/skill-a/SKILL.md" ] || fail "Test 12: つなぎ先のSKILL.mdを辿れない"
+for name in no-skill-md "bad name" pj-owned-link; do
+  if [ -e "$PJ12/.claude/skills/$name" ] || [ -L "$PJ12/.claude/skills/$name" ]; then
+    fail "Test 12: 飛ばすべきエントリがつながれた: $name"
+  fi
+done
+if ! echo "$OUT" | grep -q "つなぎました"; then fail "Test 12: 完了メッセージが出ない: $OUT"; fi
+
+# --- Test 13: [2026-10-15] 既存の .claude/skills/<id>（実ディレクトリ・壊れた symlink）は触らない ---
+PJ13="$TMP_DIR/pj13-existing/jtt-system"
+mkdir -p "$PJ13/.agents/skills/skill-a" "$PJ13/.agents/skills/skill-c" "$PJ13/.claude/skills/skill-a"
+echo "A" > "$PJ13/.agents/skills/skill-a/SKILL.md"
+echo "C" > "$PJ13/.agents/skills/skill-c/SKILL.md"
+echo "{}" > "$PJ13/.agents/skills/.hub-snapshot.json"
+echo "keep" > "$PJ13/.claude/skills/skill-a/KEEP"
+ln -s "$TMP_DIR/pj13-missing" "$PJ13/.claude/skills/skill-c"
+OUT="$(GIT_CONFIG_GLOBAL="$BROKEN_GITCONFIG" CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$PJ13" bash "$TARGET_SCRIPT" 2>&1)"
+EXIT=$?
+[ "$EXIT" -eq 0 ] || fail "Test 13: exit 0 にならない（exit=${EXIT}）"
+[ -d "$PJ13/.claude/skills/skill-a" ] && [ ! -L "$PJ13/.claude/skills/skill-a" ] || fail "Test 13: 既存の実ディレクトリが置き換えられた"
+[ -f "$PJ13/.claude/skills/skill-a/KEEP" ] || fail "Test 13: 既存ディレクトリの中身が消えた"
+[ "$(readlink "$PJ13/.claude/skills/skill-c")" = "$TMP_DIR/pj13-missing" ] || fail "Test 13: 壊れた既存 symlink が書き換えられた"
+if ! echo "$OUT" | grep -q "既存 2 本"; then fail "Test 13: 既存件数が出ない: $OUT"; fi
+
+# --- Test 14: [2026-10-15] 版記録なし（.agents/skills はあるが .hub-snapshot.json が無い）→ 従来経路 ---
+PJ14="$TMP_DIR/pj14-no-snapshot/jtt-system"
+mkdir -p "$PJ14/.agents/skills/skill-a"
+echo "A" > "$PJ14/.agents/skills/skill-a/SKILL.md"
+OUT="$(GIT_CONFIG_GLOBAL="$BROKEN_GITCONFIG" CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$PJ14" bash "$TARGET_SCRIPT" 2>&1)"
+EXIT=$?
+[ "$EXIT" -eq 0 ] || fail "Test 14: exit 0 にならない（exit=${EXIT}）"
+if ! echo "$OUT" | grep -q "取得に失敗"; then fail "Test 14: 版記録なしで従来経路に進んでいない: $OUT"; fi
+[ ! -e "$PJ14/.claude/skills/skill-a" ] || fail "Test 14: 版記録なしなのに .claude/skills へつないだ"
+
+# --- Test 15: [2026-10-15] .claude または .claude/skills が symlink → 何も作らず警告して exit 0 ---
+OUTSIDE15="$TMP_DIR/pj15-outside"
+mkdir -p "$OUTSIDE15"
+PJ15A="$TMP_DIR/pj15a/jtt-system"
+mkdir -p "$PJ15A/.agents/skills/skill-a"
+echo "A" > "$PJ15A/.agents/skills/skill-a/SKILL.md"
+echo "{}" > "$PJ15A/.agents/skills/.hub-snapshot.json"
+ln -s "$OUTSIDE15" "$PJ15A/.claude"
+OUT="$(GIT_CONFIG_GLOBAL="$BROKEN_GITCONFIG" CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$PJ15A" bash "$TARGET_SCRIPT" 2>&1)"
+EXIT=$?
+[ "$EXIT" -eq 0 ] || fail "Test 15a: exit 0 にならない（exit=${EXIT}）"
+[ -z "$(ls -A "$OUTSIDE15")" ] || fail "Test 15a: symlink 先（リポジトリ外）へ書いた"
+if ! echo "$OUT" | grep -q "symlink"; then fail "Test 15a: symlink 警告が出ない: $OUT"; fi
+
+PJ15B="$TMP_DIR/pj15b/jtt-system"
+mkdir -p "$PJ15B/.agents/skills/skill-a" "$PJ15B/.claude"
+echo "A" > "$PJ15B/.agents/skills/skill-a/SKILL.md"
+echo "{}" > "$PJ15B/.agents/skills/.hub-snapshot.json"
+ln -s "$OUTSIDE15" "$PJ15B/.claude/skills"
+OUT="$(GIT_CONFIG_GLOBAL="$BROKEN_GITCONFIG" CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$PJ15B" bash "$TARGET_SCRIPT" 2>&1)"
+EXIT=$?
+[ "$EXIT" -eq 0 ] || fail "Test 15b: exit 0 にならない（exit=${EXIT}）"
+[ -z "$(ls -A "$OUTSIDE15")" ] || fail "Test 15b: .claude/skills の symlink 先へ書いた"
+
+# --- Test 16: [2026-10-15] CLAUDE_CODE_REMOTE 未設定 → 実物があってもつながない・無音 ---
+PJ16="$TMP_DIR/pj16-local/jtt-system"
+mkdir -p "$PJ16/.agents/skills/skill-a"
+echo "A" > "$PJ16/.agents/skills/skill-a/SKILL.md"
+echo "{}" > "$PJ16/.agents/skills/.hub-snapshot.json"
+OUT="$(CLAUDE_PROJECT_DIR="$PJ16" bash "$TARGET_SCRIPT" 2>&1)"
+EXIT=$?
+[ "$EXIT" -eq 0 ] || fail "Test 16: exit 0 にならない（exit=${EXIT}）"
+[ -z "$OUT" ] || fail "Test 16: ローカルでは無音であるべき: $OUT"
+[ ! -e "$PJ16/.claude" ] || fail "Test 16: ローカルで .claude を作った"
+
+# --- Test 17: [2026-10-15] 親の .agents が symlink（リポ外）→ 新経路に入らない。
+#     SKILL.md が symlink のスキルもつながない ---
+OUTSIDE17="$TMP_DIR/pj17-outside/.agents"
+mkdir -p "$OUTSIDE17/skills/skill-a"
+echo "A" > "$OUTSIDE17/skills/skill-a/SKILL.md"
+echo "{}" > "$OUTSIDE17/skills/.hub-snapshot.json"
+PJ17="$TMP_DIR/pj17/jtt-system"
+mkdir -p "$PJ17"
+ln -s "$OUTSIDE17" "$PJ17/.agents"
+OUT="$(GIT_CONFIG_GLOBAL="$BROKEN_GITCONFIG" CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$PJ17" bash "$TARGET_SCRIPT" 2>&1)"
+EXIT=$?
+[ "$EXIT" -eq 0 ] || fail "Test 17a: exit 0 にならない（exit=${EXIT}）"
+[ ! -e "$PJ17/.claude/skills/skill-a" ] && [ ! -L "$PJ17/.claude/skills/skill-a" ] || fail "Test 17a: 親 .agents の symlink 先のスキルをつないだ"
+
+PJ17B="$TMP_DIR/pj17b/jtt-system"
+mkdir -p "$PJ17B/.agents/skills/skill-a" "$PJ17B/.agents/skills/skill-b"
+ln -s "$OUTSIDE17/skills/skill-a/SKILL.md" "$PJ17B/.agents/skills/skill-a/SKILL.md"
+echo "B" > "$PJ17B/.agents/skills/skill-b/SKILL.md"
+echo "{}" > "$PJ17B/.agents/skills/.hub-snapshot.json"
+OUT="$(GIT_CONFIG_GLOBAL="$BROKEN_GITCONFIG" CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$PJ17B" bash "$TARGET_SCRIPT" 2>&1)"
+EXIT=$?
+[ "$EXIT" -eq 0 ] || fail "Test 17b: exit 0 にならない（exit=${EXIT}）"
+[ ! -e "$PJ17B/.claude/skills/skill-a" ] && [ ! -L "$PJ17B/.claude/skills/skill-a" ] || fail "Test 17b: SKILL.md が symlink のスキルをつないだ"
+[ "$(readlink "$PJ17B/.claude/skills/skill-b")" = "../../.agents/skills/skill-b" ] || fail "Test 17b: 通常のスキルがつながれない"
 
 echo "PASS: cloud-hub-bootstrap"
 exit 0

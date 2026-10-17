@@ -21,6 +21,7 @@ import os
 import re
 import shlex
 import subprocess
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -86,15 +87,34 @@ def github_owner(url: str) -> str | None:
 #        書き込む案 → クラウドコンテナの生成経路は UI 依存で全経路を
 #        カバーできず、書けたとしても実測どおり同一セッション内の変更が
 #        本ガードに拒否される場合がありうるため不採用。
-# 対応: `CLAUDE_CODE_REMOTE=true` のときだけ、`github.user` 未設定時に
+# 対応: クラウド実行のときだけ、`github.user` 未設定時に
 #   cwd リポの `origin` remote owner を「自分の owner」とみなすフォールバックを
 #   追加する。クラウドの credential はセッションに添付した repo に限定される
 #   ため、その repo の origin owner ＝ 自分の owner とみなせる（この repo
 #   以外には書けない以上、origin 以外を騙る余地がない）。origin が無い・
 #   owner を抽出できない場合は None/空文字を返し、呼び出し側は従来どおり
 #   fail-close する。
+#   判定は次のいずれか。ローカル Cursor が `CURSOR_AGENT` だけ持つ場合は対象外。
+#   1) `CLAUDE_CODE_REMOTE=true`
+#   2) Cursor Cloud の二重信号（`CURSOR_AGENT` と `CLOUD_AGENT_ALL_SECRET_NAMES`。
+#      後者は値空でも名前があること）
+#   3) Linux だけ `/opt/cursor/artifacts`（hook が env を落とす実測の補助）。
+#      Darwin では使わない。Mac Studio の Cursor にも同じパスがあり、
+#      クラウド判定になると main へ波及する bare push が通った（2026-10-17 実測）。
+#      検査では `AGENT_HUB_HOOK_CLOUD_FS=0` で 3) を止める。
 def cloud_environment() -> bool:
-    return os.environ.get("CLAUDE_CODE_REMOTE", "").strip().lower() == "true"
+    if os.environ.get("CLAUDE_CODE_REMOTE", "").strip().lower() == "true":
+        return True
+    if os.environ.get("CURSOR_AGENT", "").strip() and "CLOUD_AGENT_ALL_SECRET_NAMES" in os.environ:
+        return True
+    if os.environ.get("AGENT_HUB_HOOK_CLOUD_FS", "").strip() == "0":
+        return False
+    if sys.platform == "darwin":
+        return False
+    try:
+        return Path("/opt/cursor/artifacts").is_dir()
+    except OSError:
+        return False
 
 
 def origin_owner(cwd: Path) -> str | None:
@@ -159,6 +179,61 @@ def resolve_remote_urls(cwd: Path, remote: str | None) -> list[str]:
             selected = upstream.split("/", 1)[0] if "/" in upstream else "origin"
     output = git(cwd, "remote", "get-url", "--push", "--all", selected or "origin")
     return [line for line in output.splitlines() if line]
+
+
+def _git_config_get(cwd: Path, key: str) -> str:
+    # --local: 親リポや global の push.default を拾って誤判定しない。
+    return subprocess.run(
+        ["git", "-C", str(cwd), "config", "--local", "--get", key],
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+
+
+def omitted_refspec_would_update_main(cwd: Path) -> bool:
+    """True when a refspec-less push would update main via push.default / upstream."""
+    pd = _git_config_get(cwd, "push.default")
+    if pd == "matching":
+        return True
+    if pd not in {"upstream", "tracking"}:
+        return False
+    branch = subprocess.run(
+        ["git", "-C", str(cwd), "branch", "--show-current"],
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+    upstream = subprocess.run(
+        ["git", "-C", str(cwd), "rev-parse", "--abbrev-ref", "@{upstream}"],
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+    merge = _git_config_get(cwd, f"branch.{branch}.merge") if branch else ""
+    if not upstream and not merge:
+        return True
+    for value in (upstream, merge):
+        if value and re.search(r"(^|/)main$", value):
+            return True
+    return False
+
+
+def git_push_refspec(tokens: list[str], push_index: int) -> str | None:
+    value_options = {
+        "--repo", "-R", "--head", "--base", "--title", "--body", "--body-file",
+        "-f", "-F", "-X", "--method", "-o", "--push-option", "--receive-pack", "--exec",
+    }
+    positionals: list[str] = []
+    index = push_index + 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token in value_options:
+            index += 2
+            continue
+        if token.startswith("-"):
+            index += 1
+            continue
+        positionals.append(token)
+        index += 1
+    return positionals[1] if len(positionals) > 1 else None
 
 
 def first_positional_after(tokens: list[str], start: int) -> str | None:
@@ -1303,11 +1378,28 @@ def command_mentions_git_or_gh(command: str) -> bool:
 #     外側の実行（gh 等）はこの検査ではなくセグメント解析が従来どおり検査する。
 #   - 他案不採用理由: 引用符内の `$(` だけを除外する案は、非引用位置の `$(` が
 #     内側を抱えるケースで誤判定が残るため不採用。置換領域を引用対応で走査する。
-def _substitution_inner_text(command: str) -> str | None:
-    """`$(` `<(` `>(` バッククォート領域の内側テキストを連結して返す。
+# [2026-10-13][fix] issue #3922: 置換の内側コマンドごとに既知の読み取り専用
+# git/gh かを判定し、`$(gh run view ...)` / `$(git describe ...)` のような
+# 書込みの無い置換は許可する。
+# 背景:
+#   - ユーザー依頼意図: `until s=$(gh run view ...)` / `T=$(git describe ...)` の
+#     ような読み取り専用のコマンド置換が、内側に git/gh があるだけで一律に
+#     「cannot prove repository target through shell substitution」で誤拒否され、
+#     調査系コマンドの都度分割を強いられていた。
+#   - 守るべき業務ルール: 内側に書込み系サブコマンド・未知サブコマンド・実行書換
+#     オプションを含む形、解析不能な形は従来どおり fail-close で拒否する
+#     （書き込みが含まれる時だけ fail-close を維持するという Issue の方針）。
+#   - 他案不採用理由: 内側を全許可する案は `$(git push)` / `$(gh pr create)` を
+#     素通しするため不採用。内側を validate() へ再帰する案は自分の fork 宛ての
+#     push も置換内で許してしまい、Issue が求める「読み取り専用だけ許可」を
+#     超えるため不採用。代わりに既存の read-only 証明と同じ基準（git は
+#     push/lfs/config・実行書換以外、gh は read-only group/action または
+#     api の GET/HEAD）で内側を検査する。
+def _substitution_spans(command: str) -> list[tuple[int, int]] | None:
+    """`$(` `<(` `>(` バッククォート領域の (start, end) 一覧を返す。
 
     解析不能（引用・括弧・エスケープが閉じない形）なら None を返し、
-    呼び出し側で「内側を証明できない=言及あり」側に倒す。
+    呼び出し側で「内側を証明できない」側に倒す。
     単引用内の `$(` はリテラルのため置換として扱わない。
     """
     spans: list[tuple[int, int]] = []
@@ -1373,7 +1465,57 @@ def _substitution_inner_text(command: str) -> str | None:
         i += 1
     if stack or quote is not None or escaped:
         return None
-    return " ".join(command[start:end] for start, end in spans)
+    return spans
+
+
+def _substitution_inner_commands(command: str) -> list[str] | None:
+    """各置換領域の内側コマンドテキスト（デリミタを除く）を返す。
+
+    解析不能なら None。トップレベルの領域と、領域内にネストした領域の
+    両方を含む（ネスト側も独立に検査する）。
+    """
+    spans = _substitution_spans(command)
+    if spans is None:
+        return None
+    commands: list[str] = []
+    for start, end in spans:
+        if command[start] == "`":
+            commands.append(command[start + 1 : end - 1])
+        else:
+            commands.append(command[start + 2 : end - 1])
+    return commands
+
+
+def _substitution_inner_may_write(inner: str) -> bool:
+    """置換の内側コマンドに upstream write / 宛先変更を起こしうる実行があれば True。
+
+    既存の read-only 証明と同じ基準で判定する: git は
+    push/lfs/config・実行書換オプション（--upload-pack 等）・-c 非無害設定・
+    未知サブコマンドを証明不能、gh は書込み系 group/action・api の
+    非 GET/HEAD・未知グループを証明不能とする。内側のセグメント解析に
+    失敗する形、ネストした `$(` `<(` `>(` バッククォートを含む引用済み
+    トークン、実行名位置の間接指定も証明不能（fail-close）。
+    python/node 等の不透明実行名はここでは止めない — 実行名より後の
+    ペイロードは外側コマンドに対する opaque payload 検査が従来どおり
+    走査するため（`x=$(python3 -c '...')` と `python3 -c '...'` の
+    評価を揃える）。
+    """
+    try:
+        segments, _separators = _shell_command_segments(inner)
+    except ValueError:
+        return True
+    for _segment, tokens in segments:
+        for index, token in enumerate(tokens):
+            executable = Path(token).name
+            if executable == "git" and _git_token_blocks_read_only_proof(tokens, index):
+                return True
+            if executable == "gh" and _gh_token_blocks_read_only_proof(tokens, index):
+                return True
+            if re.search(r"\$\(|<\(|>\(|`", token):
+                return True
+        if _command_position_is_indirect(tokens):
+            return True
+    return False
 
 
 def validate(command: str, base: Path) -> tuple[bool, str]:
@@ -1428,9 +1570,15 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
     #   `gh issue create --body "$(cat <<'EOF' ...)"` の gh 自身は置換の中身では
     #   ないため拒否根拠にしない（外側の実行はセグメント解析が検査する）。
     #   解析不能な置換領域は証明不能として従来どおり拒否する。
+    # [2026-10-13][fix] issue #3922: 内側コマンドごとに既知の読み取り専用
+    #   git/gh かを判定する。`$(gh run view)` / `$(git describe)` 等の読み取り
+    #   専用置換は許可し、書込み系サブコマンド・未知サブコマンド・解析不能な
+    #   内側だけを従来どおり fail-close で拒否する。
     if "$(" in command or "`" in command or "<(" in command or ">(" in command:
-        inner_text = _substitution_inner_text(command)
-        if inner_text is None or re.search(r"\b(?:git|gh)\b", inner_text):
+        inner_commands = _substitution_inner_commands(command)
+        if inner_commands is None or any(
+            _substitution_inner_may_write(inner) for inner in inner_commands
+        ):
             return False, "cannot prove repository target through shell substitution"
     if contains_repository_write(command) and mutates_write_target(command):
         return False, "repository write target may be changed inside the same command"
@@ -1594,6 +1742,8 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
                 ):
                     return False, "cannot prove Git push target with target-overriding global options"
                 cwd = effective_cwd(current_cwd, segment, tokens, index)
+                if git_push_refspec(tokens, push_index) is None and omitted_refspec_would_update_main(cwd):
+                    return False, "bare push would update main"
                 effective_owner = resolve_owner(cwd, owner)
                 if not effective_owner:
                     return False, "git config --global github.user is required before repository writes"

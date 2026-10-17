@@ -33,7 +33,8 @@
       "enabled": true,
       "url": "http://shintaros-mac-mini:8847/mcp",
       "headers": {
-        "X-API-Key": "{env:CODEBASE_CONTEXT_ENGINE_MCP_API_KEY}"
+        "X-API-Key": "{env:CODEBASE_CONTEXT_ENGINE_MCP_API_KEY}",
+        "X-Client-Name": "opencode"
       }
     },
     "motion": {

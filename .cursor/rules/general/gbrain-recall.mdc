@@ -58,7 +58,7 @@ alwaysApply: true
 <!-- [2026-10-04][fix] 本人指定でMy GBrainを共通入口にする。旧2接続の必須化は廃止し、必要sourceの読取は保つ。 -->
 
 My GBrainの可用性は `.claude/rules/general/tool-availability-resolution.md` の証拠順序とstatusで判定する。
-MCPは `my-gbrain` 1本に一本化されており、旧接続（`tech-gbrain`, `jtt-gbrain`）は退役済み。
+読む入口は `my-gbrain`。旧接続 `tech-gbrain` / `shintaro-gbrain` は退役済み。`jtt-gbrain` は会社の記録の書き込み口として全PJ共通の接続に残す（読むのはMy GBrain）。
 接続・sourceの選び方は `.claude/skills/agentmemory-routing/SKILL.md`（HUB正本: `skills/agentmemory-routing/SKILL.md`） の共通入口に従う。
 
 相談・直し・判断で必須なのは、source `shintaro-gbrain` と `tech-gbrain-shared` の根拠確認。

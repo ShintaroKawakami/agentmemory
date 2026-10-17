@@ -27,6 +27,16 @@
         ]
       },
       {
+        "matcher": "mcp__context-mode__ctx_execute|mcp__context-mode__ctx_execute_file|mcp__context-mode__ctx_batch_execute|mcp__context-mode__ctx_upgrade|mcp__context-mode__ctx_insight",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/block-main-commit.sh\"",
+            "timeout": 20
+          }
+        ]
+      },
+      {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {

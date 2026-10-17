@@ -33,6 +33,13 @@
         "timeout": 10
       }
     ],
+    "beforeMCPExecution": [
+      {
+        "type": "command",
+        "command": "CURSOR_BRIDGE_EVENT=beforeMCPExecution bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/block-main-commit.sh\"'",
+        "timeout": 20
+      }
+    ],
     "preToolUse": [
       {
         "type": "command",
