@@ -1,7 +1,7 @@
 {
   "tool": "opencode",
-  "generated_at": "2026-10-12T17:03:02.780441+00:00",
-  "source_commit": "07badd1",
+  "generated_at": "2026-10-17T18:01:06.414548+00:00",
+  "source_commit": "1a4fab2",
   "project_root": ".",
   "mcp_source": {
     "registry": "/Users/shintaro/business/AGENT-HUB/docs/codex-mcp-registry.yaml",
@@ -26,13 +26,16 @@
     "implementation-auditor.md",
     "qa-reviewer.md",
     "quality-engineer.md",
+    "release-announcer.md",
     "security-reviewer.md",
     "stitch-screen-creator.md",
     "technical-writer.md",
+    "test-fixer.md",
     "test-runner.md"
   ],
   "warnings": [
     "PreToolUse command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/storage-url-pr-gate.sh\"",
+    "PreToolUse matcher=mcp__context-mode__ctx_execute|mcp__context-mode__ctx_execute_file|mcp__context-mode__ctx_batch_execute|mcp__context-mode__ctx_upgrade|mcp__context-mode__ctx_insight は OpenCode plugin へ未変換",
     "PreToolUse matcher=Write|Edit|MultiEdit は OpenCode plugin へ未変換",
     "PreToolUse matcher=Bash|Edit|MultiEdit|Shell|StrReplaceFile|Write|WriteFile は OpenCode plugin へ未変換",
     "PreToolUse command 未対応のため未変換: bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/post-merge-gate.sh\"",

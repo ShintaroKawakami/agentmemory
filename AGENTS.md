@@ -19,14 +19,14 @@ older text that calls `DISTRIBUTION.yaml` a skill/MCP/hook selection SSOT is sup
 - canonical project: `agentmemory`
 - harness type: `mcp-server`
 - harness type chain: `dev -> mcp-server`
-- effective hash: `75418f65bc836ca5f8a1c1eb56cbe47baecbfbd2f4bb2d937b723210102a3193`
+- effective hash: `9ca90ff947dfac8dad3ce8c8e5d7990c05eb0c8620f175cc0dff4f87deb1a8e1`
 - constitution assets:
   - `agents-md` (selected_by=`global`, inheritance_id=`cebc562da0384df8`)
   - `gbrain-md` (selected_by=`global`, inheritance_id=`de26219fcac2c60c`)
 
 ### Claude Code on the web（クラウド起動指示）
 
-Claude Code on the web（`CLAUDE_CODE_REMOTE=true`）で、`.claude/skills` に AGENT-HUB の skill（例: plan-approval）が無ければ、セッション開始直後に `cd <このAGENTS.mdがあるPJのルート> && bash .claude/hooks/scripts/cloud-hub-bootstrap.sh` を実行し、終わったら元のcwdへ戻ってから作業を始める（複数PJを添付しているなら、hookを持つPJごとに1回ずつ）。AGENT-HUB を他リポと同時添付したセッションはcwdが親ディレクトリになり hook が自動発火しないため（実測2026-09-05）。取得できないと案内が出る場合は、作成画面の「＋」で ShintaroKawakami/AGENT-HUB を添付し直す。
+Claude Code on the web（`CLAUDE_CODE_REMOTE=true`）で、`.claude/skills` に AGENT-HUB の skill（例: plan-approval）が無ければ、版記録（`.agents/skills/.hub-snapshot.json`）の有無にかかわらず、セッション開始直後に `cd <このAGENTS.mdがあるPJのルート> && bash .claude/hooks/scripts/cloud-hub-bootstrap.sh` を実行し、終わったら元のcwdへ戻ってから作業を始める（複数PJを添付しているなら、hookを持つPJごとに1回ずつ）。AGENT-HUB を他リポと同時添付したセッションはcwdが親ディレクトリになり hook が自動発火しないため（実測2026-09-05）。版記録がある PJ では、hook がリポジトリ内のスキル実物をつなぐだけで、AGENT-HUB の添付は不要。版記録が無い PJ で取得できないと案内が出る場合は、作成画面の「＋」で ShintaroKawakami/AGENT-HUB を添付し直す。
 ### 適用するハーネスルール
 
 以下は本文を読むための索引です。条件付きルールの適用範囲は参照先のfrontmatterに従います。
@@ -49,6 +49,7 @@ Claude Code on the web（`CLAUDE_CODE_REMOTE=true`）で、`.claude/skills` に 
 - `.claude/rules/general/responsive-both-viewports.md` — 条件に該当する時だけ参照 (asset_id=`responsive-both-viewports` inheritance_id=`f1de976176e1cfe6`)
 - `.claude/rules/general/settings-protection-coexistence.md` — 条件に該当する時だけ参照 (asset_id=`settings-protection-coexistence` inheritance_id=`b2c20a61aba97c16`)
 - `.claude/rules/general/sub-agent-scope-contract.md` — 常時参照 (asset_id=`sub-agent-scope-contract` inheritance_id=`2df0dc7f3e0e83f2`)
+- `.claude/rules/general/test-kinds-and-cheap-loop.md` — 常時参照 (asset_id=`test-kinds-and-cheap-loop` inheritance_id=`c99439ea2bde4903`)
 - `.claude/rules/general/tool-availability-resolution.md` — 常時参照 (asset_id=`tool-availability-resolution` inheritance_id=`24858e26fca6d353`)
 - `.claude/rules/general/ui-registry-first.md` — 条件に該当する時だけ参照 (asset_id=`ui-registry-first` inheritance_id=`6d5ac0bda0c232fe`)
 - `.claude/rules/general/ui-stitch-mandatory.md` — 条件に該当する時だけ参照 (asset_id=`ui-stitch-mandatory` inheritance_id=`7c625ee9b414e7b8`)

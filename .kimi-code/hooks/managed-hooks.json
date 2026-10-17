@@ -23,6 +23,12 @@
     },
     {
       "event": "PreToolUse",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/block-main-commit.sh\"",
+      "matcher": "mcp__context-mode__ctx_execute|mcp__context-mode__ctx_execute_file|mcp__context-mode__ctx_batch_execute|mcp__context-mode__ctx_upgrade|mcp__context-mode__ctx_insight",
+      "timeout": 20
+    },
+    {
+      "event": "PreToolUse",
       "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/block-skill-reverse-edit.sh\"",
       "matcher": "Write|Edit|MultiEdit|WriteFile|StrReplaceFile",
       "timeout": 10

@@ -414,6 +414,127 @@ DENY_MSG='[hook:block-main-commit] mainブランチへの直接コミット/プ�
 OTHER_TARGET_GIT_GUARD_MSG='[hook:block-main-commit] 書込先は別リポジトリ/別worktreeですが、そのブランチが main、または書込が main へ波及しないことを安全に証明できないため停止しました。\n\n対応手順:\n1. 書込先の worktree/リポジトリへ作業場所を移してから、単一の非mainブランチ名だけを指定して commit/push する（src:dst・wildcard・複数 ref・値を取るオプションは証明不能として拒否）\n2. AI worker の未PRブランチを GitHub へ退避する場合は、ai-worker MCP の push_branch_backup(job_id) を使う（refs/heads/wip/ へ安全に push する正式経路）\n\n理由: セッションの作業場所が main のまま別リポジトリ/別worktreeへ書き込むコマンドは、main への波及を静的に否定できない限り拒否します（mainマージ = 本番DB自動適用 + 本番デプロイ）。'
 
 read_stdin
+
+# [2026-10-15][feat] Context Mode 試験導入 F0 / T-08: ctx のコード実行系も同じ検査にかける。
+# 背景:
+#   - ユーザー依頼意図: Context Mode（MCP サーバー context-mode）のコード実行ツール経由でも
+#     main への git commit / push を止める。試験中は実行のたびに確認も出す。
+#   - 守るべき業務ルール: 入力が Bash の `command` 欄ではない（ctx_execute / ctx_execute_file は
+#     `code`、ctx_batch_execute は `commands[].command`）ため、従来は素通りだった。
+#     main への書き込みは「確認」ではなく止める。既存の Bash の挙動は 1 バイトも変えない。
+#   - 他案不採用理由: 新しい hook ファイルを足す案は、git 判定を持つ本スクリプトが所有できるため不採用。
+#     permissions.ask を hook 断片へ足す案は deploy-hooks.py の assemble/merge が hooks 以外のキーを
+#     扱えず、他の読み手（check-pj-readiness 等）にも影響するため不採用。確認（ask）は、既存の配布経路を
+#     使う本スクリプトの出力（permissionDecision=ask）で出す。
+# 対応: 検査文字列を取り出して Bash 形の入力に組み替え、本スクリプト自身へ渡す（再帰は Bash 入力なので1回だけ）。
+#   - deny が返ればそのまま返す。deny でなければ ask を返す（組み立てた命令を静的に見抜けない限界を確認で補う）。
+#   - shell 以外の言語の code は `python3 - <<'CTX_EOF'` 形に包み、既存の opaque payload 検査（git→push 並び）にかける。
+#   - ctx_upgrade / ctx_insight は常に deny（版の自動更新・外部送信を試験中は使わない）。
+# ツール名の接頭辞は分けて組み立てる（hook 本文に MCP ツール名を直書きしない契約: test_active_hook_sources_do_not_call_mcp_tools）。
+CTX_PREFIX="mcp""__context-mode__"
+CTX_TOOL_NAME=""
+case "$HOOK_INPUT" in
+  *"${CTX_PREFIX}"*) CTX_TOOL_NAME=$(extract_field tool_name) ;;
+esac
+case "$CTX_TOOL_NAME" in
+  "${CTX_PREFIX}ctx_upgrade"|"${CTX_PREFIX}ctx_insight")
+    emit_deny "[hook:block-main-commit] Context Mode の ${CTX_TOOL_NAME#"$CTX_PREFIX"} は試験中は使いません（版は固定・自動更新や外部への送信をしない方針）。必要なら利用者に依頼してください。"
+    ;;
+  "${CTX_PREFIX}ctx_execute"|"${CTX_PREFIX}ctx_execute_file"|"${CTX_PREFIX}ctx_batch_execute")
+    # [2026-10-16][fix] Codex review: 変換に失敗した時に素通りさせない。入力は環境変数ではなく
+    #   一時ファイルで渡す（大きい code / commands で引数・環境変数の上限を超えて起動できない経路を塞ぐ）。
+    #   変換の失敗（終了コード非0・出力なし）は deny、検査対象が空の時だけ明示の目印で通す。
+    CTX_IN_FILE=$(mktemp "${TMPDIR:-/tmp}/ctx-hook-in.XXXXXX") \
+      || emit_deny "[hook:block-main-commit] Context Mode の実行内容を検査用に保存できなかったため止めました。"
+    printf '%s' "$HOOK_INPUT" > "$CTX_IN_FILE" \
+      || { rm -f "$CTX_IN_FILE"; emit_deny "[hook:block-main-commit] Context Mode の実行内容を検査用に保存できなかったため止めました。"; }
+    CTX_RC=0
+    CTX_REWRITTEN=$(CTX_IN_FILE="$CTX_IN_FILE" python3 - <<'PY' 2>/dev/null
+import json
+import os
+
+try:
+    with open(os.environ["CTX_IN_FILE"], encoding="utf-8") as fh:
+        parsed = json.load(fh)
+except Exception:
+    raise SystemExit(3)
+if not isinstance(parsed, dict):
+    raise SystemExit(3)
+ti = parsed.get("tool_input")
+if not isinstance(ti, dict):
+    ti = parsed.get("toolInput") if isinstance(parsed.get("toolInput"), dict) else {}
+tool = str(parsed.get("tool_name") or "")
+SHELL_LANGS = {"shell", "bash", "sh", "zsh"}
+text = ""
+if tool.endswith("ctx_batch_execute"):
+    cmds = ti.get("commands")
+    parts = []
+    if isinstance(cmds, list):
+        for item in cmds:
+            if isinstance(item, dict) and isinstance(item.get("command"), str):
+                parts.append(item["command"])
+            elif isinstance(item, str):
+                parts.append(item)
+    text = "\n".join(parts)
+else:
+    code = ti.get("code")
+    if isinstance(code, str) and code.strip():
+        lang = str(ti.get("language") or "").strip().lower()
+        if lang in SHELL_LANGS:
+            text = code
+        else:
+            text = "python3 - <<'CTX_EOF'\n" + code + "\nCTX_EOF"
+if not text.strip():
+    print("__CTX_EMPTY__", end="")
+    raise SystemExit(0)
+new_ti = {"command": text}
+cwd = ti.get("cwd") or ti.get("workdir") or parsed.get("cwd") or parsed.get("workdir")
+if isinstance(cwd, str) and cwd:
+    new_ti["cwd"] = cwd
+out = dict(parsed)
+out["tool_name"] = "Bash"
+out["tool_input"] = new_ti
+out.pop("toolInput", None)
+print(json.dumps(out, ensure_ascii=False), end="")
+PY
+) || CTX_RC=$?
+    rm -f "$CTX_IN_FILE"
+    if [ "$CTX_RC" -ne 0 ] || [ -z "$CTX_REWRITTEN" ]; then
+      emit_deny "[hook:block-main-commit] Context Mode の実行内容を検査できなかったため止めました（入力の読み取りに失敗）。"
+    fi
+    if [ "$CTX_REWRITTEN" = "__CTX_EMPTY__" ]; then
+      exit 0
+    fi
+    # [2026-10-16][fix] Codex review 2: 内部検査の異常終了を握りつぶさない。deny 以外で非0なら止める
+    #   （main への書き込みは「確認」ではなく止める方針。検査できなかった時も確認へ進めない）。
+    CTX_INNER_RC=0
+    CTX_INNER_OUT=$(printf '%s' "$CTX_REWRITTEN" | bash "${BASH_SOURCE[0]}" 2>/dev/null) || CTX_INNER_RC=$?
+    if printf '%s' "$CTX_INNER_OUT" | grep -q 'permissionDecision.*deny'; then
+      printf '%s\n' "$CTX_INNER_OUT"
+      exit 0
+    fi
+    if [ "$CTX_INNER_RC" -ne 0 ]; then
+      emit_deny "[hook:block-main-commit] Context Mode の実行内容の検査が異常終了したため止めました（終了コード ${CTX_INNER_RC}）。"
+    fi
+    python3 - <<'PY'
+import json
+
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "ask",
+        "permissionDecisionReason": (
+            "[hook:block-main-commit] Context Mode 試験中: コード実行は毎回確認します。"
+            "main への git commit / push は自動で止めますが、変数・eval・文字列の組み立てで作った命令は"
+            "静的に見抜けないため、実行内容を目で確認してから許可してください。"
+        ),
+    }
+}, ensure_ascii=False, separators=(",", ":")))
+PY
+    exit 0
+    ;;
+esac
+
 COMMAND=$(extract_field command)
 
 if [ -z "$COMMAND" ]; then
@@ -584,6 +705,31 @@ _OPAQUE_SINKS = {
     "npm", "npx", "yarn", "pnpm", "pipenv", "poetry", "cargo", "go",
     "docker", "kubectl", "watch", "parallel", "tmux", "screen",
 }
+# [2026-10-13][fix] issue #3922: quoted heredoc 本体が「非シェル系インタプリタ
+#   （python3 / node / ruby 等）の stdin プログラム」になる場合、本体を
+#   `python3 -c '...'` と同等の単一引用文字列として残す。
+#   背景:
+#     - ユーザー依頼意図: `python3 - <<'EOF' ... EOF` でファイルを書き換える
+#       だけのコマンドが、本体の git/gh 言及をきっかけに shell 構文解析へ進み、
+#       Python 本体が shell として解析不能となり「ambiguous shell argument
+#       concatenation」で誤拒否されていた。
+#   - 守るべき業務ルール: 本体の git/gh 言・github.com 言及と opaque payload
+#     検査（git→push 並び）は従来どおり効かせる（`-c` 引数と同じ検査面積）。
+#     シェル系実行（sh / bash / zsh 等）が同じパイプラインにある場合は本体が
+#     実際に shell として実行されうるため、従来どおり生のまま残す
+#     （fail-open を作らない）。非引用デリミタ（$(...) が実行されうる）や
+#     終端が見つからない形も同様に残す。
+#   - 他案不採用理由: 本体を空白化する案は python 本体の git push 実行を
+#     言及・opaque 検査から外してしまうため不採用。シェル判定を追加せず全ての
+#     不透明 sink で文字列化する案は `sh <<'EOF' git push EOF` の実行本体を
+#     検査不能にするため不採用。
+_SHELL_SINKS = {
+    "bash", "sh", "zsh", "dash", "ksh", "fish", "ash", "csh", "tcsh",
+    "nu", "pwsh", "powershell",
+}
+_NON_SHELL_SINKS = {
+    "node", "nodejs", "ruby", "perl", "php", "lua", "osascript",
+}
 _COMMAND_KEYWORDS = {
     "for", "do", "done", "if", "then", "else", "elif", "fi",
     "while", "until", "case", "esac", "select", "{", "}",
@@ -668,12 +814,14 @@ def parse_heredoc_delim(k):
 
 def consume_heredoc_bodies(start):
     """pending の heredoc 本体行（終端行を含む）を消費して新しい index を返す。
-    パイプラインに不透明実行が無く、本体に置換が無いものだけ mask する。"""
+    パイプラインに不透明実行が無く、本体に置換が無いものだけ mask する。
+    非シェル系インタプリタの stdin になる引用本体は単一引用の文字列へ変換する。"""
     cur = start
     for delim, strip_mode, quoted in pending:
         body_start = cur
         danger = False
         end = None
+        term_start = None
         scan = cur
         while scan <= n:
             nl = text.find("\n", scan)
@@ -685,6 +833,7 @@ def consume_heredoc_bodies(start):
             else:
                 check = line
             if check == delim:
+                term_start = scan
                 end = (nl + 1) if nl >= 0 else n
                 break
             if not quoted and ("$(" in line or "`" in line):
@@ -694,6 +843,17 @@ def consume_heredoc_bodies(start):
             scan = nl + 1
         if end is None:
             end = n
+        if (quoted and term_start is not None and term_start > body_start
+                and group_nonshell and not group_shell):
+            # 本体は実行コマンドではなく stdin の他言語プログラム。
+            # `python3 -c '...'` と同等の不透明ペイロードとして単一引用で包み、
+            # shell 構文解析だけを外す（言及・opaque 検査は有効のまま）。
+            # 範囲は本体だけ（終端行は外）: 終端行まで包むと引用が終端の改行を
+            # またぎ、直後のコマンドが本体の文字列に癒着して git/gh 実行が
+            # 見えなくなる。
+            quote_wraps.append((body_start, term_start))
+            cur = end
+            continue
         if not group_opaque and not danger:
             for pos in range(body_start, end):
                 mask[pos] = True
@@ -705,9 +865,12 @@ def consume_heredoc_bodies(start):
 # 引用・$(...)・バッククォートを追跡しながら、コマンド文脈にある << を探す。
 # pending: 当該行で見つけた heredoc デリミタのキュー。group_opaque: 現在の
 # パイプライン(| で繋がる一群)に不透明/特定不能の実行名が1つでもあるか。
+# group_shell / group_nonshell: 同パイプラインのシェル系・非シェル系
+# インタプリタ検出（quote_wraps の heredoc 文字列化判定に使う）。
 stack = []
 pending = []
-group_opaque = False
+group_opaque = group_shell = group_nonshell = False
+quote_wraps = []
 cmd_pos = True
 i = 0
 quote = None
@@ -742,12 +905,12 @@ while i < n:
             stack.append('"')
             in_backtick = True
             cmd_pos = True
-            group_opaque = False
+            group_opaque = group_shell = group_nonshell = False
         elif ch == "$" and i + 1 < n and text[i + 1] == "(":
             stack.append('"')
             quote = None
             cmd_pos = True
-            group_opaque = False
+            group_opaque = group_shell = group_nonshell = False
             i += 1
         i += 1
         continue
@@ -763,19 +926,19 @@ while i < n:
         stack.append(None)
         in_backtick = True
         cmd_pos = True
-        group_opaque = False
+        group_opaque = group_shell = group_nonshell = False
         i += 1
         continue
     if ch == "$" and i + 1 < n and text[i + 1] == "(":
         stack.append(None)
         cmd_pos = True
-        group_opaque = False
+        group_opaque = group_shell = group_nonshell = False
         i += 2
         continue
     if ch == "(":
         stack.append(None)
         cmd_pos = True
-        group_opaque = False
+        group_opaque = group_shell = group_nonshell = False
         i += 1
         continue
     if ch == ")":
@@ -788,19 +951,19 @@ while i < n:
             i = consume_heredoc_bodies(i + 1)
             continue
         cmd_pos = True
-        group_opaque = False
+        group_opaque = group_shell = group_nonshell = False
         i += 1
         continue
     if ch in ";&":
         nxt = text[i + 1] if i + 1 < n else ""
         cmd_pos = True
-        group_opaque = False
+        group_opaque = group_shell = group_nonshell = False
         i += 2 if nxt == ch else 1
         continue
     if ch == "|":
         cmd_pos = True
         if i + 1 < n and text[i + 1] == "|":
-            group_opaque = False
+            group_opaque = group_shell = group_nonshell = False
             i += 2
         else:
             i += 1
@@ -841,12 +1004,40 @@ while i < n:
                 base = word.rsplit("/", 1)[-1].lower()
                 if indeterminate or base in _OPAQUE_SINKS or base.startswith("python"):
                     group_opaque = True
+                if base in _SHELL_SINKS:
+                    group_shell = True
+                if base.startswith("python") or base in _NON_SHELL_SINKS:
+                    group_nonshell = True
                 cmd_pos = False
             i = wend
             continue
     i += 1
 
-print("".join(" " if mask[position] else char for position, char in enumerate(text)), end="")
+# quote_wraps の本体は「本体開始・終端行先頭に単一引用を挿入し、
+# 本体内の単一引用を '"'"' へエスケープ」して、不透明ペイロードを1つの
+# 文字列引数として残す。言及・opaque 検査は本文を読めるまま、
+# shell 構文解析だけを外す。
+wrap_starts = {body_start for body_start, _ in quote_wraps}
+wrap_ends = {end for _, end in quote_wraps}
+wrap_squotes = {
+    pos
+    for body_start, end in quote_wraps
+    for pos in range(body_start, end)
+    if text[pos] == "'"
+}
+out = []
+for position, char in enumerate(text):
+    if position in wrap_starts or position in wrap_ends:
+        out.append("'")
+    if position in wrap_squotes:
+        out.append('\'"\'"\'')
+    elif mask[position]:
+        out.append(" ")
+    else:
+        out.append(char)
+if len(text) in wrap_ends:
+    out.append("'")
+print("".join(out), end="")
 PY
 }
 
@@ -876,6 +1067,9 @@ guard_reason=$(python3 "$SCRIPT_DIR/../lib/upstream-write-guard.py" --cwd "$CWD"
   case "$guard_reason" in
     *"is not fork owner"*|*"github.user is fixed"*|*"Git URL rewrite configuration"*|*"may be changed inside the same command"*)
       _emit_deny_with_telemetry "$UPSTREAM_GUARD_MSG\n\n検出理由: $guard_reason"
+      ;;
+    *"bare push would update main"*)
+      _emit_deny_with_telemetry "$DENY_MSG\n\n検出理由: $guard_reason"
       ;;
     *)
       _emit_deny_with_telemetry "$UNCLASSIFIED_GIT_GUARD_MSG\n\n検出理由: $guard_reason"

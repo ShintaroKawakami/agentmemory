@@ -89,6 +89,16 @@
 #   厳密パース、無ければ grep/sed 相当のプレーンテキスト解析（簡易解決・要警告）に
 #   フォールバックする。fetch が通らない環境（オフライン・credential 無し、または
 #   AGENT-HUB が添付されていない）では、スキルは配置されず添付案内だけが出る。
+# [2026-10-15][feat] リポジトリ内に実物スキルがある PJ は、取得せずつなぐだけにする（Issue #4085）。
+#   背景: jtt-system などは .agents/skills/<id> に AGENT-HUB スキルの実物を Git で持ち、
+#     .agents/skills/.hub-snapshot.json（版記録）を置く。Claude Code on the web は .claude/skills
+#     しか読まないため、実物への相対 symlink（.claude/skills/<id> -> ../../.agents/skills/<id>）だけ作る。
+#   守るルール: 版記録が通常ファイルで .agents/skills が実ディレクトリの時だけ動く（満たさない PJ は
+#     下の従来経路へ進み挙動を変えない）。既存の .claude/skills/<id> は触らない。.claude や
+#     .claude/skills が symlink なら何もせず警告する（リポジトリ外へ書かない）。リポジトリ外は読まず、
+#     ネットワークに出ない。常に exit 0。
+#   不採用: 全 PJ で固定 URL 取得の経路を外す案 → 実物を持たない試験外 PJ の取得が止まるため不採用。
+#   対応: 分岐は PJ_ROOT 決定の直後、TEMP_ROOT 作成と fetch より前に置く。
 
 set -uo pipefail
 
@@ -98,6 +108,52 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
 fi
 
 PJ_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+
+# リポジトリ内の実物スキル（.agents/skills/<id>）を .claude/skills/<id> へ相対 symlink でつなぐ。
+# 取得はしない。既存のエントリ（壊れた symlink を含む）は触らない。戻り値は常に 0。
+link_repo_local_skills() {
+  local claude_dir="$PJ_ROOT/.claude"
+  local claude_skills="$claude_dir/skills"
+  local entry id dest linked=0 existing=0
+
+  if [ -L "$claude_dir" ] || [ -L "$claude_skills" ]; then
+    echo "⚠️  [cloud-hub-bootstrap] .claude または .claude/skills が symlink のため、スキルのつなぎは行いません（リポジトリ外へ書かないため）。" >&2
+    return 0
+  fi
+  if ! mkdir -p "$claude_skills" 2>/dev/null; then
+    echo "⚠️  [cloud-hub-bootstrap] .claude/skills を作成できませんでした。スキルのつなぎは行いません。" >&2
+    return 0
+  fi
+
+  for entry in "$PJ_ROOT/.agents/skills"/*; do
+    [ -e "$entry" ] || [ -L "$entry" ] || continue
+    id="$(basename "$entry")"
+    [[ "$id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || continue
+    [ -d "$entry" ] && [ ! -L "$entry" ] || continue
+    [ -f "$entry/SKILL.md" ] && [ ! -L "$entry/SKILL.md" ] || continue
+    dest="$claude_skills/$id"
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+      existing=$((existing + 1))
+      continue
+    fi
+    if ln -s "../../.agents/skills/$id" "$dest" 2>/dev/null; then
+      linked=$((linked + 1))
+    fi
+  done
+
+  echo "[cloud-hub-bootstrap] リポジトリ内のスキル ${linked} 本をつなぎました（既存 ${existing} 本はそのまま）" >&2
+  return 0
+}
+
+# 版記録つきの実物スキルがあれば、取得経路へ進まずつなぐだけで終わる。
+# [2026-10-15][fix] Codex レビュー3: 親の .agents が symlink ならリポ外を指しうるため新経路に入らない。
+if [ -d "$PJ_ROOT/.agents" ] && [ ! -L "$PJ_ROOT/.agents" ] \
+  && [ -d "$PJ_ROOT/.agents/skills" ] && [ ! -L "$PJ_ROOT/.agents/skills" ] \
+  && [ -f "$PJ_ROOT/.agents/skills/.hub-snapshot.json" ] \
+  && [ ! -L "$PJ_ROOT/.agents/skills/.hub-snapshot.json" ]; then
+  link_repo_local_skills
+  exit 0
+fi
 
 # hook 内に固定した取得元 URL。ローカルの git 設定（remote / insteadOf 等）は一切経由しない
 # （候補ディレクトリを fetch 元にも比較対象にもしないため、経由しようがない構成にする）。

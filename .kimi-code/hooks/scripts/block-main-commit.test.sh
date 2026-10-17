@@ -25,15 +25,25 @@ json_string() {
   python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"
 }
 
+# [2026-10-13][test] issue #3920: テストプロセス側の GIT_CONFIG_GLOBAL pin は
+# 本テストの sandbox 用の人工物であり、検査対象の hook には見せない。
+# hook 内の `git config --global` 読み取りは差し替え済み HOME 経由で同一の
+# .gitconfig を見るため挙動は変わらないが、export した GIT_CONFIG_GLOBAL を
+# hook へ継承させると upstream-write-guard が「Git target environment
+# overrides」として fail-close し、許可側のシナリオを誤判定する。
+strip_test_git_config_env() {
+  env -u GIT_CONFIG_GLOBAL "$@"
+}
+
 run_hook() {
   local cwd="$1"
   local command="$2"
-  printf '{"tool_name":"Bash","tool_input":{"cwd":%s,"command":%s}}\n' "$(json_string "$cwd")" "$(json_string "$command")" | bash "$SCRIPT"
+  printf '{"tool_name":"Bash","tool_input":{"cwd":%s,"command":%s}}\n' "$(json_string "$cwd")" "$(json_string "$command")" | strip_test_git_config_env bash "$SCRIPT"
 }
 
 run_hook_raw() {
   local payload="$1"
-  printf '%s' "$payload" | bash "$SCRIPT"
+  printf '%s' "$payload" | strip_test_git_config_env bash "$SCRIPT"
 }
 
 run_hook_script() {
@@ -41,7 +51,7 @@ run_hook_script() {
   local command="$2"
   local script="$3"
   printf '{"tool_name":"Bash","tool_input":{"cwd":%s,"command":%s}}\n' "$(json_string "$cwd")" "$(json_string "$command")" \
-    | bash "$script"
+    | strip_test_git_config_env bash "$script"
 }
 
 expect_allow() {
@@ -161,10 +171,48 @@ expect_other_target_deny() {
 }
 
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
+
+# [2026-10-13][test] issue #3920: HOME を差し替えても、外から
+# GIT_CONFIG_GLOBAL が設定されていると `git config --global` はそちらの
+# 実ファイルへ書き込み、XDG_CONFIG_HOME 配下の git/config も global
+# スコープの読み書き対象になりうる（実 ~/.gitconfig への到達経路）。
+# 冒頭で外から来た両変数を退避・unset し、trap で元へ戻す。
+# 以後 HOME を切り替えるたびに GIT_CONFIG_GLOBAL も同じ HOME 配下へ
+# 張り替え、global config の書込先を常にこの sandbox 内に固定する。
+_outer_git_config_global_set="${GIT_CONFIG_GLOBAL+set}"
+_outer_git_config_global="${GIT_CONFIG_GLOBAL-}"
+_outer_xdg_config_home_set="${XDG_CONFIG_HOME+set}"
+_outer_xdg_config_home="${XDG_CONFIG_HOME-}"
+unset GIT_CONFIG_GLOBAL XDG_CONFIG_HOME
+restore_outer_git_env() {
+  rm -rf "$tmp"
+  if [ "$_outer_git_config_global_set" = "set" ]; then
+    GIT_CONFIG_GLOBAL="$_outer_git_config_global"
+    export GIT_CONFIG_GLOBAL
+  fi
+  if [ "$_outer_xdg_config_home_set" = "set" ]; then
+    XDG_CONFIG_HOME="$_outer_xdg_config_home"
+    export XDG_CONFIG_HOME
+  fi
+}
+trap restore_outer_git_env EXIT
+
 export HOME="$tmp/home"
 mkdir -p "$HOME"
+export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
 git config --global github.user TestOwner
+# ホストの Cursor / Cloud 環境変数を検査へ漏らさない。
+# Linux の Cursor Cloud VM では artifacts 補助信号があるので、検査では明示的に止める。
+unset CLAUDE_CODE_REMOTE CURSOR_AGENT CLOUD_AGENT_ALL_SECRET_NAMES
+export AGENT_HUB_HOOK_CLOUD_FS=0
+
+# [2026-10-13][test] issue #3920 回帰検査プローブ: 外側から GIT_CONFIG_GLOBAL を
+# 向けて起動された子プロセスが、ここまでの隔離手順（退避・unset・HOME pin）と
+# 1 回の global 書き込みだけを実行して即終了する。本体全件の再実行を避けつつ、
+# 末尾の回帰テストが外側ファイル非変更を検証できる。
+if [ "${BMC_TEST_ENV_ISOLATION_PROBE:-}" = "1" ]; then
+  exit 0
+fi
 
 main_repo="$tmp/main"
 feature_repo="$tmp/feature"
@@ -298,6 +346,7 @@ git -C "$third_party_repo" commit -q -m init
 
 owner_home="$HOME"
 export HOME="$tmp/empty-home"
+export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
 mkdir -p "$HOME"
 expect_allow \
   "owner未設定でも非Git操作は許可" \
@@ -308,6 +357,7 @@ expect_block \
   "$feature_repo" \
   "git config --global github.user TestOwner"
 export HOME="$owner_home"
+export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
 
 expect_block \
   "設定済みgithub.userの別owner変更は拒否" \
@@ -543,6 +593,17 @@ expect_block \
   "$main_repo" \
   "cd $feature_repo && git push --force-with-lease"
 
+# [2026-10-17][test] クラウド判定（Claude / Cursor Cloud 信号）があっても
+# push.default=upstream かつ @{upstream}=origin/main の bare push は拒否のまま。
+export CLAUDE_CODE_REMOTE=true
+export CURSOR_AGENT=1
+export CLOUD_AGENT_ALL_SECRET_NAMES=
+expect_block \
+  "クラウド判定中でも upstream が main の bare push は拒否" \
+  "$main_repo" \
+  "cd $feature_repo && git push --force-with-lease"
+unset CLAUDE_CODE_REMOTE CURSOR_AGENT CLOUD_AGENT_ALL_SECRET_NAMES
+
 git -C "$feature_repo" config push.default current
 expect_block \
   "複数 cd は解決不能として拒否" \
@@ -707,10 +768,12 @@ expect_main_branch_deny \
 #     github.user が無く、同一セッション内で設定変更も拒否されるため、fork内の
 #     feature branch push まで恒久的に fail-close していた（AIはGitHub API
 #     経由のfallbackで push した）。
-#   - 守るべき業務ルール: フォールバックは CLAUDE_CODE_REMOTE=true の時だけ。
-#     third-party owner・main直pushの拒否は緩めない。
+#   - 守るべき業務ルール: フォールバックは Claude Code on the web
+#     （CLAUDE_CODE_REMOTE=true）と Cursor Cloud（CURSOR_AGENT +
+#     CLOUD_AGENT_ALL_SECRET_NAMES）だけ。third-party owner・main直pushの拒否は緩めない。
 cloud_test_home="$HOME"
 export HOME="$tmp/empty-home"
+export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
 export CLAUDE_CODE_REMOTE=true
 expect_allow \
   "クラウドでgithub.user未設定でもorigin ownerへのfeature pushは許可" \
@@ -725,11 +788,20 @@ expect_main_branch_deny \
   "$main_repo" \
   "git push origin main"
 unset CLAUDE_CODE_REMOTE
+export CURSOR_AGENT=1
+export CLOUD_AGENT_ALL_SECRET_NAMES=
+expect_allow \
+  "Cursor Cloudでgithub.user未設定でもorigin ownerへのfeature pushは許可" \
+  "$feature_repo" \
+  "git push origin feature/test"
+unset CURSOR_AGENT
+unset CLOUD_AGENT_ALL_SECRET_NAMES
 expect_block \
   "CLAUDE_CODE_REMOTE未設定・github.user未設定ならfeature pushも従来どおり拒否" \
   "$feature_repo" \
   "git push origin feature/test"
 export HOME="$cloud_test_home"
+export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
 
 expect_block \
   "先頭 cd でも対象が main なら commit 拒否" \
@@ -1108,6 +1180,7 @@ expect_allow \
 # 背景・守るべき業務ルールは直前の git push 回帰テスト（本ファイル同日コメント）と同じ。
 cloud_api_test_home="$HOME"
 export HOME="$tmp/empty-home"
+export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
 export CLAUDE_CODE_REMOTE=true
 expect_allow \
   "クラウドでgithub.user未設定でもfork owner一致のREST writeは許可" \
@@ -1129,11 +1202,20 @@ expect_block \
   "$main_repo" \
   "cd $feature_repo && gh api --method PATCH repos/ThirdParty/feature/issues/1 -f state=closed"
 unset CLAUDE_CODE_REMOTE
+export CURSOR_AGENT=1
+export CLOUD_AGENT_ALL_SECRET_NAMES=
+expect_allow \
+  "Cursor Cloudでgithub.user未設定でもfork owner一致のREST writeは許可" \
+  "$feature_repo" \
+  "gh api --method=PATCH repos/TestOwner/feature/issues/1 -f state=closed"
+unset CURSOR_AGENT
+unset CLOUD_AGENT_ALL_SECRET_NAMES
 expect_block \
   "CLAUDE_CODE_REMOTE未設定・github.user未設定ならREST writeも従来どおり拒否" \
   "$feature_repo" \
   "gh api --method=PATCH repos/TestOwner/feature/issues/1 -f state=closed"
 export HOME="$cloud_api_test_home"
+export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
 
 # [2026-08-27][test] issue: push-delete-main-order
 # 背景:
@@ -1820,6 +1902,233 @@ expect_main_branch_deny \
 body
 EOF
 git push origin main"
+
+# [2026-10-13][test] issue #3922: 読み取り専用の $() 置換と、非シェル系
+#   インタプリタの stdin になる quoted heredoc 本体の誤拒否を回帰固定。
+# 背景:
+#   - ユーザー依頼意図: `until s=$(gh run view ...)`・`T=$(git describe ...)`・
+#     `python3 - <<'EOF'`（ファイル書換だけ・本体に git 言及）のような、
+#     git/gh 書込みを含まないコマンドが shell substitution / ambiguous parse で
+#     誤拒否され、都度単発コマンドへの分割を強いられていた。
+#   - 守るべき業務ルール: 置換内側の書込み系（git push / gh pr create /
+#     未知サブコマンド）は従来どおり拒否し、python 本体の git push 文字列は
+#     opaque 検査で拒否を維持する（許可・拒否を対で置く）。
+#   - 他案不採用理由: 許可側だけのテストでは、将来置換検査を緩めたときに
+#     書込み置換の deny が消えても検知できないため不採用。
+expect_allow \
+  "置換内側が read-only gh run view だけの代入は許可" \
+  "$feature_repo" \
+  "s=\$(gh run view 123 --json status,conclusion --jq '.status'); echo \$s"
+
+expect_allow \
+  "until ループ内の read-only gh 置換ポーリングは許可" \
+  "$feature_repo" \
+  "until s=\$(gh run view 123 --json status --jq '.status'); [[ \"\$s\" == \"completed\" ]]; do sleep 30; done; echo \$s"
+
+expect_allow \
+  "置換内側が read-only git describe だけの代入は許可" \
+  "$feature_repo" \
+  "T=\$(git describe --tags 2>/dev/null); echo \$T"
+
+expect_allow \
+  "cd + for 内 merge-base + git describe 置換の複合は許可" \
+  "$main_repo" \
+  "cd $feature_repo && for c in a b; do git merge-base --is-ancestor \$c HEAD || echo no; done; T=\$(git describe --tags 2>/dev/null); echo \$T"
+
+expect_allow \
+  "python3 heredoc 本体の git 言及のみ（書込みなし）は許可" \
+  "$feature_repo" \
+  "python3 - <<'EOF'
+from pathlib import Path
+p = Path('f.ts')
+p.write_text(\"describe('git merge flow')\")
+EOF"
+
+expect_unclassified_deny \
+  "置換内側の git push は従来どおり拒否" \
+  "$feature_repo" \
+  "x=\$(git push origin main)" \
+  "through shell substitution"
+
+expect_unclassified_deny \
+  "置換内側の gh pr create は従来どおり拒否" \
+  "$feature_repo" \
+  "x=\$(gh pr create --title t)" \
+  "through shell substitution"
+
+expect_unclassified_deny \
+  "置換内側の未知 git サブコマンドは従来どおり拒否" \
+  "$feature_repo" \
+  "x=\$(git unknownalias)" \
+  "through shell substitution"
+
+expect_unclassified_deny \
+  "python3 heredoc 本体の git push 実行は opaque で拒否" \
+  "$main_repo" \
+  "python3 - <<'EOF'
+subprocess.run(['git', 'push', 'origin', 'main'])
+EOF" \
+  "through opaque"
+
+# 文字列化の境界: 終端行は引用の外に残す。包みすぎると後続コマンドが本体に
+# 癒着し git/gh 実行が見えなくなる（codex-review 指摘の回帰固定）。
+expect_allow \
+  "python3 heredoc 後の git status は本体と癒着せず許可" \
+  "$feature_repo" \
+  "python3 - <<'EOF'
+print('x')
+EOF
+git status"
+
+expect_unclassified_deny \
+  "python3 heredoc 後の実 git push は癒着せず opaque で拒否" \
+  "$main_repo" \
+  "python3 - <<'EOF'
+print('x')
+EOF
+git push origin main" \
+  "through opaque"
+
+# 同一行の複数 heredoc: 本体が連続しても引用境界が壊れないこと。
+expect_allow \
+  "python3 への複数 heredoc（git 言及あり）は許可" \
+  "$feature_repo" \
+  "python3 - <<'A' <<'B'
+git status read
+A
+git log read
+B"
+
+# [2026-10-13][test] issue #3920 回帰: 外側で GIT_CONFIG_GLOBAL を別ファイルへ
+# 向けて起動されても、冒頭の退避・unset・HOME pin により外側ファイルは
+# 変更されない。プローブモードの子実行が「HOME 差し替え + git config
+# --global 書き込み」だけを本スクリプトの同一経路で再現するため、センチネル
+# 内容の外側ファイルが無傷なことをここで固定する（失敗時は子 rc 非 0 または
+# 内容差分として FAIL）。
+outer_cfg="$tmp/outer-global.gitconfig"
+printf '[github]\n\tuser = OuterOwner\n' > "$outer_cfg"
+outer_cfg_before="$(cat "$outer_cfg")"
+if GIT_CONFIG_GLOBAL="$outer_cfg" BMC_TEST_ENV_ISOLATION_PROBE=1 bash "${BASH_SOURCE[0]}" >/dev/null 2>&1 \
+  && [ "$(cat "$outer_cfg")" = "$outer_cfg_before" ]; then
+  printf '[PASS] %s\n' "外側 GIT_CONFIG_GLOBAL のファイルは変更されない（issue #3920）"
+  PASS=$((PASS + 1))
+else
+  printf '[FAIL] %s\n' "外側 GIT_CONFIG_GLOBAL のファイルは変更されない（issue #3920）"
+  FAIL=$((FAIL + 1))
+fi
+
+# [2026-10-15][test] Context Mode 試験導入 F0 / T-08:
+# ctx のコード実行系（ctx_execute / ctx_execute_file / ctx_batch_execute）は入力が
+# `command` ではなく `code` / `commands[].command` のため、従来は main への
+# git commit / push が素通りした。既存 Bash のケースは変えず、ctx 経由でも同じ判定になることを固定する。
+run_hook_ctx() {
+  local cwd="$1"
+  local tool="$2"
+  local input_json="$3"
+  printf '{"tool_name":%s,"cwd":%s,"tool_input":%s}\n' "$(json_string "$tool")" "$(json_string "$cwd")" "$input_json" \
+    | (cd "$cwd" && strip_test_git_config_env bash "$SCRIPT")
+}
+
+expect_ctx_block() {
+  local name="$1" cwd="$2" tool="$3" input_json="$4" out
+  out="$(run_hook_ctx "$cwd" "$tool" "$input_json" 2>&1)"
+  if printf '%s' "$out" | grep -q 'permissionDecision.*deny'; then
+    printf '[PASS] %s\n' "$name"
+    PASS=$((PASS + 1))
+  else
+    printf '[FAIL] %s: %s\n' "$name" "$out"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+expect_ctx_allow() {
+  local name="$1" cwd="$2" tool="$3" input_json="$4" out
+  out="$(run_hook_ctx "$cwd" "$tool" "$input_json" 2>&1)"
+  if printf '%s' "$out" | grep -q 'permissionDecision'; then
+    printf '[FAIL] %s: %s\n' "$name" "$out"
+    FAIL=$((FAIL + 1))
+  else
+    printf '[PASS] %s\n' "$name"
+    PASS=$((PASS + 1))
+  fi
+}
+
+expect_ctx_ask() {
+  local name="$1" cwd="$2" tool="$3" input_json="$4" out
+  out="$(run_hook_ctx "$cwd" "$tool" "$input_json" 2>&1)"
+  if printf '%s' "$out" | grep -q 'permissionDecision":"ask"'; then
+    printf '[PASS] %s\n' "$name"
+    PASS=$((PASS + 1))
+  else
+    printf '[FAIL] %s: %s\n' "$name" "$out"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+CTX_EXEC="mcp__context-mode__ctx_execute"
+CTX_FILE="mcp__context-mode__ctx_execute_file"
+CTX_BATCH="mcp__context-mode__ctx_batch_execute"
+
+expect_ctx_block \
+  "T-08 ctx_execute(shell) で main への git push は拒否" \
+  "$main_repo" "$CTX_EXEC" '{"language":"shell","code":"git push origin main"}'
+expect_ctx_block \
+  "T-08 ctx_execute(shell) で main への git commit は拒否" \
+  "$main_repo" "$CTX_EXEC" '{"language":"shell","code":"echo hi\ngit commit -m docs"}'
+expect_ctx_block \
+  "T-08 ctx_execute(python) の文字列中 git push は拒否" \
+  "$main_repo" "$CTX_EXEC" '{"language":"python","code":"import subprocess\nsubprocess.run([\"git\", \"push\", \"origin\", \"main\"])"}'
+expect_ctx_block \
+  "T-08 ctx_execute(python) の1行 os.system git push も拒否" \
+  "$main_repo" "$CTX_EXEC" '{"language":"python","code":"import os; os.system(\"git push origin main\")"}'
+expect_ctx_block \
+  "T-08 ctx_execute_file の code で main への git push は拒否" \
+  "$main_repo" "$CTX_FILE" '{"path":"README.md","language":"shell","code":"git push origin main"}'
+expect_ctx_block \
+  "T-08 ctx_batch_execute の2件目の git commit(main) は拒否" \
+  "$main_repo" "$CTX_BATCH" '{"commands":[{"label":"a","command":"git status"},{"label":"b","command":"git commit -m docs"}],"queries":["x"]}'
+expect_ctx_ask \
+  "T-08 ctx_execute で feature ブランチへの push は止めず、確認(ask)になる" \
+  "$feature_repo" "$CTX_EXEC" '{"language":"shell","code":"git push origin feature/test"}'
+expect_ctx_ask \
+  "T-08 ctx_execute の git 無関係コードは止めず、確認(ask)になる" \
+  "$main_repo" "$CTX_EXEC" '{"language":"python","code":"print(1+1)"}'
+expect_ctx_ask \
+  "T-08 ctx_batch_execute の読み取りだけ(git status)は止めず、確認(ask)になる" \
+  "$main_repo" "$CTX_BATCH" '{"commands":[{"label":"a","command":"git status"}],"queries":["x"]}'
+expect_ctx_allow \
+  "T-08 ctx_execute 空コードは何もせず許可" \
+  "$main_repo" "$CTX_EXEC" '{"language":"shell","code":""}'
+expect_ctx_block \
+  "T-08 ctx_upgrade は常に拒否（版の自動更新をしない）" \
+  "$main_repo" "mcp__context-mode__ctx_upgrade" '{}'
+expect_ctx_block \
+  "T-08 ctx_insight は常に拒否（外部への送信をしない）" \
+  "$main_repo" "mcp__context-mode__ctx_insight" '{}'
+# [2026-10-16] Codex review: 大きい入力（環境変数・引数の上限を超える長さ）でも素通りしない
+CTX_BIG_PAD=$(python3 -c 'print("# " + "x" * 300000)')
+expect_ctx_block \
+  "T-08 ctx_execute の大きい code（約300KB）でも main への git push は拒否" \
+  "$main_repo" "$CTX_EXEC" "{\"language\":\"shell\",\"code\":\"${CTX_BIG_PAD}\\ngit push origin main\"}"
+expect_ctx_ask \
+  "T-08 ctx_execute の大きい code（約300KB）の無関係コードも素通りせず確認(ask)になる" \
+  "$main_repo" "$CTX_EXEC" "{\"language\":\"python\",\"code\":\"${CTX_BIG_PAD}\\nprint(1)\"}"
+# [2026-10-16] Codex review 2: 内部検査が異常終了したら確認(ask)へ進めず止める
+CTX_FAIL_DIR=$(mktemp -d)
+mkdir -p "$CTX_FAIL_DIR/scripts"
+ln -s "$(cd "$(dirname "$SCRIPT")/../lib" && pwd)" "$CTX_FAIL_DIR/lib"
+sed 's|bash "${BASH_SOURCE\[0\]}" 2>/dev/null|bash -c "exit 23" 2>/dev/null|' "$SCRIPT" > "$CTX_FAIL_DIR/scripts/block-main-commit.sh"
+CTX_SAVED_SCRIPT="$SCRIPT"
+SCRIPT="$CTX_FAIL_DIR/scripts/block-main-commit.sh"
+expect_ctx_block \
+  "T-08 内部検査が異常終了したら確認(ask)ではなく拒否" \
+  "$main_repo" "$CTX_EXEC" '{"language":"python","code":"print(1)"}'
+SCRIPT="$CTX_SAVED_SCRIPT"
+rm -rf "$CTX_FAIL_DIR"
+# 範囲外ツールの `code` 欄は読まない（matcher 外・従来どおり）
+expect_ctx_allow \
+  "T-08 対象外ツールの code 欄は検査しない" \
+  "$main_repo" "mcp__other__run" '{"code":"git push origin main"}'
 
 TOTAL=$((PASS + FAIL))
 printf '\n=== block-main-commit.test.sh: %d/%d PASS ===\n' "$PASS" "$TOTAL"

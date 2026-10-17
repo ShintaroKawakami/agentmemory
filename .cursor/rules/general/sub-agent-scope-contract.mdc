@@ -71,14 +71,10 @@ worker へ渡す検証要求も同じ前提で書き、sandbox/環境要因で�
 
 - 「まず `codebase-context-engine` を使う（`grep`/`Read` を先に走らせない）。遅延ツールは
   `select:mcp__codebase-context-engine__list_projects,hybrid_search,search_graph,get_code_snippet` でロード」
-- **解決済みの `project` 名を親が渡す**（親が `list_projects` を見て明示）。
-  `preferred_project` は `project_scope: current_repo` かつ `root_path` が探索対象 root と
-  照合できたときだけ使う（`preferred_project_root_path`、無ければ `projects[]` の同名エントリで確認。
-  `skills/codebase-context-engine/SKILL.md` の「project 解決契約」）。
-  `project_scope: ambiguous*` / `root_mismatch` / `no_match` の場合は、探索対象 root と一致する
-  `root_path` を持つ候補だけを `preferred_project_candidates` / `projects[]` から親が選んで渡す。
-  照合できない・対象 PJ に実体が無い場合は project 名を渡さず「実体なし」と明示する。
-  subagent に `private-tmp-cbm-...` の長いミラー名を推測させない。
+- **`project` は省略で自PJ、他PJは短い名前（例 `jtt-cms`）を親が渡す**。長い `private-tmp-cbm-...` ミラー名は
+  subagent に推測させない。応答の `resolved_project`（PJ ID と root）が意図したPJか確認させる。
+  不明・曖昧な名前はサーバーが候補一覧付きで停止するので、候補から選び直させる。対象PJに実体が無ければ
+  「実体なし」と明示して通常検索へ退避させる（旧 `list_projects` の root 照合は不要）。
 - 「索引はミラー＝当日新規/変更したファイルは未反映なので、その分だけ `Read` 併用」
 
 理由: 候補圧縮で速く・低コスト（多数 grep/Read を回避）。subagent は本ルールを自動継承しないため親が prompt 注入必須（追加経緯は詳細ドキュメント参照）。
