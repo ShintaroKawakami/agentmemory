@@ -424,3 +424,44 @@ describe("chronological project handoff boundary", () => {
     await expect(new ScopedMemoryService(backend, config.allowedProjects).getHandoff({project: "agent-hub", agent: "codex"})).rejects.toThrow(/invalid/);
   });
 });
+
+describe("RestAgentMemoryBackend transport failures", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("maps a backend timeout to backend_timeout instead of the generic internal error", async () => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const timeout = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(timeout));
+    const backend = new RestAgentMemoryBackend(config);
+    const error = await backend.search({ query: "q", limit: 1, project: "agent-hub" }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(GatewayError);
+    expect((error as GatewayError).code).toBe("backend_timeout");
+    expect((error as GatewayError).statusCode).toBe(504);
+  });
+
+  it("maps a refused connection to backend_unreachable and logs the cause without secrets", async () => {
+    const writes: string[] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: unknown) => {
+      writes.push(String(chunk));
+      return true;
+    });
+    const refused = new TypeError("fetch failed", { cause: Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }) });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(refused));
+    const backend = new RestAgentMemoryBackend({ ...config, upstreamSecret: "upstream-secret-value" });
+    const error = await backend.remember({ content: "c", type: "fact", concepts: [], files: [], project: "agent-hub" }).catch((e: unknown) => e);
+    expect((error as GatewayError).code).toBe("backend_unreachable");
+    expect(writes.join("")).toContain("ECONNREFUSED");
+    expect(writes.join("")).not.toContain("upstream-secret-value");
+  });
+
+  it("maps an invalid JSON body to backend_error", async () => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not json", { status: 200 })));
+    const backend = new RestAgentMemoryBackend(config);
+    const error = await backend.search({ query: "q", limit: 1, project: "agent-hub" }).catch((e: unknown) => e);
+    expect((error as GatewayError).code).toBe("backend_error");
+  });
+});
