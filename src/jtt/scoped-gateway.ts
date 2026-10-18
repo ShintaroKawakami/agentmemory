@@ -197,7 +197,7 @@ export class RestAgentMemoryBackend implements AgentMemoryBackend {
   constructor(private readonly config: GatewayConfig) {}
 
   private async post(path: string, body: unknown): Promise<unknown> {
-    const response = await fetch(`${this.config.upstreamUrl}/agentmemory/${path}`, {
+    const response = await this.request(path, `${this.config.upstreamUrl}/agentmemory/${path}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -206,23 +206,43 @@ export class RestAgentMemoryBackend implements AgentMemoryBackend {
           : {}),
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(this.config.requestTimeoutMs),
     });
+    return readBackendJson(path, response);
+  }
+
+  /**
+   * Call the AgentMemory core. Transport failures (timeout, connection refused/reset)
+   * are mapped to GatewayError so callers get an actionable code instead of the
+   * generic "AgentMemory operation failed", and the cause is logged to stderr.
+   */
+  private async request(label: string, url: string, init: RequestInit): Promise<Response> {
+    const started = Date.now();
+    let response: Response;
+    try {
+      response = await fetch(url, { ...init, signal: AbortSignal.timeout(this.config.requestTimeoutMs) });
+    } catch (error) {
+      const elapsedMs = Date.now() - started;
+      if (isTimeoutError(error)) {
+        logGatewayIssue(`backend ${label} timed out after ${elapsedMs}ms (limit ${this.config.requestTimeoutMs}ms)`);
+        throw new GatewayError("AgentMemory backend timed out", 504, "backend_timeout");
+      }
+      logGatewayIssue(`backend ${label} request failed after ${elapsedMs}ms: ${describeError(error)}`);
+      throw new GatewayError("AgentMemory backend is unreachable", 502, "backend_unreachable");
+    }
     if (!response.ok) {
+      logGatewayIssue(`backend ${label} returned HTTP ${response.status} after ${Date.now() - started}ms`);
       throw new GatewayError("AgentMemory backend is unavailable", 502, "backend_error");
     }
-    return response.json();
+    return response;
   }
 
   async latestHandoff(input: { project: string }): Promise<SearchHit | null> {
     const query = new URLSearchParams({ handoffProject: input.project });
-    const response = await fetch(`${this.config.upstreamUrl}/agentmemory/memories?${query}`, {
+    const response = await this.request("memories", `${this.config.upstreamUrl}/agentmemory/memories?${query}`, {
       headers: this.config.upstreamSecret
         ? { authorization: `Bearer ${this.config.upstreamSecret}` } : {},
-      signal: AbortSignal.timeout(this.config.requestTimeoutMs),
     });
-    if (!response.ok) throw new GatewayError("AgentMemory backend is unavailable", 502, "backend_error");
-    const result = await response.json() as { handoff?: { id?: string; project?: string; content?: string } | null };
+    const result = await readBackendJson("memories", response) as { handoff?: { id?: string; project?: string; content?: string } | null };
     // An old backend returning its unscoped list must fail closed, never look empty.
     if (!result || typeof result !== "object" || Array.isArray(result) || !("handoff" in result)) {
       throw new GatewayError("AgentMemory handoff lookup is unavailable", 502, "backend_error");
@@ -565,7 +585,37 @@ export function createScopedMcpServer(service: ScopedMemoryService, scope: Reque
 
 function toPublicError(error: unknown): Record<string, unknown> {
   if (error instanceof GatewayError) return { error: error.code, message: error.message };
+  logGatewayIssue(`internal error: ${describeError(error)}`);
   return { error: "internal_error", message: "AgentMemory operation failed" };
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+}
+
+/** Error name/message/cause code only; never request headers or bodies, so secrets stay out of logs. */
+function describeError(error: unknown): string {
+  if (!(error instanceof Error)) return typeof error;
+  const cause = (error as { cause?: { code?: unknown } }).cause;
+  const code = cause && typeof cause.code === "string" ? ` (${cause.code})` : "";
+  return `${error.name}: ${error.message}${code}`.slice(0, 500);
+}
+
+function logGatewayIssue(message: string): void {
+  process.stderr.write(`[jtt-agentmemory] ${new Date().toISOString()} ${message}\n`);
+}
+
+async function readBackendJson(label: string, response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch (error) {
+    if (isTimeoutError(error)) {
+      logGatewayIssue(`backend ${label} response body timed out`);
+      throw new GatewayError("AgentMemory backend timed out", 504, "backend_timeout");
+    }
+    logGatewayIssue(`backend ${label} returned invalid JSON: ${describeError(error)}`);
+    throw new GatewayError("AgentMemory backend response is invalid", 502, "backend_error");
+  }
 }
 
 async function readBody(req: IncomingMessage): Promise<Buffer> {
