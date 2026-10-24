@@ -37,6 +37,14 @@
         "X-Client-Name": "opencode"
       }
     },
+    "jtt-box": {
+      "type": "remote",
+      "enabled": true,
+      "url": "https://jtt-box.jtt.cafe/api/mcp",
+      "headers": {
+        "X-API-Key": "{env:JTT_BOX_KEY_LOCAL}"
+      }
+    },
     "motion": {
       "type": "local",
       "enabled": true,

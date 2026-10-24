@@ -95,6 +95,11 @@
     },
     {
       "event": "Stop",
+      "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/stop-loop-continuity.py\"",
+      "timeout": 15
+    },
+    {
+      "event": "Stop",
       "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/telemetry-log.sh\"",
       "timeout": 5
     }

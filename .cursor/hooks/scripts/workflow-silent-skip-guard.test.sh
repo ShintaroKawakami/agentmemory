@@ -4,6 +4,9 @@
 # asana-call-guard.test.sh と同じ流儀（bash + python3 で payload を組み立て、
 # permissionDecision の有無を検査）。
 
+# [2026-10-21][fix]: 編集前から有った該当パターンで無関係な編集まで止めない回帰テスト（7, 16-21）。
+# 新規に持ち込む編集は従来どおり deny する（17-21）。背景は workflow-silent-skip-guard.sh 冒頭の CaD。
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,6 +44,31 @@ import sys
 tool_name = sys.argv[1]
 tool_input = json.loads(sys.argv[2]) if sys.argv[2] else {}
 print(json.dumps({"tool_name": tool_name, "tool_input": tool_input}), end="")
+PY
+}
+
+# Edit / MultiEdit の payload を python で組み立てる（エスケープ事故を避ける）。
+# 使い方: payload_edit <file_path> <old> <new>
+#         payload_multiedit <file_path> <old1> <new1> <old2> <new2>
+payload_edit() {
+  python3 - "$1" "$2" "$3" <<'PY'
+import json
+import sys
+
+print(json.dumps({"tool_name": "Edit", "tool_input": {"file_path": sys.argv[1], "old_string": sys.argv[2], "new_string": sys.argv[3]}}), end="")
+PY
+}
+
+payload_multiedit() {
+  python3 - "$1" "$2" "$3" "$4" "$5" <<'PY'
+import json
+import sys
+
+edits = [
+    {"old_string": sys.argv[2], "new_string": sys.argv[3]},
+    {"old_string": sys.argv[4], "new_string": sys.argv[5]},
+]
+print(json.dumps({"tool_name": "MultiEdit", "tool_input": {"file_path": sys.argv[1], "edits": edits}}), end="")
 PY
 }
 
@@ -178,49 +206,49 @@ jobs:
         run: echo x
 YML
 
-echo "1/15 Write: 反パターン workflow -> deny"
+echo "1/21 Write: 反パターン workflow -> deny"
 p="$(payload_write "$WORKFLOW_PATH" "$TMP_ROOT/silent-skip.yml")"
 output="$(run_hook "$p")"
 assert_denied "$output"
 printf '%s' "$output" | grep -q 'Issue #1988' || { printf 'deny 理由に Issue #1988 が無い: %s\n' "$output" >&2; exit 1; }
 
-echo "2/15 Write: fail-closed 版（check で exit 1・出力なし）-> allow"
+echo "2/21 Write: fail-closed 版（check で exit 1・出力なし）-> allow"
 p="$(payload_write "$WORKFLOW_PATH" "$TMP_ROOT/fail-closed.yml")"
 output="$(run_hook "$p")"
 assert_allowed "$output"
 
-echo "3/15 Write: != true の fail ステップ付き -> allow"
+echo "3/21 Write: != true の fail ステップ付き -> allow"
 p="$(payload_write "$WORKFLOW_PATH" "$TMP_ROOT/fail-step.yml")"
 output="$(run_hook "$p")"
 assert_allowed "$output"
 
-echo "4/15 Write: emit 後の else 内に exit 1 -> allow"
+echo "4/21 Write: emit 後の else 内に exit 1 -> allow"
 p="$(payload_write "$WORKFLOW_PATH" "$TMP_ROOT/emit-with-exit.yml")"
 output="$(run_hook "$p")"
 assert_allowed "$output"
 
-echo "5/15 Write: workflow 以外のパスなら反パターンでも対象外 -> allow"
+echo "5/21 Write: workflow 以外のパスなら反パターンでも対象外 -> allow"
 p="$(payload_write "$TMP_ROOT/deploy.yml" "$TMP_ROOT/silent-skip.yml")"
 output="$(run_hook "$p")"
 assert_allowed "$output"
 
-echo "6/15 Write: emit はあるが gate が無い（出力未使用）-> allow"
+echo "6/21 Write: emit はあるが gate が無い（出力未使用）-> allow"
 p="$(payload_write "$WORKFLOW_PATH" "$TMP_ROOT/no-gate.yml")"
 output="$(run_hook "$p")"
 assert_allowed "$output"
 
-echo "7/15 Edit: 既存ファイルが反パターンのまま -> deny"
+echo "7/21 Edit: 編集前から反パターンがあるファイルへの無関係な編集 -> allow（誤検知の修正・旧仕様は deny）"
 cp "$TMP_ROOT/silent-skip.yml" "$WORKFLOW_PATH"
 p="$(payload_tool "Edit" "{\"file_path\":\"$WORKFLOW_PATH\",\"old_string\":\"Setup SSH\",\"new_string\":\"Setup SSH v2\"}")"
 output="$(run_hook "$p")"
-assert_denied "$output"
+assert_allowed "$output"
 
-echo "8/15 Edit: emit 行を消す修正なら -> allow"
+echo "8/21 Edit: emit 行を消す修正なら -> allow"
 p="$(payload_tool "Edit" "{\"file_path\":\"$WORKFLOW_PATH\",\"old_string\":\"echo \\\"available=false\\\" >> \\\"\$GITHUB_OUTPUT\\\"\",\"new_string\":\"exit 1\"}")"
 output="$(run_hook "$p")"
 assert_allowed "$output"
 
-echo "9/15 Bash: heredoc で反パターン workflow を生成 -> deny"
+echo "9/21 Bash: heredoc で反パターン workflow を生成 -> deny"
 cat > "$TMP_ROOT/heredoc.txt" <<'TXT'
 cat > .github/workflows/x.yml <<'EOF'
       - run: |
@@ -241,12 +269,12 @@ PY
 output="$(run_hook "$p")"
 assert_denied "$output"
 
-echo "10/15 Bash: workflow 非言及のコマンド -> allow"
+echo "10/21 Bash: workflow 非言及のコマンド -> allow"
 p="$(payload_tool "Bash" '{"command":"ls -la && echo done"}')"
 output="$(run_hook "$p")"
 assert_allowed "$output"
 
-echo "11/15 apply_patch: 反パターン追加 -> deny"
+echo "11/21 apply_patch: 反パターン追加 -> deny"
 cat > "$TMP_ROOT/patch-add.txt" <<'TXT'
 *** Begin Patch
 *** Update File: .github/workflows/x.yml
@@ -269,7 +297,7 @@ PY
 output="$(run_hook "$p")"
 assert_denied "$output"
 
-echo "12/15 apply_patch: 反パターン削除（修正）-> allow"
+echo "12/21 apply_patch: 反パターン削除（修正）-> allow"
 cat > "$TMP_ROOT/patch-remove.txt" <<'TXT'
 *** Begin Patch
 *** Update File: .github/workflows/x.yml
@@ -290,18 +318,74 @@ PY
 output="$(run_hook "$p")"
 assert_allowed "$output"
 
-echo "13/15 別名の出力（has_secrets=false）でも -> deny"
+echo "13/21 別名の出力（has_secrets=false）でも -> deny"
 p="$(payload_write "$WORKFLOW_PATH" "$TMP_ROOT/alt-name.yml")"
 output="$(run_hook "$p")"
 assert_denied "$output"
 
-echo "14/15 AGENT_HUB_ALLOW_WORKFLOW_SILENT_SKIP_GUARD=1 -> allow（バイパス）"
+echo "14/21 AGENT_HUB_ALLOW_WORKFLOW_SILENT_SKIP_GUARD=1 -> allow（バイパス）"
 p="$(payload_write "$WORKFLOW_PATH" "$TMP_ROOT/silent-skip.yml")"
 output="$(AGENT_HUB_ALLOW_WORKFLOW_SILENT_SKIP_GUARD=1 run_hook "$p")"
 assert_allowed "$output"
 
-echo "15/15 壊れた入力 -> allow（fail-open）"
+echo "15/21 壊れた入力 -> allow（fail-open）"
 output="$(run_hook 'not-json-at-all')"
 assert_allowed "$output"
+
+echo "16/21 MultiEdit: 編集前から反パターンがあるファイルへの無関係な 2 箇所編集 -> allow"
+cp "$TMP_ROOT/silent-skip.yml" "$WORKFLOW_PATH"
+p="$(payload_multiedit "$WORKFLOW_PATH" "name: deploy" "name: deploy v2" "Setup SSH" "Setup SSH v2")"
+output="$(run_hook "$p")"
+assert_allowed "$output"
+
+echo "17/21 Edit: 反パターンの無いファイルへ該当パターンを新規に足す -> deny（検知は弱めない）"
+cp "$TMP_ROOT/fail-closed.yml" "$WORKFLOW_PATH"
+new_block='run: |
+          echo "available=false" >> "$GITHUB_OUTPUT"
+      - if: steps.c.outputs.available == '"'"'true'"'"'
+        run: echo x'
+p="$(payload_edit "$WORKFLOW_PATH" 'run: echo "deploy"' "$new_block")"
+output="$(run_hook "$p")"
+assert_denied "$output"
+printf '%s' "$output" | grep -q 'available=false' || { printf '17: deny 理由に available が無い: %s\n' "$output" >&2; exit 1; }
+
+echo "18/21 Edit: 既存パターン(available)があるファイルへ別名(has_secrets)を新規に足す -> deny（新しい名前だけ報告）"
+cp "$TMP_ROOT/silent-skip.yml" "$WORKFLOW_PATH"
+new_block='run: |
+          echo "has_secrets=false" >> "$GITHUB_OUTPUT"
+      - if: steps.c.outputs.has_secrets == '"'"'true'"'"'
+        run: echo x'
+p="$(payload_edit "$WORKFLOW_PATH" 'run: echo "deploy"' "$new_block")"
+output="$(run_hook "$p")"
+assert_denied "$output"
+printf '%s' "$output" | grep -q 'has_secrets=false' || { printf '18: deny 理由に has_secrets が無い: %s\n' "$output" >&2; exit 1; }
+if printf '%s' "$output" | grep -q 'available=false'; then
+  printf '18: 編集前から有った available まで報告している: %s\n' "$output" >&2
+  exit 1
+fi
+
+echo "19/21 MultiEdit: 既存パターンがあるファイルで 1 箇所は無関係・1 箇所は別名を新規に足す -> deny"
+cp "$TMP_ROOT/silent-skip.yml" "$WORKFLOW_PATH"
+p="$(payload_multiedit "$WORKFLOW_PATH" "name: deploy" "name: deploy v2" 'run: echo "deploy"' "$new_block")"
+output="$(run_hook "$p")"
+assert_denied "$output"
+printf '%s' "$output" | grep -q 'has_secrets=false' || { printf '19: deny 理由に has_secrets が無い: %s\n' "$output" >&2; exit 1; }
+
+echo "20/21 Edit: fail 経路を壊して既存の安全な名前を新規に offender 化する -> deny"
+cp "$TMP_ROOT/fail-step.yml" "$WORKFLOW_PATH"
+p="$(payload_edit "$WORKFLOW_PATH" "run: exit 1" "run: echo skipped")"
+output="$(run_hook "$p")"
+assert_denied "$output"
+
+echo "21/21 Edit: 編集前ファイルが無い（新規作成相当）で該当パターンを持ち込む -> deny（従来どおり）"
+MISSING_PATH="$TMP_ROOT/.github/workflows/not-yet-created.yml"
+rm -f "$MISSING_PATH"
+new_block='run: |
+          echo "available=false" >> "$GITHUB_OUTPUT"
+      - if: steps.c.outputs.available == '"'"'true'"'"'
+        run: echo x'
+p="$(payload_edit "$MISSING_PATH" "" "$new_block")"
+output="$(run_hook "$p")"
+assert_denied "$output"
 
 echo "all workflow-silent-skip-guard tests passed"

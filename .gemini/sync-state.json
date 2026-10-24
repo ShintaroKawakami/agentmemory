@@ -1,7 +1,7 @@
 {
   "tool": "antigravity-sync",
-  "generated_at": "2026-10-17T18:01:09.486529+00:00",
-  "source_commit": "1a4fab2",
+  "generated_at": "2026-10-24T09:52:20.866683+00:00",
+  "source_commit": "ab7a667",
   "project_root": ".",
   "generated_gemini_md": false,
   "instruction_surface": "AGENTS.md",
@@ -33,6 +33,7 @@
     "lib/gbrain-recall-policy.json",
     "lib/handover-preflight-policy.json",
     "lib/hook-io.sh",
+    "lib/loop-continuity-policy.json",
     "lib/quality-check-common.sh",
     "lib/resolve-handover-path.py",
     "lib/staff-message-policy.json",
@@ -73,6 +74,9 @@
     "scripts/stop-goal-check.py",
     "scripts/stop-goal-check.test.py",
     "scripts/stop-goal-check.test.sh",
+    "scripts/stop-loop-continuity.py",
+    "scripts/stop-loop-continuity.test.py",
+    "scripts/stop-loop-continuity.test.sh",
     "scripts/stop-quality-check.sh",
     "scripts/storage-url-pr-gate.sh",
     "scripts/subagent-quality-check.sh",
@@ -94,7 +98,7 @@
     "BeforeAgent",
     "BeforeTool"
   ],
-  "mcp_server_count": 6,
+  "mcp_server_count": 7,
   "warnings": [
     "backend-developer.md: agent frontmatter `model: haiku` は Claude 固有のため除去（Gemini 側 inherit 相当）",
     "backend-developer.md: agent frontmatter field `memory` は Gemini 互換でないため除去",

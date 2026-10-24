@@ -133,6 +133,31 @@ def resolve_owner(cwd: Path, configured: str) -> str:
     return ""
 
 
+# [2026-10-24][fix] Issue #4417: `git -C ~/repo push` や `cd ~/repo && git push` の
+#   ~ を実シェルのチルダ展開と同じく os.path.expanduser で解決する。
+# 背景:
+#   - 依頼意図: 自分の fork worktree への `git -C ~/repo push origin <branch>` が
+#     「cannot prove Git push target is the user's fork」で誤拒否され、都度
+#     絶対パスへの書き換えが必要だった。
+#   - 守るべき業務ルール: fork 以外への push 拒否は緩めない。expanduser が
+#     展開できず先頭 ~ が残る形（ディレクトリスタックの ~- / ~+ / ~N や
+#     存在しない ~user）は実シェルの移動先を証明できないため fail-closed。
+#   - 他案不採用理由: 未展開の ~ を相対パスとして cwd に join する案は、
+#     `git -C ~-`（実シェルでは OLDPWD 展開）の宛先を別 repo で検査する
+#     fail-open になり得るため不採用。同じ理由で、引用された "~/x" が
+#     実シェルで指す literal 相対パス（<cwd>/~/x）が実在する場合も
+#     宛先を一意に決められないため拒否する。
+def expand_tilde_target(value: str, cwd: Path) -> Path:
+    if not value.startswith("~"):
+        return Path(value)
+    expanded = os.path.expanduser(value)
+    if expanded.startswith("~"):
+        raise ValueError("cannot prove tilde directory target")
+    if (cwd / value).exists():
+        raise ValueError("ambiguous tilde directory target")
+    return Path(expanded)
+
+
 def effective_cwd(base: Path, segment: str, tokens: list[str], git_index: int | None = None) -> Path:
     lead = re.match(r"^\s*cd\s+([^;&|]+?)\s*&&", segment)
     cwd = base
@@ -140,7 +165,7 @@ def effective_cwd(base: Path, segment: str, tokens: list[str], git_index: int | 
         value = shlex.split(lead.group(1))
         if len(value) != 1:
             raise ValueError("ambiguous cd target")
-        target = Path(value[0])
+        target = expand_tilde_target(value[0], cwd)
         cwd = (base / target).resolve() if not target.is_absolute() else target.resolve()
     if git_index is not None:
         index = git_index + 1
@@ -148,7 +173,7 @@ def effective_cwd(base: Path, segment: str, tokens: list[str], git_index: int | 
             if tokens[index] == "-C":
                 if index + 1 >= len(tokens):
                     raise ValueError("missing git -C target")
-                target = Path(tokens[index + 1])
+                target = expand_tilde_target(tokens[index + 1], cwd)
                 cwd = (cwd / target).resolve() if not target.is_absolute() else target.resolve()
                 index += 2
                 continue
@@ -781,13 +806,18 @@ def leading_git_config_assignment(command: str) -> dict[str, str]:
 #   メタ文字は不一致）。
 #   <dir>・<path> は先頭が - でない [A-Za-z0-9_./-]+、<remote> は先頭が - でない
 #   [A-Za-z0-9_.-]+、<refspec> は先頭が - でも + でもない [A-Za-z0-9_./:-]+。
+#   [2026-10-24][fix] Issue #4417: <dir>・<path> の先頭 ~ だけ追加で許可する。
+#   単純形一致は「このゲートを素通りして通常経路へ進める」意味だけで、
+#   expand_tilde_target の展開可否判定と remote owner 検査は通常経路で
+#   従来どおり走る（展開できない ~- / ~+ / ~N・存在しない ~user は
+#   通常経路で fail-closed）。先頭以外の ~・引用符・空白は従来どおり不一致。
 #   force 用の + 付き refspec・--repo / --rep*・-o / --push-option・
 #   --receive-pack・--exec・--mirror・--all・--delete・--force（単独）・
 #   コマンド先頭の KEY=VALUE 代入は単純形に当たらない（＝止める）。
 #   なお `-u` / `--set-upstream` の前には半角スペース1個必須で、
 #   `git push--set-upstream`（空白無し）は単純形に当たらない。
 #   `cd <dir> &&` の前置きは1回だけ・`&&` 区切りのみ（`;` / `||` / 引用符付き /
-#   空白・~・変数を含む path は単純形に当たらない）。
+#   空白・変数を含む path は単純形に当たらない）。
 # [2026-10-03][fix] issue #3239: 無害 GIT_CONFIG_* 環境（Claude Code が常駐させる
 #   credential.interactive / credential.guiPrompt）で `cd <dir> && git push` と
 #   remote 省略の bare `git push` が依然「cannot prove Git push target outside a
@@ -806,8 +836,8 @@ def leading_git_config_assignment(command: str) -> dict[str, str]:
 #          単純形は狭く保つ方が審査済みの穴を広げないため不採用。
 #   対応: 単純形に「`cd <literal> &&` 前置き（1回）」と「<remote> 省略」を足す。
 _SIMPLE_GIT_PUSH_RE = re.compile(
-    r"^(?:cd [A-Za-z0-9_./][A-Za-z0-9_./-]* && )?"
-    r"git(?: -C [A-Za-z0-9_./][A-Za-z0-9_./-]*)? push"
+    r"^(?:cd [A-Za-z0-9_./~][A-Za-z0-9_./-]* && )?"
+    r"git(?: -C [A-Za-z0-9_./~][A-Za-z0-9_./-]*)? push"
     r"(?: (?:-u|--set-upstream))?"
     r"(?: --force-with-lease)?"
     r"(?: [A-Za-z0-9_.][A-Za-z0-9_.-]*"
@@ -1642,12 +1672,15 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
             return False, "cannot prove repository write target across conditional or piped cd"
     for segment, tokens in segments:
         if tokens and tokens[0] == "cd":
-            if (len(tokens) != 2 or tokens[1] == "-"
-                    or tokens[1].startswith("~") or re.search(r"[$`]", tokens[1])):
+            if len(tokens) != 2 or tokens[1] == "-" or re.search(r"[$`]", tokens[1]):
                 cwd_known = False
             else:
-                target = Path(tokens[1])
-                current_cwd = (current_cwd / target).resolve() if not target.is_absolute() else target.resolve()
+                try:
+                    target = expand_tilde_target(tokens[1], current_cwd)
+                except ValueError:
+                    cwd_known = False
+                else:
+                    current_cwd = (current_cwd / target).resolve() if not target.is_absolute() else target.resolve()
             continue
         for index, token in enumerate(tokens):
             executable = Path(token).name
@@ -1741,7 +1774,10 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
                     for option in global_options
                 ):
                     return False, "cannot prove Git push target with target-overriding global options"
-                cwd = effective_cwd(current_cwd, segment, tokens, index)
+                try:
+                    cwd = effective_cwd(current_cwd, segment, tokens, index)
+                except ValueError:
+                    return False, "cannot prove Git push working directory"
                 if git_push_refspec(tokens, push_index) is None and omitted_refspec_would_update_main(cwd):
                     return False, "bare push would update main"
                 effective_owner = resolve_owner(cwd, owner)
@@ -1751,7 +1787,10 @@ def validate(command: str, base: Path) -> tuple[bool, str]:
                 try:
                     target_owners = [github_owner(url) for url in resolve_remote_urls(cwd, remote)]
                 except (subprocess.CalledProcessError, ValueError, OSError):
-                    return False, "cannot prove Git push target is the user's fork"
+                    # [2026-10-24][fix] Issue #4417: -C/cd の ~ は expanduser で
+                    #   解決するようになったが、解決不能なパス・repo でない宛先は
+                    #   従来どおり fail-closed。次の一手として -C の絶対パス指定を示す。
+                    return False, "cannot prove Git push target is the user's fork (use git -C with an absolute path)"
                 if not target_owners or any(target_owner is None or target_owner.casefold() != effective_owner.casefold() for target_owner in target_owners):
                     rendered = ",".join(target_owner or "unknown" for target_owner in target_owners) or "unknown"
                     return False, f"Git push target owner {rendered} is not fork owner {effective_owner}"

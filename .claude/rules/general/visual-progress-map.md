@@ -157,6 +157,19 @@ skill 非起動時でも、以下のいずれかに該当したら L1 ASCII 図�
 
 `.claude/parallel-run-state/<feature-slug>.json` に保管（kebab-case slug、各PJの `.gitignore` へ追加）。フィールド定義・モード別 schema・`gh pr list` 合成手順の全文は `<AGENT-HUB>/skills/visual-companion/references/state-file-schema.md` を参照。
 
+## 6-bis. セッション状況ページ
+
+<!-- [2026-10-21][feat] session-status スキル新設に伴う発火義務の接続（承認済みプラン）。
+対応: まとまった報告の表示先を「毎回更新される1枚の進捗HTML」へ固定する旨の短い節を追加。詳細は skill 参照（複製しない）。-->
+
+まとまった報告・進捗・残件・終了整理の表示は `skills/session-status` の進捗ページへ出す（`~/Documents/AI-Work/status/<PJ>.html` を更新し続ける固定URLの1枚）。
+
+- 優先順位: **まとまった報告＝ページ / 短答＝現行1行（§1）/ 配信不能＝チャット代替＋「ページ未配信」明記**
+- 骨組みの正本は My GBrain「判断軸/進捗htmlの骨組み見本」（開始時に読む。写し: `skills/session-status/references/status-skeleton.html`）
+- ページは状態の正本にしない（current.md・parallel-run-state 等は従来どおり）
+
+本人に見せる説明・資料・モックを作るときは、まず My GBrain「分かりやすいのレパートリー」索引を読む（自律参照の入口。読めなければ「索引未取得」と明記して続行）。
+
 ## 7. 関連ルール
 
 - `.claude/rules/general/response-style.md` / `sub-agent-scope-contract.md` / `branch-rule.md`

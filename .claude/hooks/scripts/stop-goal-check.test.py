@@ -1690,6 +1690,13 @@ class ProseEvidenceTests(unittest.TestCase):
             self._assistant("[明示保留] owner=本人（本番確認待ち）\n台帳の全行照合が済みました。")]
         self.assertFalse(HOOK.should_block(entries))
 
+    def test_block_reason_example_hold_and_crosscheck_passes(self) -> None:
+        # Issue #4324: 阻止文に書いた実例そのまま（行頭の [明示保留] owner=伸太郎）と
+        # 台帳照合の文を同じ返答に書けば Stop hook が通る。
+        entries = self._goal() + [
+            self._assistant("[明示保留] owner=伸太郎 〇〇を確かめる\n台帳を全行照合した。")]
+        self.assertFalse(HOOK.should_block(entries))
+
     def test_ledger_reference_without_hold_still_blocks(self) -> None:
         entries = self._goal() + [self._compact(),
                                   self._assistant("台帳の全行照合が済みました。")]
@@ -1806,6 +1813,23 @@ class MarkdownLedgerAndClearTests(unittest.TestCase):
         self.ledger.write_text("| 行 | 内容 | 状態 |\n|---|---|---|\n| P1 | ☐ |\n", encoding="utf-8")
         claim = self.said("[明示保留] owner=本人（確認待ち）\n台帳の全行照合が済みました。")
         self.assertTrue(self.blocked(self.goal() + [self.wrote(), claim]))
+
+    def test_bullet_list_ledger_blocks_and_reason_shows_table_format(self) -> None:
+        # Issue #4324: 箇条書きのチェックボックス台帳は読めず未完了扱い（fail-close）。
+        # 止めた時の阻止文が「状態」列を持つ表の書式を示す。
+        self.ledger.write_text("# 台帳\n\n- [x] 作業1\n- [x] 作業2\n- [ ] 作業3\n", encoding="utf-8")
+        entries = self.goal() + [self.wrote()]
+        self.assertTrue(self.blocked(entries))
+        transcript = self.tmp / "bullet.jsonl"
+        _write_jsonl(transcript, entries)
+        env = {HOOK.LEDGER_PLANS_ENV: str(self.tmp / "none"),
+               HOOK.LEDGER_STATE_ENV: str(self.tmp / "st-bullet")}
+        with mock.patch.dict(os.environ, env):
+            _, out = _run_main({"transcript_path": str(transcript), "session_id": "s-bullet"})
+        payload = json.loads(out)
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("「状態」列を持つ表", payload["reason"])
+        self.assertIn("箇条書きのチェックボックス", payload["reason"])
 
     def test_missing_file_and_unrelated_names_are_not_evidence(self) -> None:
         self.assertTrue(self.blocked(self.goal() + [self.wrote()]))          # ファイルが無い

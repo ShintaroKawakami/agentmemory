@@ -6,7 +6,7 @@
 - **詳細**: `.claude/rules/general/test-kinds-and-cheap-loop.md`
 <!-- agents-md-card:end -->
 
-<!-- [2026-10-16][feat] 承認済みプラン「テストを見える化し、直すのは Kimi・GLM に回す」（~/Downloads/AI-Work/jtt-system/2026-10-16-test-loop-plan/）。
+<!-- [2026-10-16][feat] 承認済みプラン「テストを見える化し、直すのは Kimi・GLM に回す」（~/Documents/AI-Work/jtt-system/2026-10-16-test-loop-plan/）。
 背景:
   - ユーザー依頼意図: 伸太郎さん 2026-10-16「Claude が永遠と繰り返している意味が分からなかった。全部テストで落ちていた。
     種類があるから明確に表示して」「GLM・Kimi にループで回せば、バグが直るまで回す指示ができる」「全プロジェクトの共通認識にしたい」。
