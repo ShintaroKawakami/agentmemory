@@ -99,6 +99,7 @@ def load_policy(path: Path | None = None) -> dict | None:
             "hw_markers": [str(s) for s in hw["markers"]],
             "hw_choice": comp("choice_patterns", hw),
             "hw_gate": comp("gate_patterns", hw),
+            "hw_cond": comp("condition_patterns", hw) if hw.get("condition_patterns") else [],
             "wait": comp("wait_patterns"),
             "intent": comp("intent_end_patterns"),
             "done": comp("done_patterns"),
@@ -371,13 +372,18 @@ def decide(entries: list[Any], policy: dict) -> str | None:
         return None
     last = sents[-1]
     tail = " ".join(sents[-2:])
+    # [2026-10-24][fix] 「返事をもらえたら作ります」「よければ直します」など、本人の返事を条件にした結びは
+    #   人の答え待ちなので通す。背景: P5 の空打ちで、正常例を止めた270件の大半がこの型だった。
+    #   「完了後に」「届き次第」のような作業の終わりが条件の文はここで通さず、(a) の見張り判定に任せる。
+    #   承認直後の聞き直し (c) は、この条件があっても止める（承認済みの範囲を聞き直す文は通さない）。
+    human_cond = _any(policy["hw_cond"], " ".join(sents[-3:]))
     tool_after_text = any(kind == "tool_use" for kind, _ in seq[last_idx + 1:])
     reasons = policy["reasons"]
     prefix = reasons["prefix"]
 
     # (a) 見張りなしの待ち。待ち文面があるなら、見張りの有無だけで決めてここで終える。
     if _any(policy["wait"], tail):
-        if _any(policy["carryover"], tail):
+        if human_cond or _any(policy["carryover"], tail):
             return None
         return prefix + reasons["wait"] if watcher_state(scoped, policy) == "none" else None
 
@@ -389,7 +395,7 @@ def decide(entries: list[Any], policy: dict) -> str | None:
         return prefix + reasons["reconfirm"]
 
     # (b) 途中の一言
-    if (not tool_after_text and _any(policy["intent"], last)
+    if (not tool_after_text and not human_cond and _any(policy["intent"], last)
             and not _any(policy["done"], " ".join(sents[-3:]))
             and not _any(policy["carryover"], tail)):
         return prefix + reasons["intent"]
