@@ -21,6 +21,24 @@
 #   修正手順付きで deny する。緊急回避は AGENT_HUB_ALLOW_WORKFLOW_SILENT_SKIP_GUARD=1
 #   （hook-library/BYPASS-CONVENTION.md の規約どおり telemetry に残る）。
 
+# [2026-10-21][fix]
+# 背景:
+# - ユーザー依頼意図: 既存の workflow に「skip_reset=false 出力 + outputs.skip_reset == 'true' 判定」が
+#   元からあるだけで、無関係な 1 行追加（jtt-cms deploy-reservation-staging.yml の TRUNCATE 一覧へ
+#   1 行足す Edit）まで deny されていた。hook は Edit/MultiEdit を「適用後の全文」で走査するため、
+#   編集箇所と関係なく、元からある該当パターンで全ての編集が止まる誤検知だった。
+# - 守るべき業務ルール: 見張りの目的は「新しく足した skip 設計」を書き込み時点で止めること
+#   （Issue #1988）。元からある問題の是正は各 PJ のスコープで、別の編集を人質にしない。
+#   新規に該当パターンを持ち込む編集は従来どおり deny し続ける。
+# - 他案不採用理由:
+#   1) 判定自体を弱める（outputs 名の許可リスト・skip_reset 例外）案は、新規持ち込みまで通して
+#      見張りを弱めるため不採用。
+#   2) 該当ファイルを恒久的に対象外にする案は、同じファイルへ別名の問題を足されても止まらず不採用。
+# 対応: Edit/MultiEdit は編集前のディスク上の全文でも同じ判定を行い、編集前から有った offender 名を
+#   除外して「編集で新たに生じた offender」だけで deny する。編集前ファイルが読めない・新規作成・
+#   Write(全文置換) は従来どおり適用後全文で判定する。Bash/apply_patch 経路は追加行のみ走査のため
+#   既存行の問題が小さく現状維持。
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -101,6 +119,8 @@ if not is_workflow_path and not mentions_workflow:
     raise SystemExit
 
 scan = ""
+# Edit/MultiEdit で「編集前から有った offender」を除外するための編集前全文（読めなければ None）
+base_text = None
 if is_workflow_path:
     # Write: content がそのまま対象。Edit/MultiEdit: ディスク上の現行内容へ
     # old_string -> new_string を適用して「書き込み後の姿」を推定する。
@@ -114,6 +134,8 @@ if is_workflow_path:
                     base = f.read()
             except Exception:
                 base = ""
+        if file_path and os.path.exists(file_path):
+            base_text = base
         applied = base
         for edit in edits:
             if isinstance(edit, dict):
@@ -146,73 +168,77 @@ else:
 if not scan.strip():
     raise SystemExit
 
-lines = scan.splitlines()
-
-# 1) GITHUB_OUTPUT へ <name>=false を書き出す行を拾う
-#    （echo "available=false" >> "$GITHUB_OUTPUT" 等。名前は available 以外も拾う）
-EMIT_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*=\s*['\"]?false")
-emitted: dict[str, list[int]] = {}
-for i, line in enumerate(lines):
-    if "GITHUB_OUTPUT" not in line:
-        continue
-    m = EMIT_RE.search(line)
-    if m:
-        emitted.setdefault(m.group(1), []).append(i)
-
-if not emitted:
-    raise SystemExit
-
-
-def block_window(start: int, limit: int = 60) -> list[str]:
-    """emit 行が属する run ブロック相当の範囲（dedent で打ち切る簡易近似）。"""
-    emit_line = lines[start]
-    emit_indent = len(emit_line) - len(emit_line.lstrip())
-    out = [emit_line]
-    for line in lines[start + 1 :]:
-        if len(out) >= limit:
-            break
-        if not line.strip():
-            out.append(line)
-            continue
-        indent = len(line) - len(line.lstrip())
-        # fi / else は emit より浅いことがあるため -2 まで許容。
-        # 次のステップ（- name: 等）はさらに浅いのでここで打ち切る。
-        if indent < emit_indent - 2:
-            break
-        out.append(line)
-    return out
-
-
 FAIL_RE = re.compile(r"\bexit\s+[1-9]")
+EMIT_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*=\s*['\"]?false")
 
-offenders: list[str] = []
-for name, idxs in emitted.items():
-    # 2) if: <expr>.outputs.<name> == 'true' で後続を skip しているか
-    gate_re = re.compile(r"outputs\." + re.escape(name) + r"\s*==\s*['\"]?true")
-    if not any(gate_re.search(line) for line in lines):
-        continue
 
-    has_fail = False
-    # 3a) emit しているブロックの中に exit 1+ があるか（check 時点で fail-closed）
-    for i in idxs:
-        if any(FAIL_RE.search(line) for line in block_window(i)):
-            has_fail = True
-            break
-    # 3b) outputs.<name> != 'true' / == 'false' で発火する fail ステップがあるか
-    if not has_fail:
-        neg_re = re.compile(
-            r"outputs\."
-            + re.escape(name)
-            + r"\s*(?:!=\s*['\"]?true|==\s*['\"]?false)"
-        )
-        for i, line in enumerate(lines):
-            if neg_re.search(line) and any(
-                FAIL_RE.search(x) for x in lines[i : i + 40]
-            ):
+def find_offenders(lines: list[str]) -> list[str]:
+    """「<name>=false 出力 + outputs.<name> == 'true' の skip ゲート + fail 経路なし」の name 一覧。"""
+    # 1) GITHUB_OUTPUT へ <name>=false を書き出す行を拾う
+    #    （echo "available=false" >> "$GITHUB_OUTPUT" 等。名前は available 以外も拾う）
+    emitted: dict[str, list[int]] = {}
+    for i, line in enumerate(lines):
+        if "GITHUB_OUTPUT" not in line:
+            continue
+        m = EMIT_RE.search(line)
+        if m:
+            emitted.setdefault(m.group(1), []).append(i)
+
+    def block_window(start: int, limit: int = 60) -> list[str]:
+        """emit 行が属する run ブロック相当の範囲（dedent で打ち切る簡易近似）。"""
+        emit_line = lines[start]
+        emit_indent = len(emit_line) - len(emit_line.lstrip())
+        out = [emit_line]
+        for line in lines[start + 1 :]:
+            if len(out) >= limit:
+                break
+            if not line.strip():
+                out.append(line)
+                continue
+            indent = len(line) - len(line.lstrip())
+            # fi / else は emit より浅いことがあるため -2 まで許容。
+            # 次のステップ（- name: 等）はさらに浅いのでここで打ち切る。
+            if indent < emit_indent - 2:
+                break
+            out.append(line)
+        return out
+
+    found: list[str] = []
+    for name, idxs in emitted.items():
+        # 2) if: <expr>.outputs.<name> == 'true' で後続を skip しているか
+        gate_re = re.compile(r"outputs\." + re.escape(name) + r"\s*==\s*['\"]?true")
+        if not any(gate_re.search(line) for line in lines):
+            continue
+
+        has_fail = False
+        # 3a) emit しているブロックの中に exit 1+ があるか（check 時点で fail-closed）
+        for i in idxs:
+            if any(FAIL_RE.search(line) for line in block_window(i)):
                 has_fail = True
                 break
-    if not has_fail:
-        offenders.append(name)
+        # 3b) outputs.<name> != 'true' / == 'false' で発火する fail ステップがあるか
+        if not has_fail:
+            neg_re = re.compile(
+                r"outputs\."
+                + re.escape(name)
+                + r"\s*(?:!=\s*['\"]?true|==\s*['\"]?false)"
+            )
+            for i, line in enumerate(lines):
+                if neg_re.search(line) and any(
+                    FAIL_RE.search(x) for x in lines[i : i + 40]
+                ):
+                    has_fail = True
+                    break
+        if not has_fail:
+            found.append(name)
+    return found
+
+
+offenders = find_offenders(scan.splitlines())
+if base_text is not None:
+    # Edit/MultiEdit: 編集前から有った offender 名は除外し、編集で新たに生じたものだけ止める。
+    pre_existing = set(find_offenders(base_text.splitlines()))
+    offenders = [n for n in offenders if n not in pre_existing]
 
 if offenders:
     names = ", ".join(sorted(set(offenders)))

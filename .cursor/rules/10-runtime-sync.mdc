@@ -73,6 +73,7 @@ alwaysApply: true
 - `.claude/hooks/lib/gbrain-recall-policy.json`
 - `.claude/hooks/lib/handover-preflight-policy.json`
 - `.claude/hooks/lib/hook-io.sh`
+- `.claude/hooks/lib/loop-continuity-policy.json`
 - `.claude/hooks/lib/quality-check-common.sh`
 - `.claude/hooks/lib/resolve-handover-path.py`
 - `.claude/hooks/lib/staff-message-policy.json`
@@ -113,6 +114,9 @@ alwaysApply: true
 - `.claude/hooks/scripts/stop-goal-check.py`
 - `.claude/hooks/scripts/stop-goal-check.test.py`
 - `.claude/hooks/scripts/stop-goal-check.test.sh`
+- `.claude/hooks/scripts/stop-loop-continuity.py`
+- `.claude/hooks/scripts/stop-loop-continuity.test.py`
+- `.claude/hooks/scripts/stop-loop-continuity.test.sh`
 - `.claude/hooks/scripts/stop-quality-check.sh`
 - `.claude/hooks/scripts/storage-url-pr-gate.sh`
 - `.claude/hooks/scripts/subagent-quality-check.sh`
@@ -174,6 +178,7 @@ alwaysApply: true
 - `.cursor/hooks/lib/gbrain-recall-policy.json`
 - `.cursor/hooks/lib/handover-preflight-policy.json`
 - `.cursor/hooks/lib/hook-io.sh`
+- `.cursor/hooks/lib/loop-continuity-policy.json`
 - `.cursor/hooks/lib/quality-check-common.sh`
 - `.cursor/hooks/lib/resolve-handover-path.py`
 - `.cursor/hooks/lib/staff-message-policy.json`
@@ -215,6 +220,9 @@ alwaysApply: true
 - `.cursor/hooks/scripts/stop-goal-check.py`
 - `.cursor/hooks/scripts/stop-goal-check.test.py`
 - `.cursor/hooks/scripts/stop-goal-check.test.sh`
+- `.cursor/hooks/scripts/stop-loop-continuity.py`
+- `.cursor/hooks/scripts/stop-loop-continuity.test.py`
+- `.cursor/hooks/scripts/stop-loop-continuity.test.sh`
 - `.cursor/hooks/scripts/stop-quality-check.sh`
 - `.cursor/hooks/scripts/storage-url-pr-gate.sh`
 - `.cursor/hooks/scripts/subagent-quality-check.sh`
@@ -275,6 +283,7 @@ alwaysApply: true
 - `.cursor/skills/plan-approval`
 - `.cursor/skills/post-merge`
 - `.cursor/skills/project-prompt-review`
+- `.cursor/skills/session-status`
 - `.cursor/skills/shintaro-gbrain`
 - `.cursor/skills/shintaro-voice`
 - `.cursor/skills/skill-audit`

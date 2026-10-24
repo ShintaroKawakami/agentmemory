@@ -179,13 +179,42 @@ tmp="$(mktemp -d)"
 # 冒頭で外から来た両変数を退避・unset し、trap で元へ戻す。
 # 以後 HOME を切り替えるたびに GIT_CONFIG_GLOBAL も同じ HOME 配下へ
 # 張り替え、global config の書込先を常にこの sandbox 内に固定する。
+# [2026-10-23][test] issue #4144: Orca の端末は GIT_CONFIG_COUNT /
+# GIT_CONFIG_KEY_* / GIT_CONFIG_VALUE_* 等の GIT_CONFIG_* 変数を常駐させる。
+# 無害キー以外を含む GIT_CONFIG_* が hook 環境へ届くと upstream-write-guard が
+# 「cannot prove Git push target ... GIT_CONFIG_* environment」で fail-close し、
+# 単純形以外の push を許可する検査（先頭 cd + redirect / -C 経由 + redirect /
+# パイプ繋ぎ / --delete 系）が本来の検査と無関係に偽の失敗になる。
+# GIT_CONFIG_GLOBAL / XDG_CONFIG_HOME と同じく、外から来た GIT_CONFIG_* は
+# 冒頭で退避・unset し trap で元へ戻す。テスト内で意図的に export する
+# GIT_CONFIG_*（無害 GIT_CONFIG 環境の検査ブロック）はこの時点では存在
+# しないため退避対象外＝そのまま hook へ届き、検査の実効性は維持される。
 _outer_git_config_global_set="${GIT_CONFIG_GLOBAL+set}"
 _outer_git_config_global="${GIT_CONFIG_GLOBAL-}"
 _outer_xdg_config_home_set="${XDG_CONFIG_HOME+set}"
 _outer_xdg_config_home="${XDG_CONFIG_HOME-}"
+_outer_git_config_env_names=()
+_outer_git_config_env_values=()
+while IFS='=' read -r _name _rest; do
+  case "$_name" in
+    GIT_CONFIG_GLOBAL) ;; # 既存の個別退避・復元経路に任せる
+    GIT_CONFIG_*)
+      _outer_git_config_env_names+=("$_name")
+      _outer_git_config_env_values+=("${!_name}")
+      ;;
+  esac
+done < <(env)
 unset GIT_CONFIG_GLOBAL XDG_CONFIG_HOME
+if [ "${#_outer_git_config_env_names[@]}" -gt 0 ]; then
+  unset "${_outer_git_config_env_names[@]}"
+fi
 restore_outer_git_env() {
   rm -rf "$tmp"
+  if [ "${#_outer_git_config_env_names[@]}" -gt 0 ]; then
+    for _i in "${!_outer_git_config_env_names[@]}"; do
+      export "${_outer_git_config_env_names[$_i]}=${_outer_git_config_env_values[$_i]}"
+    done
+  fi
   if [ "$_outer_git_config_global_set" = "set" ]; then
     GIT_CONFIG_GLOBAL="$_outer_git_config_global"
     export GIT_CONFIG_GLOBAL
@@ -211,6 +240,15 @@ export AGENT_HUB_HOOK_CLOUD_FS=0
 # 1 回の global 書き込みだけを実行して即終了する。本体全件の再実行を避けつつ、
 # 末尾の回帰テストが外側ファイル非変更を検証できる。
 if [ "${BMC_TEST_ENV_ISOLATION_PROBE:-}" = "1" ]; then
+  exit 0
+fi
+
+# [2026-10-23][test] issue #4144 回帰検査プローブ: 外側から GIT_CONFIG_COUNT /
+# GIT_CONFIG_KEY_* / GIT_CONFIG_VALUE_* 等を入れて起動された子プロセスが、
+# 冒頭の退避・unset 直後に見える GIT_CONFIG_* の変数名だけを印字して即終了する。
+# 砂箱 pin の GIT_CONFIG_GLOBAL だけが残ることを末尾の回帰テストで検証する。
+if [ "${BMC_TEST_GIT_CONFIG_ENV_PROBE:-}" = "1" ]; then
+  env | sed -n 's/^\(GIT_CONFIG_[A-Za-z0-9_]*\)=.*/\1/p'
   exit 0
 fi
 
@@ -2014,6 +2052,27 @@ if GIT_CONFIG_GLOBAL="$outer_cfg" BMC_TEST_ENV_ISOLATION_PROBE=1 bash "${BASH_SO
   PASS=$((PASS + 1))
 else
   printf '[FAIL] %s\n' "外側 GIT_CONFIG_GLOBAL のファイルは変更されない（issue #3920）"
+  FAIL=$((FAIL + 1))
+fi
+
+# [2026-10-23][test] issue #4144 回帰: Orca の端末が常駐させる GIT_CONFIG_*
+# （無害リスト外のキーや COUNT/KEY/VALUE 以外の GIT_CONFIG_* も含む）が外側
+# から注入されても、冒頭の退避・unset により検査環境には砂箱 pin の
+# GIT_CONFIG_GLOBAL だけが残る。漏れると hook が「cannot prove Git push
+# target ... GIT_CONFIG_* environment」で fail-close し、push 系の許可検査が
+# 本来の検査と無関係に偽の失敗になる。
+git_config_env_probe_out="$(
+  GIT_CONFIG_COUNT=2 \
+  GIT_CONFIG_KEY_0=core.sshCommand GIT_CONFIG_VALUE_0='ssh -i /tmp/oops' \
+  GIT_CONFIG_KEY_1=remote.origin.pushurl GIT_CONFIG_VALUE_1='https://example.invalid/x.git' \
+  GIT_CONFIG_PARAMETERS="'core.pager=less'" GIT_CONFIG_SYSTEM=/tmp/git-sysconfig GIT_CONFIG_NOSYSTEM=1 \
+  BMC_TEST_GIT_CONFIG_ENV_PROBE=1 bash "${BASH_SOURCE[0]}" 2>/dev/null
+)"
+if [ "$git_config_env_probe_out" = "GIT_CONFIG_GLOBAL" ]; then
+  printf '[PASS] %s\n' "外側 GIT_CONFIG_*（COUNT/KEY/VALUE/PARAMETERS/SYSTEM/NOSYSTEM）は検査環境へ漏れない（issue #4144）"
+  PASS=$((PASS + 1))
+else
+  printf '[FAIL] %s: %s\n' "外側 GIT_CONFIG_*（COUNT/KEY/VALUE/PARAMETERS/SYSTEM/NOSYSTEM）は検査環境へ漏れない（issue #4144）" "$git_config_env_probe_out"
   FAIL=$((FAIL + 1))
 fi
 

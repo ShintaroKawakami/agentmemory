@@ -117,13 +117,17 @@ CARD 00 の話し方 → 返答・Plan・承認 → 変更・検証 → 完了�
 - 完了報告にはcommit hash、clean状態、検証結果を含める。中断時は安全な`WIP:` commit、未完了のまま完了扱いにしない。force push、チェック回避、他者のbranch/worktree削除はしない。
 ## 人が後で探す作業成果物の保存
 
-- ローカルで本人が後から読む・見る・開く成果物の既定保存先は `~/Downloads/AI-Work/<canonical-pj>/<YYYY-MM-DD-task-run>/`。PJ名は登録された正規名を使い、worktree名にしない。日付・作業名・一意なrunで分け、別の成果物の同名を上書きしない。同じrun内で自分が納品した資料の継続更新は可。
+- ローカルで本人が後から読む・見る・開く成果物の既定保存先は `~/Documents/AI-Work/<canonical-pj>/<YYYY-MM-DD-task-run>/`。Gitでは管理しない。PJ名は登録された正規名を使い、worktree名にしない。日付・作業名・一意なrunで分け、別の成果物の同名を上書きしない。同じrun内で自分が納品した資料の継続更新は可。
+- `/tmp` は本当に使い捨てのものだけ。Claude Code のプランは `~/Documents/AI-Work/claude-plans` に置き、`~/.claude/plans` はそのディレクトリを指す。
 - 作業用Markdown、PDF、説明HTML、画像（PNG/JPEG/WebP/SVG等）、CSV、PPTX、確認動画（MP4等）を用途で選ぶ。拡張子だけで収集しない。
 - README・正式仕様・ルール・引継ぎなどの正本、アプリのソース、Stitch等の専用保存先は移さない。本人の明示保存先を優先し、必要な納品用コピーだけを残す。
 - OSのtmp・AIのscratchpad・TMPDIRは変えない。ログ・ロック・DB・中間生成物は従来の場所に置き、秘密情報・機密資料を検索用フォルダへ勝手にコピーしない。
 - scratchpadやrepo内のGit管理外フォルダで作っても、本人へ渡す前に選んだ成果物を上記へ保存する。原本は残し、コピーの内容一致を確認する。Markdown/HTMLの相対参照画像・CSS等も一緒に保持し、自己完結HTMLは既存の組立処理を使う。
 - 納品時は保存先の絶対パスを伝える。ファイル名・パスで検索して開く運用であり、全文検索・OCR・クラウド同期・自動削除は追加しない。Gitのignoreを解除しない。
 - リモート実行環境にローカル保存先が無い場合は、既存の成果物受渡し経路で回収する。本人のMacへの保存を確認するまで、ローカル保存・Raycast検索済みとは報告しない。
+
+- AIを動かすアプリ（Orca・Codex・Cursor・Warp・Claude デスクトップ等）には、macOS の「プライバシーとセキュリティ → ファイルとフォルダ → 書類フォルダ」の許可を入れる。許可はアプリごとに1回で、そのアプリから開く全プロジェクトに効く。
+- `~/Documents/AI-Work` を読み書きする前に `bash ~/business/AGENT-HUB/scripts/check-ai-work-access.sh` で確かめてよい。`Operation not permitted` で読めない時は、迂回せず止まり、表示されたアプリ名と許可の入れ方を本人へ伝える。書けなかった成果物は一時置きの絶対パスを伝え、許可後に上記へ移す。
 
 ## 音声入力の共通辞書
 
