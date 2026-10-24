@@ -77,8 +77,8 @@ TASK_TOOL_NAMES = frozenset(
 # 承認の自然文から状態を推測する案は、否定・予定・条件で誤終了/誤停止が
 # 繰り返されたため採らない。未完了のまま、札と owner を明記する契約を使う。
 HOLD_RE = re.compile(
-    r"^[ \t]*(?:\[明示保留\](?=[ \t]|$)|【明示保留】(?=[ \t]|$)|明示保留[:：])"
-    r"[ \t]*owner[ \t]*[=：:][ \t]*(?P<owner>[^\s/]+)"
+    r"^[ \t]*(?:\[返事待ち\](?=[ \t]|$)|【返事待ち】(?=[ \t]|$)|返事待ち[:：])"
+    r"[ \t]*担当[ \t]*[=：:][ \t]*(?P<owner>[^\s/]+)"
 )
 
 
@@ -95,13 +95,17 @@ PENDING_STATUSES = frozenset({"pending", "in_progress", "todo", "open"})
 #     unreadable 扱いになり、本文の「台帳照合＋明示保留」も使われなかった（mixpost-app 実測）。
 #   - 判定ロジック（HOLD_RE・台帳の読み方）は変えず、阻止文に実例と台帳の書式を足すだけにする。
 #     HOLD_RE を `[明示保留 owner=…]` にも広げる案は §6 の書式を2つにするため不採用。
+# [2026-10-24][feat] 札を「[返事待ち] 担当=」に改名し、阻止文を「進捗ページの台帳を更新して、チャットには
+#   地図と URL だけ」に変更（伸太郎殿発言 2026-10-24: チャットに表や札が並ぶのが嫌い）。
+#   旧書式との二重受付はしない（上の不採用判断「書式を2つにしない」を維持）。
 BLOCK_REASON = (
     "Goal の完了を確認できません。タスクが未完了・確認待ち、または今回の起票証拠が不足しています。"
     " 既存の TaskList と transcript（compaction summary 含む）を確認し、未完了の作業を進めてください。"
     " プラン文書の未起票項目だけを 1行=1タスクで起票してください。"
-    " 本人判断などで保留する項目は [明示保留] の札と owner を付けて残してください（§6）。"
-    " 書式の実例（行頭からこの形で）: [明示保留] owner=伸太郎 〇〇を確かめる"
-    " 。本文で保留を宣言する時は「台帳を全行照合した」など台帳照合の文も同じ返答に書いてください。"
+    " 本人の返事が要る項目は、進捗ページ（~/Documents/AI-Work/status/<PJ>.html）の台帳（const D の ledger）に"
+    " s='hold'・who='伸太郎殿' で書き、終わった行は s='done' に更新してください（§6・skills/session-status）。"
+    " チャットには短い地図と進捗ページの URL だけを書き、表や札を並べないでください。"
+    " 進捗ページを使えない環境だけ、本文に台帳照合の文と、行頭からの [返事待ち] 担当=伸太郎殿 〇〇 の行を書いてください。"
     " Markdown 台帳は「状態」列を持つ表で書いてください（箇条書きのチェックボックスは読めず未完了扱い）。"
 )
 
@@ -811,8 +815,8 @@ LEDGER_MARKS = ("☐", "☑")
 #   [2026-10-14] codex レビュー指摘で境界を厳格化: owner の直前が英数字・_・- なら不一致（previous_owner= / backup-owner= を除外）。
 LEDGER_HOLD = "hold"
 _LEDGER_HOLD_RE = re.compile(
-    r"^[ \t]*(?:\[明示保留\]|【明示保留】|明示保留[:：])"
-    r".*?(?<![A-Za-z0-9_\-])owner[ \t]*[=：:][ \t]*(?P<owner>[^\s/]+)",
+    r"^[ \t]*(?:\[返事待ち\]|【返事待ち】|返事待ち[:：])"
+    r".*?(?<![\w\-])担当[ \t]*[=：:][ \t]*(?P<owner>[^\s/]+)",
     re.DOTALL,
 )
 _MAX_PLAN_BYTES = 8 * 1024 * 1024
@@ -999,6 +1003,217 @@ def _md_ledger_state(scoped: list[Any]) -> str:
             states.append("open")
     if "open" in states or "unreadable" in states:
         return "open"                                  # 読めない台帳は未完了と同じ扱い（本文の宣言で通さない）
+    if states and all(state == "complete" for state in states):
+        return "complete"
+    return "none"
+
+
+# [2026-10-24][feat] 完了の根拠に「進捗ページの台帳」を足す（session-status）。
+#   背景: 伸太郎殿発言 2026-10-24「チャットに表や札が並ぶのが嫌い。詳しくは進捗ページ＋URL にしたい」。
+#   これまでの根拠5は「本文に台帳照合の文＋行頭の札」を書かせており、チャットが札だらけになった。
+#   進捗ページ ~/Documents/AI-Work/status/<PJ>.html の `const D` の ledger（行ごとに s=done/open/hold と
+#   who=担当）を完了の根拠として読めば、札はページに置け、チャットは地図と URL だけにできる。
+#   守るべき業務ルール: 根拠6（Markdown 台帳）と同じ安全境界を使う。今回の Goal 中に assistant が
+#   Write/Edit したページだけを読み（本文に書いただけの path は採らない＝より厳しい）、全行 done、または
+#   hold で担当が空でない時だけ「完了」。open・未知の状態・担当なしの hold・読めない/空の台帳は止める（fail-close）。
+#   ledger キーの無い旧ページは証拠なし。新しい判定基盤・「見た」記録（根拠4の seen 記録）は作らない
+#   ＝根拠4の「初回判定で全 ☑ だと記録が無く止まる」罠は持ち込まない。
+#   他案不採用理由: 本文の宣言だけで通す案は #3604 の穴を開け直すため不採用。ページの更新時刻で判定する案は
+#   再生成で時刻が新しくなるため不採用。JS 全体を評価する案は危険なため、object リテラルだけの小さな読取りにする。
+_STATUS_PAGE_MAX_BYTES = 1024 * 1024
+_JS_WS_RE = re.compile(r"(?:\s+|//[^\n]*|/\*.*?\*/)+", re.DOTALL)
+_JS_IDENT_RE = re.compile(r"[A-Za-z_$][\w$]*")
+_JS_NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
+_JS_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "b": "\b", "f": "\f", "0": "\0"}
+_JS_CONST_D_RE = re.compile(r"\bconst\s+D\s*=\s*(?=\{)")
+
+
+class _JsLiteralError(Exception):
+    pass
+
+
+class _JsLiteralParser:
+    """JS の object / array / 文字列 / 数値 / true false null だけの小さな読取り（式・関数・テンプレ補間は不可）。"""
+
+    def __init__(self, src: str, pos: int = 0) -> None:
+        self.src = src
+        self.pos = pos
+
+    def _ws(self) -> None:
+        match = _JS_WS_RE.match(self.src, self.pos)
+        if match:
+            self.pos = match.end()
+
+    def _peek(self) -> str:
+        self._ws()
+        return self.src[self.pos] if self.pos < len(self.src) else ""
+
+    def _take(self, char: str) -> None:
+        if self._peek() != char:
+            raise _JsLiteralError(char)
+        self.pos += 1
+
+    def value(self, depth: int = 0) -> Any:
+        if depth > 20:
+            raise _JsLiteralError("depth")
+        char = self._peek()
+        if char == "{":
+            return self._object(depth)
+        if char == "[":
+            return self._array(depth)
+        if char and char in "\"'`":
+            return self._string()
+        match = _JS_NUMBER_RE.match(self.src, self.pos)
+        if match:
+            self.pos = match.end()
+            return float(match.group())
+        match = _JS_IDENT_RE.match(self.src, self.pos)
+        if match and match.group() in ("true", "false", "null"):
+            self.pos = match.end()
+            return {"true": True, "false": False, "null": None}[match.group()]
+        raise _JsLiteralError("value")
+
+    def _string(self) -> str:
+        quote = self.src[self.pos]
+        self.pos += 1
+        out: list[str] = []
+        while self.pos < len(self.src):
+            char = self.src[self.pos]
+            self.pos += 1
+            if char == quote:
+                return "".join(out)
+            if quote == "`" and char == "$" and self.src[self.pos:self.pos + 1] == "{":
+                raise _JsLiteralError("template")
+            if char == "\\":
+                if self.pos >= len(self.src):
+                    break
+                esc = self.src[self.pos]
+                self.pos += 1
+                if esc == "u":
+                    hexa = self.src[self.pos:self.pos + 4]
+                    if not re.fullmatch(r"[0-9a-fA-F]{4}", hexa):
+                        raise _JsLiteralError("unicode")
+                    out.append(chr(int(hexa, 16)))
+                    self.pos += 4
+                else:
+                    out.append(_JS_ESCAPES.get(esc, esc))
+            elif char == "\n" and quote != "`":
+                raise _JsLiteralError("newline")
+            else:
+                out.append(char)
+        raise _JsLiteralError("unterminated")
+
+    def _key(self) -> str:
+        if self._peek() in ("\"", "'"):
+            return self._string()
+        match = _JS_IDENT_RE.match(self.src, self.pos) or _JS_NUMBER_RE.match(self.src, self.pos)
+        if not match:
+            raise _JsLiteralError("key")
+        self.pos = match.end()
+        return match.group()
+
+    def _object(self, depth: int) -> dict:
+        self._take("{")
+        result: dict = {}
+        while self._peek() != "}":
+            key = self._key()
+            self._take(":")
+            result[key] = self.value(depth + 1)
+            if self._peek() == ",":
+                self.pos += 1
+            elif self._peek() != "}":
+                raise _JsLiteralError("object")
+        self.pos += 1
+        return result
+
+    def _array(self, depth: int) -> list:
+        self._take("[")
+        result: list = []
+        while self._peek() != "]":
+            result.append(self.value(depth + 1))
+            if self._peek() == ",":
+                self.pos += 1
+            elif self._peek() != "]":
+                raise _JsLiteralError("array")
+        self.pos += 1
+        return result
+
+
+def _is_status_page_path(path: str) -> bool:
+    parts = Path(path).parts
+    return len(parts) >= 3 and parts[-1].lower().endswith(".html") \
+        and parts[-2] == "status" and parts[-3] == "AI-Work"
+
+
+def _status_page_candidates(scoped: list[Any]) -> list[Path]:
+    """今回の Goal 中に assistant が Write/Edit した進捗ページ（本文に書いた path は採らない）。"""
+    found: dict[str, None] = {}
+    for entry in scoped:
+        if not isinstance(entry, dict) or entry.get("type") != "assistant":
+            continue
+        message = entry.get("message", entry)
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            name = str(block.get("name", "")).rsplit("__", 1)[-1].rsplit(".", 1)[-1].lower()
+            args = block.get("input")
+            path = args.get("file_path") if isinstance(args, dict) else None
+            if name in _LEDGER_WRITE_TOOLS and isinstance(path, str) and os.path.isabs(path) \
+                    and _is_status_page_path(path):
+                found[path] = None
+    return [Path(path) for path in found]
+
+
+def _status_page_ledger(path: Path) -> list[Any] | str:
+    """進捗ページの const D の ledger（行の配列）。読めない時は "unreadable"、キー無しは "absent"。"""
+    try:
+        if path.stat().st_size > _STATUS_PAGE_MAX_BYTES:
+            return "unreadable"
+        text = path.read_text(encoding="utf-8")
+        match = _JS_CONST_D_RE.search(text)
+        if not match:
+            return "unreadable"
+        data = _JsLiteralParser(text, match.end()).value()
+    except (OSError, ValueError, _JsLiteralError, RecursionError):
+        return "unreadable"
+    if not isinstance(data, dict):
+        return "unreadable"
+    if "ledger" not in data:
+        return "absent"                                # ledger キーの無い旧ページは証拠にならない
+    rows = data["ledger"]
+    return rows if isinstance(rows, list) else "unreadable"
+
+
+def _status_page_state(scoped: list[Any]) -> str:
+    """"complete"（候補が全て 全行 done / 担当付き hold）/ "open"（未完了・不明・読めない）/ "none"（証拠なし）。"""
+    states: list[str] = []
+    for path in _status_page_candidates(scoped):
+        try:
+            if not path.is_file():
+                continue                               # 存在しない候補（例示パス等）は無視
+        except OSError:
+            continue
+        rows = _status_page_ledger(path)
+        if rows == "absent":
+            continue
+        if not isinstance(rows, list) or not rows:
+            states.append("open")                      # 読めない・空の台帳は未完了と同じ（宣言で通さない）
+            continue
+        complete = True
+        for row in rows:
+            state = row.get("s") if isinstance(row, dict) else None
+            who = row.get("who") if isinstance(row, dict) else None
+            if state == "done":
+                continue
+            if state == "hold" and isinstance(who, str) and who.strip():
+                continue
+            complete = False                           # open・未知の状態・担当なしの hold
+        states.append("complete" if complete else "open")
+    if "open" in states:
+        return "open"
     if states and all(state == "complete" for state in states):
         return "complete"
     return "none"
@@ -1228,7 +1443,7 @@ def _ledger_item_marks(path: Path) -> list[str] | None:
 
 
 def _classify_ledger_cell(cell: str) -> str:
-    """最後の列を "☐" / "☑" / "hold"（owner 付き明示保留）/ それ以外は先頭1文字（空欄は ""）に分類する。"""
+    """最後の列を "☐" / "☑" / "hold"（担当付き返事待ち）/ それ以外は先頭1文字（空欄は ""）に分類する。"""
     if cell[:1] in LEDGER_MARKS:
         return cell[:1]
     if _LEDGER_HOLD_RE.search(cell):
@@ -1286,7 +1501,7 @@ def _blocked_marker_path(state_dir: Path, conversation_id: str) -> Path:
 def _evaluate(entries: list[Any], *, conversation_id: str = "",
               plans_dir: Path | None = None, state_dir: Path | None = None,
               project_dir: Path | None = None) -> tuple[bool, str, bool]:
-    """(阻止するか, 阻止状態の指紋, 明示保留を含むか) を返す。"""
+    """(阻止するか, 阻止状態の指紋, 返事待ちを含むか) を返す。"""
     active, scoped, previous_ids = _goal_scope(entries)
     if not active:
         return False, "", False
@@ -1335,8 +1550,13 @@ def _evaluate(entries: list[Any], *, conversation_id: str = "",
     if md_state == "complete":
         return False, "", has_hold
     # 5つ目の終了根拠: タスク道具を使っていない領域で、同一 assistant メッセージに
-    # 「台帳照合・タスク化証拠 + owner 付き明示保留」がある時だけ通す（Issue #3595）。
-    if prose_paired and md_state != "open":
+    # 「台帳照合・タスク化証拠 + 担当付き返事待ち」がある時だけ通す（Issue #3595）。
+    # 7つ目（2026-10-24）: 今回の Goal 中に更新した進捗ページ（session-status）の台帳。
+    #   全行 done / 担当付き hold なら通す。open が残るページは本文の宣言（5つ目）より優先して止める。
+    status_state = _status_page_state(scoped)
+    if status_state == "complete":
+        return False, "", has_hold
+    if prose_paired and md_state != "open" and status_state != "open":
         return False, "", True
     return True, _block_fingerprint("evidence", [], holds), has_hold
 
@@ -1396,7 +1616,7 @@ def main() -> int:
             pass
         return 0
 
-    # 明示保留を含む阻止状態が直前と同一なら再発火しない（Issue #3595）。
+    # 返事待ちを含む阻止状態が直前と同一なら再発火しない（Issue #3595）。
     # 札の無い未完了は抑制対象にしない（止め続ける）。
     if has_hold and fingerprint:
         try:
