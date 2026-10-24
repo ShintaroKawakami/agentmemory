@@ -225,6 +225,28 @@ class MidSentence(_Base):
     def test_plain_report_passes(self):
         self.assertIsNone(self.decide([user("どうなった"), assistant("テストは全て緑です。変更は3ファイルです。")]))
 
+    # [2026-10-24][fix] 本人の返事を条件にした結びは人の答え待ちとして通す（P5 空打ちの止めすぎ対策）
+    def test_human_condition_endings_pass(self):
+        for text in ("時給はこれでよいですか？ 返事をもらえたら、求人文を作ります。",
+                     "この形でよければ、PR 作成まで進めます。",
+                     "押し直したら教えてください。届いたかをすぐ確認します。",
+                     "これで実装に進めてよいですか。「進めて」で着手します。",
+                     "気になる場合は確認します。"):
+            self.assertIsNone(self.decide([user("お願い"), assistant(text)]), text)
+
+    def test_system_condition_ending_still_blocks(self):
+        self.assertTrue(self.decide([user("お願い"), assistant("push 中です。完了後に PR を作ります。")]))
+        self.assertTrue(self.decide([user("お願い"), assistant("CI から結果をもらえたら確認します。")]))
+
+    def test_notice_spec_description_passes(self):
+        self.assertIsNone(self.decide([user("お願い"), assistant("通知が来るとバッジが表示されます。変更は3ファイルです。")]))
+
+    def test_notice_wait_without_watcher_blocks_with_watcher_passes(self):
+        text = "どちらも終わると私に知らせが来るので、そこで続けます。"
+        reason = self.decide([user("お願い"), assistant(text)])
+        self.assertTrue(reason and "見張り" in reason)
+        self.assertIsNone(self.decide([user("お願い"), *bg_bash("t1", "bg1"), assistant(text)]))
+
     def test_intent_inside_code_or_quote_is_ignored(self):
         text = "結果は次のとおりです。\n```\n確認します。\n```\n> 続けます。\n`実行します`"
         self.assertIsNone(self.decide([user("見せて"), assistant(text)]))
