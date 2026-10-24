@@ -11,7 +11,7 @@
   - 守るべき業務ルール:
       * 同じ所では1回だけ止める（stop_hook_active / loop_count>0 は必ず通す）。
       * どんな例外・読めない記録・読めない policy でも通す（fail-open）。迷ったら通す。
-      * 人の答え待ち（[明示保留]・選択肢つき質問・本番 GO/外部送信/お金/権限/新しいプランの承認待ち・
+      * 人の答え待ち（[返事待ち]・選択肢つき質問・本番 GO/外部送信/お金/権限/新しいプランの承認待ち・
         AskUserQuestion）は先に通す。本番 GO・外への送信・お金・権限の止まり所は変えない。
       * ターンの境界は「最新の実ユーザー発言」。<task-notification>・<system-reminder>・
         tool_result・Stop hook feedback などの合成 user 行は境界にしない

@@ -275,7 +275,7 @@ class ReconfirmAfterApproval(_Base):
 
 class HumanWait(_Base):
     def test_explicit_hold_passes(self):
-        self.assertIsNone(self.decide([user("お願い"), assistant("[明示保留] owner=伸太郎 本番確認を待ちます。終わったら続けます。")]))
+        self.assertIsNone(self.decide([user("お願い"), assistant("[返事待ち] 担当=伸太郎 本番確認を待ちます。終わったら続けます。")]))
 
     def test_choice_question_passes(self):
         self.assertIsNone(self.decide([user("お願い"), assistant("方法は2つあります。\nA 全部直す / B 一部だけ直す\nどれにしますか？推奨: B")]))

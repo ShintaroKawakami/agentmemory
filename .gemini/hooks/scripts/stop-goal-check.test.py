@@ -360,7 +360,7 @@ class EvidenceDetectionTests(unittest.TestCase):
     def test_text_list_preserves_verified_hold_fields_and_removal(self) -> None:
         for field in ("description", "note"):
             entries = [{"type": "user", "message": {"content": "/goal 作業"}}] + _created()
-            entries += [_call("hold", "TaskUpdate", {"taskId": "1", field: "[明示保留] owner=本人 / 承認待ち"}),
+            entries += [_call("hold", "TaskUpdate", {"taskId": "1", field: "[返事待ち] 担当=本人 / 承認待ち"}),
                 _result("hold", "Updated"), _call("list", "TaskList", {}), _result("list", "#1 [pending] 本番操作を待つ")]
             self.assertFalse(HOOK.should_block(entries))
             entries += [_call("remove", "TaskUpdate", {"taskId": "1", field: ""}), _result("remove", "Updated"),
@@ -424,7 +424,7 @@ class EvidenceDetectionTests(unittest.TestCase):
                     entries = [_call("old", "TaskList", {}),
                         _result("old", {"tasks": [{"id": "1", "status": "pending"}]}),
                         {"type": "user", "message": {"content": "/goal 次の作業"}},
-                        _call("hold", "TaskUpdate", {"taskId": "1", field: "[明示保留] owner=本人 / 承認待ち"}),
+                        _call("hold", "TaskUpdate", {"taskId": "1", field: "[返事待ち] 担当=本人 / 承認待ち"}),
                         _result("hold", "Task updated", failed=failed)]
                     self.assertEqual(HOOK.should_block(entries), failed)
                     if not failed:
@@ -677,38 +677,38 @@ class EvidenceDetectionTests(unittest.TestCase):
             "本人承認は不要ではありません", "本人承認は完了したら実装を進める",
             "本人承認は完了したのではありません", "本人承認は完了したのであれば実装を進める",
             "本人承認は不要になった", "本人承認は完了したため実装を進める",
-            "明示保留ではない", "明示保留の札を付ける作業", "[明示保留]と書く",
-            "[明示保留]", "[明示保留] owner= / 承認待ち",
-            '[明示保留] owner="" / 承認待ち',
-            "札の記入例\n[明示保留] owner=本人 / 承認待ち",
+            "返事待ちではない", "返事待ちの札を付ける作業", "[返事待ち]と書く",
+            "[返事待ち]", "[返事待ち] 担当= / 承認待ち",
+            '[返事待ち] 担当="" / 承認待ち',
+            "札の記入例\n[返事待ち] 担当=本人 / 承認待ち",
         ]:
             with self.subTest(text=text):
                 self.assertFalse(HOOK.is_explicit_hold(text))
                 self.assertFalse(HOOK.task_list_is_complete([{"content": text, "status": "pending"}]))
-        for label in ["[明示保留] owner=本人 / 承認待ち", "【明示保留】 owner=本人 / 日付待ち", "明示保留：owner=本人 / 別プラン"]:
+        for label in ["[返事待ち] 担当=本人 / 承認待ち", "【返事待ち】 担当=本人 / 日付待ち", "返事待ち：担当=本人 / 別プラン"]:
             with self.subTest(label=label):
                 self.assertTrue(HOOK.is_explicit_hold(label))
                 self.assertTrue(HOOK.task_list_is_complete([{"content": label, "status": "pending"}]))
         self.assertTrue(HOOK.task_list_is_complete([{
-            "content": "本番操作を待つ", "note": "[明示保留] owner=本人 / 承認待ち", "status": "pending",
+            "content": "本番操作を待つ", "note": "[返事待ち] 担当=本人 / 承認待ち", "status": "pending",
         }]))
         self.assertFalse(HOOK.task_list_is_complete([
-            {"content": "[明示保留] owner=本人 / 承認待ち", "status": "pending"},
+            {"content": "[返事待ち] 担当=本人 / 承認待ち", "status": "pending"},
             {"content": "AIが行う実装", "status": "pending"},
         ]))
 
     def test_hold_owner_must_be_on_the_label_line(self) -> None:
         for text in [
-            "[明示保留] owner=\n承認待ち", "[明示保留] owner=\r\n本人",
-            "[明示保留]\nowner=本人", "[明示保留] owner\n=本人",
-            "\n[明示保留] owner=本人", "明示保留：\nowner=本人",
+            "[返事待ち] 担当=\n承認待ち", "[返事待ち] 担当=\r\n本人",
+            "[返事待ち]\n担当=本人", "[返事待ち] 担当\n=本人",
+            "\n[返事待ち] 担当=本人", "返事待ち：\n担当=本人",
         ]:
             with self.subTest(text=text):
                 self.assertFalse(HOOK.is_explicit_hold(text))
                 self.assertFalse(HOOK.task_list_is_complete([
                     {"content": text, "status": "pending"}
                 ]))
-        self.assertTrue(HOOK.is_explicit_hold(" [明示保留]\towner = 本人 / 承認待ち"))
+        self.assertTrue(HOOK.is_explicit_hold(" [返事待ち]\t担当 = 本人 / 承認待ち"))
 
     def test_document_view_request_does_not_activate_goal(self) -> None:
         for text in ["既存のプラン文書を表示して", "コミットメント台帳を見せて", "show the plan document"]:
@@ -757,15 +757,15 @@ class EvidenceDetectionTests(unittest.TestCase):
                                             "status": "completed",
                                         },
                                         {
-                                            "content": "[明示保留] owner=本人 / 本番投入 10/6以降",
+                                            "content": "[返事待ち] 担当=本人 / 本番投入 10/6以降",
                                             "status": "pending",
                                         },
                                         {
-                                            "content": "[明示保留] owner=本人 / 本人承認待ち",
+                                            "content": "[返事待ち] 担当=本人 / 本人承認待ち",
                                             "status": "pending",
                                         },
                                         {
-                                            "content": "[明示保留] owner=本人 / 次期プラン",
+                                            "content": "[返事待ち] 担当=本人 / 次期プラン",
                                             "status": "pending",
                                         },
                                     ]
@@ -845,7 +845,7 @@ class EvidenceDetectionTests(unittest.TestCase):
     def test_latest_task_snapshot_replaces_pending_history(self) -> None:
         for latest in [
             {"id": "1", "subject": "配布する", "status": "completed"},
-            {"id": "1", "subject": "[明示保留] owner=本人 / 本人承認待ち", "status": "pending"},
+            {"id": "1", "subject": "[返事待ち] 担当=本人 / 本人承認待ち", "status": "pending"},
         ]:
             entries = [
                 {"type": "user", "message": {"content": "/goal 全部✓"}},
@@ -1523,13 +1523,13 @@ class LedgerFileTests(unittest.TestCase):
         self.assertEqual(HOOK._ledger_item_marks(path), ["☑", "☑"])
         self.assertFalse(self.blocked())
 
-    # [2026-10-14][test] 台帳の owner 付き明示保留と、プロジェクトの claude-plans 探索（伸太郎さん「hookも直しましょう」）。
-    HOLD_OK = "[明示保留] okka=見張り化を選んだため非該当 owner=本人"
+    # [2026-10-14][test] 台帳の 担当 付き返事待ちと、プロジェクトの claude-plans 探索（伸太郎さん「hookも直しましょう」）。
+    HOLD_OK = "[返事待ち] okka=見張り化を選んだため非該当 担当=本人"
 
     def test_done_and_valid_holds_pass_with_seen_marker(self) -> None:
         self.plan("a.html", GOAL, ["☐ 未", "☑ 済", self.HOLD_OK])
         self.assertTrue(self.blocked())                      # ☐ が残る間は止めて記録
-        self.plan("a.html", GOAL, ["☑ 済", self.HOLD_OK, "  【明示保留】 理由 owner：本人", "明示保留: owner=PM"])
+        self.plan("a.html", GOAL, ["☑ 済", self.HOLD_OK, "  【返事待ち】 理由 担当：本人", "返事待ち: 担当=PM"])
         self.assertEqual(HOOK._ledger_item_marks(self.plans / "a.html"), ["☑", "hold", "hold", "hold"])
         self.assertFalse(self.blocked())
 
@@ -1539,8 +1539,8 @@ class LedgerFileTests(unittest.TestCase):
         self.assertEqual(self.markers(), [])
 
     def test_hold_without_owner_blocks_without_record(self) -> None:
-        for hold in ("[明示保留] 理由だけ", "[明示保留] owner=", "[明示保留] owner:  ", "保留 owner=本人", "[明示保留x] owner=本人",
-                     "[明示保留] 理由 previous_owner=本人", "[明示保留] 理由 backup-owner=PM"):
+        for hold in ("[返事待ち] 理由だけ", "[返事待ち] 担当=", "[返事待ち] 担当:  ", "保留 担当=本人", "[返事待ちx] 担当=本人",
+                     "[返事待ち] 理由 前担当=本人", "[返事待ち] 理由 副-担当=PM"):
             with self.subTest(hold=hold):
                 self.plan("a.html", GOAL, ["☐ 未"])
                 self.assertTrue(self.blocked())              # 記録を作っておく
@@ -1663,7 +1663,7 @@ class LedgerFileTests(unittest.TestCase):
 
 class ProseEvidenceTests(unittest.TestCase):
     """Issue #3595: 圧縮後・タスク道具の無い領域で assistant 本文の
-    「台帳照合/タスク化証拠 + 行頭の owner 付き明示保留」を終了根拠にする経路。"""
+    「台帳照合/タスク化証拠 + 行頭の 担当 付き返事待ち」を終了根拠にする経路。"""
 
     @staticmethod
     def _assistant(text: str) -> dict:
@@ -1682,19 +1682,19 @@ class ProseEvidenceTests(unittest.TestCase):
                        "台帳をタスク化済みです。"):
             with self.subTest(ledger=ledger):
                 entries = (self._goal() + [self._compact(),
-                           self._assistant("[明示保留] owner=本人（本番確認待ち）\n" + ledger)])
+                           self._assistant("[返事待ち] 担当=本人（本番確認待ち）\n" + ledger)])
                 self.assertFalse(HOOK.should_block(entries))
 
     def test_prose_evidence_works_without_compaction(self) -> None:
         entries = self._goal() + [
-            self._assistant("[明示保留] owner=本人（本番確認待ち）\n台帳の全行照合が済みました。")]
+            self._assistant("[返事待ち] 担当=本人（本番確認待ち）\n台帳の全行照合が済みました。")]
         self.assertFalse(HOOK.should_block(entries))
 
     def test_block_reason_example_hold_and_crosscheck_passes(self) -> None:
-        # Issue #4324: 阻止文に書いた実例そのまま（行頭の [明示保留] owner=伸太郎）と
+        # Issue #4324: 阻止文に書いた実例そのまま（行頭の [返事待ち] 担当=伸太郎）と
         # 台帳照合の文を同じ返答に書けば Stop hook が通る。
         entries = self._goal() + [
-            self._assistant("[明示保留] owner=伸太郎 〇〇を確かめる\n台帳を全行照合した。")]
+            self._assistant("[返事待ち] 担当=伸太郎 〇〇を確かめる\n台帳を全行照合した。")]
         self.assertFalse(HOOK.should_block(entries))
 
     def test_ledger_reference_without_hold_still_blocks(self) -> None:
@@ -1704,7 +1704,7 @@ class ProseEvidenceTests(unittest.TestCase):
 
     def test_hold_without_ledger_reference_still_blocks(self) -> None:
         entries = self._goal() + [self._compact(),
-                                  self._assistant("[明示保留] owner=本人（本番確認待ち）")]
+                                  self._assistant("[返事待ち] 担当=本人（本番確認待ち）")]
         self.assertTrue(HOOK.should_block(entries))
 
     def test_negative_or_future_ledger_reference_is_not_evidence(self) -> None:
@@ -1712,25 +1712,25 @@ class ProseEvidenceTests(unittest.TestCase):
                      "台帳の照合をしたい。", "台帳は照合しましたか？"):
             with self.subTest(text=text):
                 entries = self._goal() + [
-                    self._assistant("[明示保留] owner=本人（本番確認待ち）\n" + text)]
+                    self._assistant("[返事待ち] 担当=本人（本番確認待ち）\n" + text)]
                 self.assertTrue(HOOK.should_block(entries))
 
     def test_evidence_and_hold_in_different_messages_do_not_pair(self) -> None:
         entries = self._goal() + [self._compact(),
                                   self._assistant("台帳の全行照合が済みました。"),
-                                  self._assistant("[明示保留] owner=本人（本番確認待ち）")]
+                                  self._assistant("[返事待ち] 担当=本人（本番確認待ち）")]
         self.assertTrue(HOOK.should_block(entries))
 
     def test_ownerless_or_midline_hold_is_not_evidence(self) -> None:
-        for hold in ("[明示保留] 本番確認待ち", "注: [明示保留] owner=本人"):
+        for hold in ("[返事待ち] 本番確認待ち", "注: [返事待ち] 担当=本人"):
             with self.subTest(hold=hold):
                 entries = self._goal() + [
                     self._assistant(hold + "\n台帳の全行照合が済みました。")]
                 self.assertTrue(HOOK.should_block(entries))
 
     def test_fenced_or_quoted_markers_are_not_evidence(self) -> None:
-        for text in ("```text\n[明示保留] owner=本人\n台帳の全行照合が済みました。\n```",
-                     "> [明示保留] owner=本人\n> 台帳の全行照合が済みました。"):
+        for text in ("```text\n[返事待ち] 担当=本人\n台帳の全行照合が済みました。\n```",
+                     "> [返事待ち] 担当=本人\n> 台帳の全行照合が済みました。"):
             with self.subTest(text=text[:30]):
                 entries = self._goal() + [self._compact(), self._assistant(text)]
                 self.assertTrue(HOOK.should_block(entries))
@@ -1740,13 +1740,13 @@ class ProseEvidenceTests(unittest.TestCase):
             with self.subTest(name=name):
                 entries = (self._goal() + [self._compact(),
                            _call("t1", name, {}),
-                           self._assistant("[明示保留] owner=本人\n台帳の全行照合が済みました。")])
+                           self._assistant("[返事待ち] 担当=本人\n台帳の全行照合が済みました。")])
                 self.assertTrue(HOOK.should_block(entries))
 
     def test_pre_compact_prose_alone_is_not_enough_after_compaction(self) -> None:
         # 圧縮より前の assistant 本文は要約側の証拠判定に任せ、証拠経路には混ぜない
         entries = (self._goal()
-                   + [self._assistant("[明示保留] owner=本人\n台帳の全行照合が済みました。"),
+                   + [self._assistant("[返事待ち] 担当=本人\n台帳の全行照合が済みました。"),
                       self._compact()])
         self.assertTrue(HOOK.should_block(entries))
 
@@ -1780,7 +1780,7 @@ class MarkdownLedgerAndClearTests(unittest.TestCase):
         return HOOK.should_block(entries, conversation_id="c", plans_dir=empty, state_dir=empty)
 
     def test_all_done_or_hold_does_not_block(self) -> None:
-        self.ledger.write_text(self.table(["☑", "☑ 済", "[明示保留] owner=本人 / 別プラン"]), encoding="utf-8")
+        self.ledger.write_text(self.table(["☑", "☑ 済", "[返事待ち] 担当=本人 / 別プラン"]), encoding="utf-8")
         self.assertFalse(self.blocked(self.goal() + [self.wrote()]))
 
     def test_path_written_in_reply_text_is_read(self) -> None:
@@ -1793,14 +1793,14 @@ class MarkdownLedgerAndClearTests(unittest.TestCase):
 
     def test_open_ledger_beats_prose_claim(self) -> None:
         self.ledger.write_text(self.table(["☑", "☐"]), encoding="utf-8")
-        claim = self.said("[明示保留] owner=本人（確認待ち）\n台帳の全行照合が済みました。")
+        claim = self.said("[返事待ち] 担当=本人（確認待ち）\n台帳の全行照合が済みました。")
         self.assertTrue(self.blocked(self.goal() + [self.wrote(), claim]))
 
     def test_unreadable_or_ambiguous_ledger_blocks_as_before(self) -> None:
         cases = {
             "状態列なし": self.table(["☑"], header="メモ"),
             "不明な印": self.table(["☑", "完了"]),
-            "owner無し保留": self.table(["☑", "[明示保留] 本人待ち"]),
+            "担当無し保留": self.table(["☑", "[返事待ち] 本人待ち"]),
             "空の表": "| 行 | 状態 |\n|---|---|\n",
             "列ずれ": "| 行 | 内容 | 状態 |\n|---|---|---|\n| P1 | ☑ |\n",
         }
@@ -1811,7 +1811,7 @@ class MarkdownLedgerAndClearTests(unittest.TestCase):
 
     def test_unreadable_ledger_beats_prose_claim(self) -> None:
         self.ledger.write_text("| 行 | 内容 | 状態 |\n|---|---|---|\n| P1 | ☐ |\n", encoding="utf-8")
-        claim = self.said("[明示保留] owner=本人（確認待ち）\n台帳の全行照合が済みました。")
+        claim = self.said("[返事待ち] 担当=本人（確認待ち）\n台帳の全行照合が済みました。")
         self.assertTrue(self.blocked(self.goal() + [self.wrote(), claim]))
 
     def test_bullet_list_ledger_blocks_and_reason_shows_table_format(self) -> None:
@@ -1889,6 +1889,130 @@ class MarkdownLedgerAndClearTests(unittest.TestCase):
             self.assertEqual((code, out), (0, ""))
 
 
+class StatusPageLedgerTests(unittest.TestCase):
+    """2026-10-24: 進捗ページ（~/Documents/AI-Work/status/<PJ>.html）の const D の ledger を完了の根拠に読む。"""
+
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.dir = self.tmp / "Documents" / "AI-Work" / "status"
+        self.dir.mkdir(parents=True)
+        self.page = self.dir / "AGENT-HUB.html"
+
+    @staticmethod
+    def html(ledger_js: str | None, extra: str = "") -> str:
+        body = "" if ledger_js is None else f"ledger: {ledger_js},\n  "
+        return ("<html><script>\n/* ===== ここだけ ===== */\nconst D = {\n  workId: 'AGENT-HUB-x',\n  "
+                f"title: 'ページ', // 行末コメント\n  {body}detail: 'ledger: [ {{ s: \"open\" }} ]{extra}'\n}};\n"
+                "/* ===== 毎回同じ ===== */\n(function(){})();\n</script></html>")
+
+    @staticmethod
+    def rows(*pairs: tuple[str, str]) -> str:
+        return "[" + ", ".join(f"{{ t: '作業', s: '{s}', who: '{w}' }}" for s, w in pairs) + "]"
+
+    def goal(self) -> list[dict]:
+        return [{"type": "user", "uuid": "g1", "message": {"content": "/goal 進める"}}]
+
+    def wrote(self, path: Path | None = None, tool: str = "Edit") -> dict:
+        return {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "w1", "name": tool,
+             "input": {"file_path": str(path or self.page)}}]}}
+
+    def said(self, text: str) -> dict:
+        return {"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}}
+
+    def blocked(self, entries: list[dict]) -> bool:
+        empty = self.tmp / "none"
+        return HOOK.should_block(entries, conversation_id="c", plans_dir=empty, state_dir=empty)
+
+    def write(self, ledger_js: str | None) -> None:
+        self.page.write_text(self.html(ledger_js), encoding="utf-8")
+
+    def test_all_done_or_hold_with_owner_passes(self) -> None:
+        self.write(self.rows(("done", ""), ("done", ""), ("hold", "伸太郎殿")))
+        self.assertFalse(self.blocked(self.goal() + [self.wrote()]))
+
+    def test_quoted_json_keys_and_trailing_comma_pass(self) -> None:
+        self.write('[{"t": "作業", "s": "done", "who": ""}, {"t": "確認", "s": "hold", "who": "伸太郎殿"},]')
+        self.assertFalse(self.blocked(self.goal() + [self.wrote(tool="Write")]))
+
+    def test_first_judgment_with_all_done_passes_without_seen_record(self) -> None:
+        # 根拠4の罠（初回判定で全 ☑ だと「見た」記録が無く止まる）を持ち込まない。
+        self.write(self.rows(("done", "")))
+        self.assertFalse(self.blocked(self.goal() + [self.wrote()]))
+        self.assertFalse((self.tmp / "none").exists())
+
+    def test_open_row_blocks(self) -> None:
+        self.write(self.rows(("done", ""), ("open", "")))
+        self.assertTrue(self.blocked(self.goal() + [self.wrote()]))
+
+    def test_hold_without_owner_or_unknown_state_blocks(self) -> None:
+        for name, pairs in {"担当なし": [("hold", "")], "空白": [("hold", "  ")],
+                            "未知の状態": [("done", ""), ("finished", "")]}.items():
+            with self.subTest(name=name):
+                self.write(self.rows(*pairs))
+                self.assertTrue(self.blocked(self.goal() + [self.wrote()]))
+
+    def test_unreadable_empty_or_malformed_ledger_blocks(self) -> None:
+        for name, ledger in {"空": "[]", "配列でない": "'done'", "関数": "(() => [])()",
+                             "行が文字列": "['done']", "補間": "[{ s: `${x}` }]"}.items():
+            with self.subTest(name=name):
+                self.write(ledger)
+                self.assertTrue(self.blocked(self.goal() + [self.wrote()]))
+
+    def test_page_without_ledger_key_is_not_evidence(self) -> None:
+        self.write(None)
+        self.assertTrue(self.blocked(self.goal() + [self.wrote()]))
+
+    def test_string_that_looks_like_ledger_is_not_read(self) -> None:
+        # detail の文字列中の "ledger: [ { s: "open" } ]" には反応せず、本物の ledger だけを読む。
+        self.write(self.rows(("done", "")))
+        self.assertFalse(self.blocked(self.goal() + [self.wrote()]))
+
+    def test_only_pages_edited_in_this_goal_are_read(self) -> None:
+        self.write(self.rows(("done", "")))
+        self.assertTrue(self.blocked(self.goal()))                                      # 触っていない
+        self.assertTrue(self.blocked(self.goal() + [self.said(f"ページは {self.page} です。")]))  # 本文の path だけ
+        self.assertTrue(self.blocked([self.wrote()] + self.goal()))                     # Goal 開始前の更新
+
+    def test_only_status_dir_html_counts(self) -> None:
+        other = self.tmp / "notes" / "AGENT-HUB.html"
+        other.parent.mkdir()
+        other.write_text(self.html(self.rows(("done", ""))), encoding="utf-8")
+        self.assertTrue(self.blocked(self.goal() + [self.wrote(other)]))
+
+    def test_every_edited_page_must_be_complete(self) -> None:
+        second = self.dir / "other.html"
+        self.write(self.rows(("done", "")))
+        second.write_text(self.html(self.rows(("open", ""))), encoding="utf-8")
+        self.assertTrue(self.blocked(self.goal() + [self.wrote(), self.wrote(second)]))
+        second.write_text(self.html(self.rows(("done", ""))), encoding="utf-8")
+        self.assertFalse(self.blocked(self.goal() + [self.wrote(), self.wrote(second)]))
+
+    def test_open_page_beats_prose_claim(self) -> None:
+        self.write(self.rows(("open", "")))
+        claim = self.said("[返事待ち] 担当=本人（確認待ち）\n台帳の全行照合が済みました。")
+        self.assertTrue(self.blocked(self.goal() + [self.wrote(), claim]))
+
+    def test_task_tool_state_still_wins(self) -> None:
+        self.write(self.rows(("done", "")))
+        self.assertTrue(self.blocked(self.goal() + _created() + [self.wrote()]))
+
+    def test_old_hold_label_is_not_accepted(self) -> None:
+        # 旧書式との二重受付はしない（札は [返事待ち] 担当= だけ）。
+        for old in ("[明示保留] owner=本人 本番確認待ち", "明示保留: owner=本人"):
+            with self.subTest(old=old):
+                self.assertFalse(HOOK.is_explicit_hold(old))
+        self.assertTrue(HOOK.is_explicit_hold("[返事待ち] 担当=伸太郎殿 本番確認待ち"))
+
+    def test_block_reason_points_to_status_page_and_not_labels_in_chat(self) -> None:
+        reason = HOOK.BLOCK_REASON
+        self.assertIn("進捗ページ", reason)
+        self.assertIn("地図と進捗ページの URL だけ", reason)
+        self.assertNotIn("明示保留", reason)
+        self.assertNotIn("owner", reason)
+
+
 class HookCliTests(unittest.TestCase):
     def test_stop_hook_active_is_silent(self) -> None:
         code, out = _run_main({"stop_hook_active": True, "transcript_path": "/nope"})
@@ -1912,7 +2036,7 @@ class HookCliTests(unittest.TestCase):
                         "message": {
                             "content": (
                                 "compaction summary: コミットメント台帳 47行を"
-                                " TaskCreate でタスク化済み。3行は明示保留。"
+                                " TaskCreate でタスク化済み。3行は返事待ち。"
                             )
                         },
                     },
@@ -1959,10 +2083,10 @@ class HookCliTests(unittest.TestCase):
         return path
 
     def test_same_hold_state_fires_once(self) -> None:
-        # Issue #3595: owner 付き明示保留の同一阻止状態は再発火しない
+        # Issue #3595: 担当 付き返事待ちの同一阻止状態は再発火しない
         with tempfile.TemporaryDirectory() as tmp:
             state = self._with_state_dir(tmp)
-            path = self._hold_transcript(tmp, "[明示保留] owner=AI（サブエージェント完了待ち）")
+            path = self._hold_transcript(tmp, "[返事待ち] 担当=AI（サブエージェント完了待ち）")
             payload = {"transcript_path": str(path), "session_id": "s1"}
             self.assertEqual(json.loads(_run_main(payload)[1])["decision"], "block")
             self.assertTrue(list(state.glob("blocked-*")))
@@ -1972,10 +2096,10 @@ class HookCliTests(unittest.TestCase):
     def test_changed_hold_state_fires_again(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             self._with_state_dir(tmp)
-            path = self._hold_transcript(tmp, "[明示保留] owner=AI（A完了待ち）")
+            path = self._hold_transcript(tmp, "[返事待ち] 担当=AI（A完了待ち）")
             payload = {"transcript_path": str(path), "session_id": "s1"}
             self.assertEqual(json.loads(_run_main(payload)[1])["decision"], "block")
-            self._hold_transcript(tmp, "[明示保留] owner=AI（B完了待ち）")
+            self._hold_transcript(tmp, "[返事待ち] 担当=AI（B完了待ち）")
             self.assertEqual(json.loads(_run_main(payload)[1])["decision"], "block")
 
     def test_holdless_block_is_never_deduped(self) -> None:
@@ -1990,11 +2114,11 @@ class HookCliTests(unittest.TestCase):
     def test_prose_evidence_pass_clears_dedupe_marker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             state = self._with_state_dir(tmp)
-            path = self._hold_transcript(tmp, "[明示保留] owner=AI（A完了待ち）")
+            path = self._hold_transcript(tmp, "[返事待ち] 担当=AI（A完了待ち）")
             payload = {"transcript_path": str(path), "session_id": "s1"}
             self.assertEqual(json.loads(_run_main(payload)[1])["decision"], "block")
             self._hold_transcript(
-                tmp, "[明示保留] owner=AI（A完了待ち）\n台帳の全行照合が済みました。")
+                tmp, "[返事待ち] 担当=AI（A完了待ち）\n台帳の全行照合が済みました。")
             self.assertEqual(_run_main(payload), (0, ""))
             self.assertFalse(list(state.glob("blocked-*")))
 

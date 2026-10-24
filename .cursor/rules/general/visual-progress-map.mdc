@@ -8,7 +8,7 @@ alwaysApply: true
 <!-- agents-md-card:start -->
 ### CARD: visual-progress-map — 現在地を図で
 - **いつ**: 3つ以上の要素説明・進捗・Issue/PR方針・原因→対処など §1-bis 該当時
-- **何を**: 短い再開・状況変化は現在地と残りを1行。図解が必要な時はL1 ASCII。**説明HTMLは薄いストーリー＋左ナビ。細部詰め込み禁止。MermaidはPC横/スマホ縦。共有は0.0.0.0+Tailscale URL。Stitch不要**（本番UIだけStitch）。手順: `skills/visual-companion/references/explain-html-codex.md`
+- **何を**: 短い再開・状況変化は現在地と残りを1行。図解が必要な時はL1 ASCII。**説明HTMLは薄いストーリー＋左ナビ。細部詰め込み禁止。MermaidはPC横/スマホ縦。共有は127.0.0.1配信+Tailscale Serve URL（0.0.0.0は使わない）。Stitch不要**（本番UIだけStitch）。手順: `skills/visual-companion/references/explain-html-codex.md`
 - **できた状態**: 今どこ・次どこが図で分かる（情報過多で迷わせない）
 - **詳細**: `.claude/rules/general/visual-progress-map.md`
 <!-- agents-md-card:end -->
@@ -55,6 +55,10 @@ alwaysApply: true
 - 再開時、状況が変わった時、短い進捗質問への返答では、最初の1行で「確認済みの現在地＋残り」を伝える。未確認のことは完了に含めない。同じ進捗を毎ターン再掲しない。
 - 同じ作業の続きだけを伝える短い報告は、この1行でよい。この場合は §1-bis②⑦・§2-bis より本項を優先する。複数案件・依存関係の説明、選択肢の比較、全体の見直しには既存の図解を使う。
 - 例：「修正は反映済み。残りはiPhoneでの接続確認です。」実際に確認できた状態だけで書く。
+
+### チャットの地図の型（L1）
+
+図解を出す時の型は「コードの枠・12行まで・右端罫線なし・行頭の漢字札 [済][今][未][待]・URL は枠の外」。**型の正本は My GBrain `判断軸/作業中は現在地を毎回チャットに図で示す` と `skills/visual-companion/SKILL.md`（L1 節）**。ここへ複製しない。まとまった詳細・台帳・表はチャットに並べず、進捗ページ（§6-bis）へ置き、チャットは地図と Tailscale URL だけにする。
 
 ## 1-bis. skill 非依存の常時発火トリガー（バランス型）
 
@@ -128,7 +132,7 @@ skill 非起動時でも、以下のいずれかに該当したら L1 ASCII 図�
 - お手本粒度: `kaizen-unified` の PART A / `kaizen-cold-storage-story` 級
 - セクション 3 つ以上 → **左 sticky 目次**（スマホは横スクロール目次）
 - Mermaid を出すとき → **PC=LR・スマホ=TD** の2本＋CSS切替（手順正本参照）
-- 他端末・Tailscale 共有時 → `0.0.0.0` 配信し localhost と Tailscale URL の両方を出す
+- 他端末・Tailscale 共有時 → `127.0.0.1` で配信し Tailscale Serve で中継する（`0.0.0.0` 直配信は使わない）。主リンクは Tailscale URL
 
 **禁止（頼まれなくてもやらない）**:
 
