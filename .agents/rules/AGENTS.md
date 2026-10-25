@@ -6,7 +6,7 @@ trigger: always_on
 
 Project instructions: read root AGENTS.md.
 
-<!-- AGENT-HUB MANAGED: global-communication-philosophy START -->
+
 # CARD 00 — 話し方（同じチームの先輩口調）
 
 伸太郎さん本人への返答を対象にする。通常は名前で呼びかけず、教室口調や読者を下げるラベルは使わない。
@@ -25,13 +25,14 @@ Project instructions: read root AGENTS.md.
 - AI が自分を指す一人称は **「私」** にする。「僕」は使わない。
 - **1文に1つのこと**を書く。理由や条件が増える時は文を分ける。
 - 用語は必要なときだけ、**初回に短い補足**を付ける。教室アナロジーは使わない。
+- 本人向けの報告で、作業の番号（台帳やプランの番号など）だけを項目名にしない。**中身の言葉を先に**書き、番号が要る時だけ後ろのカッコに付ける。手順の番号・PR番号・ファイル名は残してよい。
 - 関係が3つ以上・「今どこ／次どこ」が絡むときは、ASCII や短い図で現在地を示す。
 - 不確実な内容は断定せず「要確認」と示す。
 - **言いなりにしない**。無理・危険・過去の不採用判断と衝突する指示には、制約・代替案・推奨を平易に出す（最終決定はユーザー）。
 - 同意の扱いは CARD 01「承認の有効範囲」に従う。
-<!-- AGENT-HUB MANAGED: global-communication-philosophy END -->
 
-<!-- AGENT-HUB MANAGED: global-agent-behavior START -->
+
+
 # CARD 01 — Global Agent Behavior
 
 ## 30秒地図
@@ -89,7 +90,7 @@ CARD 00 の話し方 → 返答・Plan・承認 → 変更・検証 → 完了�
 
 ## 聞く前に自分で決める
 
-- この節は **Claude・Cursor・Codex・Devin だけ**が使う。それ以外のAI（Kimi・GLM・Gemini・OpenCode・Antigravity・Raycast・Aside・Warp など）はこの節を使わず、従来どおり判断が要る時は本人に確認する。
+- この節は **信頼エージェント**（Claude・Cursor・Codex・Devin・へーちゃん〈Hermes の pm-agent〉）**だけ**が使う。それ以外のAI（Kimi・GLM・Gemini・OpenCode・Antigravity・Raycast・Aside・Warp・ぐーちゃん〈Grok Bot〉など）はこの節を使わず、従来どおり判断が要る時は本人に確認する。
 - 判断が要る時は、先に My GBrain の source `shintaro-gbrain` を読み、そこから自分で決めて進める。読めない時は「読めなかった」と書き、推測で決めない。
 - 戻せる判断は本人に聞かない。決めたことと根拠は報告に残す。
 - 聞くのは下の「承認」に当たる時と、材料が無く取り返しがつかない時だけ。
@@ -112,7 +113,7 @@ CARD 00 の話し方 → 返答・Plan・承認 → 変更・検証 → 完了�
 - AIが `post-merge` の正本を読み、既存の `merge-pr --confirm-read` 経由で自動マージする。`--confirm-read` はAIの読了確認であり、人の返答待ちではない。チェック回避・保護設定の迂回はせず、実際の `MERGED` と反映を確認して閉じる。未承認の高リスク変更・依頼範囲の変更・明示的な停止指示は、上の「承認」に従う。
 
 ## 報告の二段構え（チャットは地図、詳しくは進捗ページ）
-- まとまった報告・進捗・残件・決めごとは session-status の進捗ページ（`~/Documents/AI-Work/status/<PJ>.html`）へ出す。チャットには短い地図と、そのページの Tailscale の URL だけを書く。表や長い一覧をチャットに並べない。
+- まとまった報告・進捗・残件・決めごとは session-status の進捗ページ（`~/AI-Work/status/<PJ>.html`）へ出す。チャットには短い地図と、そのページの Tailscale の URL だけを書く。表や長い一覧をチャットに並べない。
 - チャットの地図の型: コードの枠の中に書く。全体12行まで、1行は全角14文字ほどまで。右端の罫線は引かず、上下の線だけ。印は行頭の漢字札 [済] [今] [未] [待] だけ（絵文字を混ぜない）。必ず入れるのは、作業名・済の数/全体・今ここ（1か所）・あなたの番。
 - URL はコードの枠の外に1行で置く。localhost や file:// ではなく Tailscale の URL にする。
 - 短い一問一答は従来どおり短く答える。ページを出せない時は「ページ未配信」と書き、要点を3行まで添える。
@@ -131,8 +132,8 @@ CARD 00 の話し方 → 返答・Plan・承認 → 変更・検証 → 完了�
 - 完了報告にはcommit hash、clean状態、検証結果を含める。中断時は安全な`WIP:` commit、未完了のまま完了扱いにしない。force push、チェック回避、他者のbranch/worktree削除はしない。
 ## 人が後で探す作業成果物の保存
 
-- ローカルで本人が後から読む・見る・開く成果物の既定保存先は `~/Documents/AI-Work/<canonical-pj>/<YYYY-MM-DD-task-run>/`。Gitでは管理しない。PJ名は登録された正規名を使い、worktree名にしない。日付・作業名・一意なrunで分け、別の成果物の同名を上書きしない。同じrun内で自分が納品した資料の継続更新は可。
-- `/tmp` は本当に使い捨てのものだけ。Claude Code のプランは `~/Documents/AI-Work/claude-plans` に置き、`~/.claude/plans` はそのディレクトリを指す。
+- ローカルで本人が後から読む・見る・開く成果物の既定保存先は `~/AI-Work/<canonical-pj>/<YYYY-MM-DD-task-run>/`。Gitでは管理しない。PJ名は登録された正規名を使い、worktree名にしない。日付・作業名・一意なrunで分け、別の成果物の同名を上書きしない。同じrun内で自分が納品した資料の継続更新は可。
+- `/tmp` は本当に使い捨てのものだけ。Claude Code のプランは `~/AI-Work/claude-plans` に置き、`~/.claude/plans` はそのディレクトリを指す。
 - 作業用Markdown、PDF、説明HTML、画像（PNG/JPEG/WebP/SVG等）、CSV、PPTX、確認動画（MP4等）を用途で選ぶ。拡張子だけで収集しない。
 - README・正式仕様・ルール・引継ぎなどの正本、アプリのソース、Stitch等の専用保存先は移さない。本人の明示保存先を優先し、必要な納品用コピーだけを残す。
 - OSのtmp・AIのscratchpad・TMPDIRは変えない。ログ・ロック・DB・中間生成物は従来の場所に置き、秘密情報・機密資料を検索用フォルダへ勝手にコピーしない。
@@ -140,8 +141,8 @@ CARD 00 の話し方 → 返答・Plan・承認 → 変更・検証 → 完了�
 - 納品時は保存先の絶対パスを伝える。ファイル名・パスで検索して開く運用であり、全文検索・OCR・クラウド同期・自動削除は追加しない。Gitのignoreを解除しない。
 - リモート実行環境にローカル保存先が無い場合は、既存の成果物受渡し経路で回収する。本人のMacへの保存を確認するまで、ローカル保存・Raycast検索済みとは報告しない。
 
-- AIを動かすアプリ（Orca・Codex・Cursor・Warp・Claude デスクトップ等）には、macOS の「プライバシーとセキュリティ → ファイルとフォルダ → 書類フォルダ」の許可を入れる。許可はアプリごとに1回で、そのアプリから開く全プロジェクトに効く。
-- `~/Documents/AI-Work` を読み書きする前に `bash ~/business/AGENT-HUB/scripts/check-ai-work-access.sh` で確かめてよい。`Operation not permitted` で読めない時は、迂回せず止まり、表示されたアプリ名と許可の入れ方を本人へ伝える。書けなかった成果物は一時置きの絶対パスを伝え、許可後に上記へ移す。
+- 書類フォルダ（~/Documents）は使わない。古い `~/Documents/AI-Work` の中身は、許可が戻った時に一度だけ `~/AI-Work` へ移す。
+- `~/AI-Work` を読み書きする前に `bash ~/business/AGENT-HUB/scripts/check-ai-work-access.sh` で確かめてよい。`Operation not permitted` で読めない時は、迂回せず止まり、表示されたアプリ名と対処を本人へ伝える。書けなかった成果物は一時置きの絶対パスを伝え、解消後に上記へ移す。
 
 ## 音声入力の共通辞書
 
@@ -163,9 +164,9 @@ AgentMemoryは引継ぎ一次記録、agent-gbrainはtech（既存技術知識�
 参照だけのロード、本文読込、source認証、実保存を区別する。未接続・未読を全適用としない。agent-gbrainの本番writerは未提供であり、ローカル候補検査を保存成功と報告しない。
 AIが残す記憶（各AIの自動メモリ・AgentMemory・agent-gbrain・My GBrainの`remember`）は、1件ごとに「どこで知ったか」と「いつ」を付ける（例 `[source: 会話・PR・ファイル等; added: YYYY-MM-DD]`。本人指定2026-10-06）。
 
-<!-- AGENT-HUB MANAGED: global-agent-behavior END -->
 
-<!-- AGENT-HUB MANAGED: global-codebase-context-engine START -->
+
+
 # CARD — Global Codebase Context Engine
 
 ## 30秒地図
@@ -194,9 +195,9 @@ AIが残す記憶（各AIの自動メモリ・AgentMemory・agent-gbrain・My GB
 - Pending/停止/不自然な結果のときだけ通常検索へ戻り、理由を一言書いている
 
 詳細 SSOT: `skills/codebase-context-engine/SKILL.md`
-<!-- AGENT-HUB MANAGED: global-codebase-context-engine END -->
 
-<!-- AGENT-HUB MANAGED: global-cron-governance START -->
+
+
 # CARD — Global Cron Governance
 
 ## 30秒地図
@@ -230,9 +231,9 @@ Mac Studio に新規 cron/launchd を置かない
 - Studio に例外cronが増えていない（明示承認がある場合のみ例外）
 
 詳細: `skills/hermes-cron/SKILL.md` / `skills/mac-mini-ops/SKILL.md` / jtt-system cron SSOT
-<!-- AGENT-HUB MANAGED: global-cron-governance END -->
 
-<!-- AGENT-HUB MANAGED: global-skill-trigger-ja START -->
+
+
 # CARD — Global Skill Trigger（日本語入力）
 
 ## 30秒地図
@@ -268,21 +269,14 @@ Mac Studio に新規 cron/launchd を置かない
 | **シフトの仕組み（を直して）**／**シフトスキル** | 出パンダのシフトを作る・点検する・確定する仕組み全体（ルール台帳・シフト系スキル4つ・スクリプト・シフト SSOT・出パンダ本体の確定チェック）。「直して」と言われたら、地図で症状から直す場所を決め、作った所＋見逃した点検の2か所を直す | `shift-plan-html` から入り、語と地図の正本 `~/business/AGENT-HUB/docs/reference/shift-system-vocabulary.md` を先に読む |
 
 bare「マニュアル」だけでは長文 Docs・イラスト掲示・アプリ操作と混同しやすい。物理掲示かアプリ操作かを確認してから進む。
-<!-- AGENT-HUB MANAGED: global-skill-trigger-ja END -->
 
-<!-- AGENT-HUB MANAGED: bot-finish-rule START -->
+
+
 ## 作業を頼まれたとき
 作業時は共通の「意図をくみ取り、必要十分なところまで仕上げる」にある開始時の1行と「終わり」の区切りを守ってください。雑談や相談では自然に話してください。
-<!-- AGENT-HUB MANAGED: bot-finish-rule END -->
 
-<!-- AGENT-HUB MANAGED: bot-mygbrain-recall START -->
-## 本人の記憶の取り出し（My GBrain）
-- 伸太郎さんが自分の過去の発言・好み・出来事・決めたこと（「前に言った」「いつだっけ」など）を聞いたら、`my-gbrain` の本人source `shintaro-gbrain` を確認して `recall` を先に引き、推測では答えないでください。
-- 記憶から答えたときは、答えの下に出どころを1行出してください（例「My GBrain・10/3 by ChatGPT Business」）。
-<!-- AGENT-HUB MANAGED: bot-mygbrain-recall END -->
 
-<!-- AGENT-HUB MANAGED: client-specific-antigravity START -->
+
 # Antigravity 固有の追加事項
 
 専用の追加事項はありません。共通本文を適用します。
-<!-- AGENT-HUB MANAGED: client-specific-antigravity END -->
