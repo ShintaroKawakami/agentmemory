@@ -252,6 +252,30 @@ class MidSentence(_Base):
         self.assertIsNone(self.decide([user("見せて"), assistant(text)]))
 
 
+class HumanActionWait(_Base):
+    # [2026-10-25][fix] 本人のボタン操作・画面操作を待つ文だけ、待ちの判定から外す（回帰テスト）。
+    def test_human_button_wait_passes(self):
+        text = "ボット対策のほうは前のままです。Kimi の画面で「トークンを作成する」が押されるのを待っています。 / 終わり"
+        self.assertIsNone(self.decide([user("お願い"), assistant(text)]))
+
+    def test_plain_ci_wait_without_watcher_blocks(self):
+        reason = self.decide([user("お願い"), assistant("CI が終わるのを待っています。")])
+        self.assertTrue(reason and reason.startswith(PREFIX))
+
+    def test_human_action_wait_with_ci_wait_still_blocks(self):
+        reason = self.decide([user("お願い"), assistant("Kimi の画面でボタンが押されるのを待っています。CI の結果も待っています。")])
+        self.assertTrue(reason and reason.startswith(PREFIX))
+
+    def test_passive_automated_button_wait_blocks(self):
+        # [2026-10-25][fix] 受け身の形でも、押すのが自動テストなら人の操作待ちではない
+        reason = self.decide([user("お願い"), assistant("自動テストでボタンが押されるのを待っています。")])
+        self.assertTrue(reason and reason.startswith(PREFIX))
+
+    def test_automated_button_wait_blocks(self):
+        reason = self.decide([user("お願い"), assistant("自動テストがボタンを押すのを待っています。")])
+        self.assertTrue(reason and reason.startswith(PREFIX))
+
+
 class ReconfirmAfterApproval(_Base):
     def test_reconfirm_after_approval_blocks(self):
         reason = self.decide([user("進めて"), assistant("計画は以上です。進めてよいですか？")])

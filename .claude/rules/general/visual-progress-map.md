@@ -166,7 +166,7 @@ skill 非起動時でも、以下のいずれかに該当したら L1 ASCII 図�
 <!-- [2026-10-21][feat] session-status スキル新設に伴う発火義務の接続（承認済みプラン）。
 対応: まとまった報告の表示先を「毎回更新される1枚の進捗HTML」へ固定する旨の短い節を追加。詳細は skill 参照（複製しない）。-->
 
-まとまった報告・進捗・残件・終了整理の表示は `skills/session-status` の進捗ページへ出す（`~/Documents/AI-Work/status/<PJ>.html` を更新し続ける固定URLの1枚）。
+まとまった報告・進捗・残件・終了整理の表示は `skills/session-status` の進捗ページへ出す（`~/AI-Work/status/<PJ>.html` を更新し続ける固定URLの1枚）。
 
 - 優先順位: **まとまった報告＝ページ / 短答＝現行1行（§1）/ 配信不能＝チャット代替＋「ページ未配信」明記**
 - 骨組みの正本は My GBrain「判断軸/進捗htmlの骨組み見本」（開始時に読む。写し: `skills/session-status/references/status-skeleton.html`）

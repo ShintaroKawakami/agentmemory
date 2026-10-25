@@ -100,6 +100,9 @@ def load_policy(path: Path | None = None) -> dict | None:
             "hw_choice": comp("choice_patterns", hw),
             "hw_gate": comp("gate_patterns", hw),
             "hw_cond": comp("condition_patterns", hw) if hw.get("condition_patterns") else [],
+            "hw_action": comp("action_wait_patterns", hw) if hw.get("action_wait_patterns") else [],
+            # [2026-10-25][fix] 操作する人を確かめる: 自動・テスト・CI 等が同じ文にあれば人の操作待ちとはみなさない。
+            "hw_action_exclude": comp("action_wait_exclude_patterns", hw) if hw.get("action_wait_exclude_patterns") else [],
             "wait": comp("wait_patterns"),
             "intent": comp("intent_end_patterns"),
             "done": comp("done_patterns"),
@@ -382,7 +385,13 @@ def decide(entries: list[Any], policy: dict) -> str | None:
     prefix = reasons["prefix"]
 
     # (a) 見張りなしの待ち。待ち文面があるなら、見張りの有無だけで決めてここで終える。
-    if _any(policy["wait"], tail):
+    # [2026-10-25][fix] 本人の画面操作（ボタンを押す・入力する）を待つ文だけは待ちの判定から外す。
+    #   同じ返事の別の文（CI・裏作業）の待ちは従来どおり判定する。語は policy の action_wait_patterns。
+    wait_part = " ".join(
+        s for s in sents[-2:]
+        if not (_any(policy["hw_action"], s) and not _any(policy["hw_action_exclude"], s))
+    )
+    if _any(policy["wait"], wait_part):
         if human_cond or _any(policy["carryover"], tail):
             return None
         return prefix + reasons["wait"] if watcher_state(scoped, policy) == "none" else None
