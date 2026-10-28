@@ -27,7 +27,7 @@ paths:
 ## 0-bis. Codex 指名時の固定ルール
 
 - **`codexで実装` / `Codexで実装` / `codex実装` / `Codex実装`** と言われた時だけ、Codex 実装として扱う。
-- Codex 実装は `agents.yaml#worker_delegation.codex_model_routing` で **GPT-6 Luna** に解決する。作業量・難度に応じて **medium / high / xhigh / max** を使い分ける（既定 max）。GPT-6 Sol は PM・レビュー専用。旧世代と Spark は実装候補にしない。
+- Codex 実装は `agents.yaml#worker_delegation.codex_model_routing` で **GPT-6.1 Terra**（無効時は fallback の GPT-6 Luna）に解決する。作業量・難度に応じて **medium / high / xhigh / max** を使い分ける（既定 max）。GPT-6 Sol は PM・レビュー専用。旧世代と Spark は実装候補にしない。
 - Codex の敵対的レビューは `agents.yaml#task_routing.adversarial_review` を参照する。**GPT-6 Sol は medium 既定**で、難度に応じて high / xhigh へ上げる。
 - Codex の Fast は **明示指定時だけ**許可する。自動選択では標準速度を使う。
 - 週次枠は10%を予備として残す。上限到達、残量不明、古い計測値では Codex 実装を停止し、別の利用可能な provider を選ぶ。
@@ -56,13 +56,16 @@ paths:
 [2026-10-09][feat] 実装サブエージェント（Haiku / Luna / Sonnet）と effort 使い分け方針の反映。
   Claude Code 実装サブエージェントは Haiku（現行 5.5・可変・既定 medium）を主力とし、大規模・難所は Sonnet（既定 high）。
   Codex 実装サブエージェントは Luna（既定 max）。作業量や難度に応じて medium / high / xhigh / max を使い分ける。
+[2026-10-27][feat] Codex 実装の第一候補を GPT-6.1 Terra へ（伸太郎さん 2026-10-27「terra 6.1 を luna よりも優先」）。
+  Luna は agents.yaml の fallback_catalog_entry に残す（切替は旧経路を残す原則）。runtime ID は agents.yaml だけに書く。
+  Kimi の古い記述（K3 は敵対的レビュー用）は 2026-10-13 の Sol 固定化に合わせて直した。
 -->
 
 **既定（2026-08-08 ctx-slim）**: 実装・大量読み（リポ横断の読み込み・大規模ファイル調査）は AI worker への委譲を既定とし、Claude（PM）は設計・検証・統括に徹する。大量読みの第一候補は **Kimi（現行 K3.1 Pro・1M）**（長大 context 対応。選択条件・上限は `agents.yaml` の `kimi_model_routing` を正本とする）。目的: Claude 本体のクレジット消費を抑える（ガバナンス領域 `.claude/` `hook` 等は worker 編集不可のため従来どおり Claude が担う）。
 
-**境界（2026-08-08・2026-10-09 改定）**: 見積り10分未満の小実装とガバナンス領域（`.claude/` `hook` 等の worker 編集不可領域）はサブエージェント内製、大タスク・並列・大量読みは worker（判定手順は `skills/agent-dispatch` が正本）。Claude Code の実装サブエージェントは **Haiku（現行 5.5・可変・既定 medium）** を主力とし、大規模・高難度・複数ファイルは **Sonnet（既定 high）** を使う。Codex の実装サブエージェントは **Luna（既定 max）**。どちらも作業量・難度に応じて **medium / high / xhigh / max** を使い分ける。
+**境界（2026-08-08・2026-10-09 改定）**: 見積り10分未満の小実装とガバナンス領域（`.claude/` `hook` 等の worker 編集不可領域）はサブエージェント内製、大タスク・並列・大量読みは worker（判定手順は `skills/agent-dispatch` が正本）。Claude Code の実装サブエージェントは **Haiku（現行 5.5・可変・既定 medium）** を主力とし、大規模・高難度・複数ファイルは **Sonnet（既定 high）** を使う。Codex の実装サブエージェントは **GPT-6.1 Terra（既定 max・fallback Luna）**。どちらも作業量・難度に応じて **medium / high / xhigh / max** を使い分ける。
 
-**三役の呼称**: 監督=Claude / GPT-6 Sol / Cursor（PM クライアント）／参謀=Kimi（現行 K3.1 Pro）／職人=CodeBar残量と task fit で配分する GPT-6 Luna（量に応じ medium〜max）・Kimi K3.1 Pro・GLM 5.3 系・Gemini Flash High。Kimi K3は敵対的レビューに使い、実装のfallbackにはしない。OpenCode GoはAI Worker候補から除外する。現行モデルと経路の正本は `agents.yaml#model_catalog` と `worker_delegation`。
+**三役の呼称**: 監督=Claude / GPT-6 Sol / Cursor（PM クライアント）／参謀=Kimi（現行 K3.1 Pro）／職人=CodeBar残量と task fit で配分する GPT-6.1 Terra（量に応じ medium〜max・fallback GPT-6 Luna）・Kimi K3.1 Pro・GLM 5.3 系・Gemini Flash High。Kimi K2.8 Preview・K3 は明示指定の互換経路で、実装のfallbackにはしない（敵対的レビューは GPT-6.1 Sol 固定）。OpenCode GoはAI Worker候補から除外する。現行モデルと経路の正本は `agents.yaml#model_catalog` と `worker_delegation`。
 
 **Fable 使用条件（2026-08-11・ctx-save）**: Fable は難所（設計・承認判断／原因不明バグの診断／ガバナンス領域編集）限定。調査・大量読み・軽作業は使わない。重い調査が主目的のセッションは、セッションモデル自体を Sonnet 既定で開始する（第二弾 2026-08-11）。正本・境界の全文は `agents.yaml` の `task_routing.fable_usage_policy`（`session_model_default` 含む）を参照（複製しない）。
 
@@ -78,10 +81,10 @@ paths:
 
 | タスク種別 | 第一候補 | 理由 |
 |-----------|---------|------|
-| 仕様が明確・クリーンさ重視・UI/結線・お手本コード | **CodeBar残量が多い高品質候補（GLM / GPT-6 Luna / Kimi K3.1 Pro / Gemini High）** | 固定 provider に寄せず、残量と task fit の同じ品質帯から選ぶ |
+| 仕様が明確・クリーンさ重視・UI/結線・お手本コード | **CodeBar残量が多い高品質候補（GLM / GPT-6.1 Terra / Kimi K3.1 Pro / Gemini High）** | 固定 provider に寄せず、残量と task fit の同じ品質帯から選ぶ |
 | 通常の実装 / DB・認証・本番・横断 | **CodeBar残量が多い高品質候補** | 明示の安全条件・難度条件を残量加点で覆さない |
-| 小〜中の明確な実装 | **GPT-6 Luna または残量に余裕のある Kimi K3.1 Pro / GLM / Gemini High** | Codex 実装はLuna・effort max。Kimi 実装はK3.1 Pro |
-| 難所・広域変更 | **同じ実装候補から task fit で選ぶ** | GPT-6 Sol はPM・レビュー専用。Codex実装時はLuna・effort max |
+| 小〜中の明確な実装 | **GPT-6.1 Terra または残量に余裕のある Kimi K3.1 Pro / GLM / Gemini High** | Codex 実装はTerra（fallback Luna）・effort max。Kimi 実装はK3.1 Pro |
+| 難所・広域変更 | **同じ実装候補から task fit で選ぶ** | GPT-6 Sol はPM・レビュー専用。Codex実装時はTerra（fallback Luna）・effort max |
 | 複雑バックエンド・高品質候補の枯渇時 | **役割resolverが返す利用可能候補** | `agents.yaml#subagent_routing` の順序に従う |
 | 巨大 context の読み込み・リポ横断調査 | **Kimi K3.1 Pro**（参謀。実装で選ばれた場合も同じ高品質枠） | 1M context 対応。用途に応じて参謀と職人を分ける |
 
@@ -91,7 +94,7 @@ paths:
 
 ### Kimi 内モデル選択（決定論的）
 
-`agents.yaml.worker_delegation.kimi_model_routing` を正本とする。Kimi 実装は K3.1 Pro（long-context も同じモデル。K2.8 Preview は明示指定の互換経路）を使う。敵対的レビューの K3 は `agents.yaml#task_routing.adversarial_review` から OpenCode 経由で解決する。K3 を実装へ自動投入しない。経路の互換性と現在の CLI 版を実測できていない時は、利用可能と見なさない。
+`agents.yaml.worker_delegation.kimi_model_routing` を正本とする。Kimi 実装は K3.1 Pro（long-context も同じモデル。K2.8 Preview は明示指定の互換経路）を使う。敵対的レビューは GPT-6.1 Sol 固定（`agents.yaml#task_routing.adversarial_review`）。K2.8 Preview・K3 を実装へ自動投入しない。経路の互換性と現在の CLI 版を実測できていない時は、利用可能と見なさない。
 
 - 長大 context 条件: `requires_long_context=true`、推定contextが既定モデルの13/16（1Mなら約852K token）超、または推定不能かつraw UTF-8が既定モデルcontextの2倍超。閾値は catalog `context_window` から計算する（`agents.yaml` が正本）。
 - K3.1 Pro: 上限1,048,576 token、effort `low` / `high` / `max` を `kimi_variant` で指定可（既定 `high`）。K2.8 Preview も同じ上限・effort。

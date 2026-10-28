@@ -1,5 +1,5 @@
 {
-  "_comment": "[2026-09-08][feat] handover-preflight.sh の発火語（引き継ぎ・終了整理の合図）と否定判定語の正本。以前はスクリプト内の TRIGGER_RE / NEGATED_CLOSEOUT_KEYWORDS / NEGATED_CLOSEOUT_SUFFIXES にハードコードされ、tests/test_hook_policy_registry.py の allowlist で例外扱いだった。hook はこのファイルだけを読む。trigger_words は正規表現の選択肢として順に結合される（語の並びは長い語を先に置く）。",
+  "_comment": "[2026-09-08][feat] handover-preflight.sh の発火語（引き継ぎ・終了整理の合図）と否定判定語の正本。以前はスクリプト内の TRIGGER_RE / NEGATED_CLOSEOUT_KEYWORDS / NEGATED_CLOSEOUT_SUFFIXES にハードコードされ、tests/test_hook_policy_registry.py の allowlist で例外扱いだった。hook はこのファイルだけを読む。trigger_words は正規表現の選択肢として順に結合される（語の並びは長い語を先に置く）。[2026-10-26][fix] Issue #4488: prompt_project_names を追加。終了整理プロンプト本文の PJ 名検出用で、aliases.yaml の app 名だけでは拾えない PJ 名（jtt-cms / AGENT-HUB / non-pj 等）を補う。正本 resolver（resolve-handover-path.py）の ROOT_HINTS の project 名と、MAC_MINI_REPOS のうち識別性の高い repo 名（keiei-dashboard / cron-dashboard。sales / register / analytics は一般英単語のため除外）を写したもので、scope 解決の正ではなく『本文に複数 PJ 名が出るか』の判定にだけ使う。新 PJ 追加時は resolver 側の登録と一緒にここも更新する。",
   "version": 1,
   "trigger_words": [
     "続き",
@@ -34,5 +34,22 @@
     "要らない",
     "いらない",
     "ない"
+  ],
+  "prompt_project_names": [
+    "AGENT-HUB",
+    "jtt-system",
+    "jtt-apps",
+    "smaregi-mobile-order",
+    "mixpost-app",
+    "jtt-cms",
+    "jtt-cafe-video-workspace",
+    "jtt-cafe-pj",
+    "mcp-servers",
+    "non-pj",
+    "hermes",
+    "mac-mini-server",
+    "ugreen-nas",
+    "keiei-dashboard",
+    "cron-dashboard"
   ]
 }
