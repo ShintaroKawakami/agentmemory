@@ -163,6 +163,26 @@ grep -q "prompt=jtt-cafe-pj/root" <<< "$jtt_cms_prompt_conflict_output" \
 grep -vq "scope: jtt-cafe-pj/root" <<< "$jtt_cms_prompt_conflict_output" \
   || fail "本文の jtt-cafe-pj で scope が上書きされた: $jtt_cms_prompt_conflict_output"
 
+# [2026-10-26][test] #4488: 本文に複数の PJ 名が出る時は本文側の PJ 判定を保留し、
+# 「cwd と本文の PJ が食い違う」を出さない。
+# 実害: ;cchikidev の「PJの判定」節（non-pj / jtt-cafe-pj / jtt-cms / AGENT-HUB の
+# 例示・条件分岐）を jtt-apps の cwd で貼ると jtt-cafe-pj を本文の PJ と誤認して警告した。
+multi_pj_output="$(run_hook "終了整理して。PJの判定: non-pj の場合は ;cchikinon、業務PJ（jtt-cafe-pj など）の場合は ;cchikibiz、開発PJ（jtt-cms / AGENT-HUB など）の場合だけこの手順で閉じる" "/Users/shintaro/Herd/jtt-apps")"
+assert_exact_scope "$multi_pj_output" "jtt-apps/root"
+if grep -q "cwd と本文の PJ が食い違う" <<< "$multi_pj_output"; then
+  fail "複数PJ名の本文で食い違い警告が出た: $multi_pj_output"
+fi
+grep -q "本文側のPJ判定を保留" <<< "$multi_pj_output" \
+  || fail "本文側PJ判定の保留メモが出ない: $multi_pj_output"
+
+# 本文が別 PJ を1つだけ指す時は従来どおり食い違い警告を出す（#4488 で弱めすぎない）
+single_pj_output="$(run_hook "jtt-cafe-pj の終了整理をして" "/Users/shintaro/Herd/jtt-apps")"
+assert_exact_scope "$single_pj_output" "jtt-apps/root"
+grep -q "cwd と本文の PJ が食い違う" <<< "$single_pj_output" \
+  || fail "単一の別PJを指す本文で食い違い警告が出ない: $single_pj_output"
+grep -q "prompt=jtt-cafe-pj/root" <<< "$single_pj_output" \
+  || fail "警告に本文側 PJ が出ない: $single_pj_output"
+
 # 同一 PJ 内のアプリ別名は、従来どおり prompt で scope を絞ってよい
 jtt_system_alias_output="$(run_hook "評価わんこの続き" "/Users/shintaro/jtt-system")"
 assert_exact_scope "$jtt_system_alias_output" "jtt-system/hyoka-wanko"

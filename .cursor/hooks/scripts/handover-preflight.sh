@@ -166,6 +166,10 @@ NEGATED_CLOSEOUT_KEYWORDS = _policy_words("negated_closeout_keywords")
 NEGATED_CLOSEOUT_SUFFIXES = _policy_words("negated_closeout_suffixes")
 NEGATED_PUNCTUATION = re.compile(r"[\s、。.!?！？ー−‐\\-]")
 MAX_ALIAS_TRIGGER_DISTANCE = 32
+# [2026-10-26][fix] #4488: 本文中の PJ 名検出語。aliases.yaml の app 名だけでは
+# jtt-cms / AGENT-HUB / non-pj 等の PJ 名を拾えないため、台帳側で補う。
+# scope 解決の正ではなく「本文に複数の PJ 名が出るか」の判定にだけ使う。
+PROMPT_PROJECT_NAMES = _policy_words("prompt_project_names")
 
 
 def normalize_for_negation(value: str) -> str:
@@ -213,25 +217,50 @@ def alias_near_trigger(prompt: str, name: str, trigger_spans: list[tuple[int, in
     return False
 
 
-def matched_app(prompt: str, apps: list[dict[str, object]]) -> dict[str, object] | None:
+def app_names(app: dict[str, object]) -> list[str]:
+    names: list[str] = []
+    for key in ("canonical_name", "display_name"):
+        value = app.get(key)
+        if isinstance(value, str):
+            names.append(value)
+    aliases = app.get("aliases")
+    if isinstance(aliases, list):
+        names.extend(str(alias) for alias in aliases)
+    return names
+
+
+def matched_apps(prompt: str, apps: list[dict[str, object]]) -> list[dict[str, object]]:
+    """本文に名前が出る app を全件返す（#4488 で複数PJ判定が必要になったため全件化）。"""
     folded_prompt = prompt.casefold()
     trigger_spans = positive_trigger_spans(prompt)
+    found: list[dict[str, object]] = []
     for app in apps:
-        names: list[str] = []
-        for key in ("canonical_name", "display_name"):
-            value = app.get(key)
-            if isinstance(value, str):
-                names.append(value)
-        aliases = app.get("aliases")
-        if isinstance(aliases, list):
-            names.extend(str(alias) for alias in aliases)
-
-        for name in names:
+        for name in app_names(app):
             if trigger_spans and alias_near_trigger(prompt, name, trigger_spans):
-                return app
+                found.append(app)
+                break
             if name and name.casefold() in folded_prompt:
-                return app
-    return None
+                found.append(app)
+                break
+    return found
+
+
+def mentioned_projects(prompt: str, matched: list[dict[str, object]]) -> list[str]:
+    """本文に出る PJ 名を重複なしで返す。
+
+    matched app の project と、台帳の PJ 名トークン（jtt-cms / AGENT-HUB /
+    non-pj 等、aliases.yaml の app 名では拾えないもの）の両方を数える。
+    """
+    found: list[str] = []
+    for app in matched:
+        project = str(app.get("project") or "")
+        if project and project not in found:
+            found.append(project)
+    folded = prompt.casefold()
+    for name in PROMPT_PROJECT_NAMES:
+        if name.casefold() in folded and name not in found:
+            found.append(name)
+    return found
 
 
 # [2026-10-04][fix] #1501: scope 解決の写像を正本 resolver 1 箇所へ集約する。
@@ -442,7 +471,11 @@ def claude_memory_path(project: str, app: dict[str, object] | None) -> str:
     return str(Path.home() / ".claude" / "projects" / encoded / "memory" / "MEMORY.md")
 
 
-def print_hint(app: dict[str, object] | None, forced: bool) -> None:
+def print_hint(
+    app: dict[str, object] | None,
+    forced: bool,
+    mentioned: list[str],
+) -> None:
     manual_path = "skills/handover-manual/references/handover.md"
     reflection_path = "agent-memory/registry/reflection-policy.md"
     placement_path = "agent-memory/registry/placement-policy.md"
@@ -473,6 +506,24 @@ def print_hint(app: dict[str, object] | None, forced: bool) -> None:
     display = cwd_scope
     project_mismatch = False
     prompt_label = ""
+
+    # [2026-10-26][fix] #4488: 本文が複数の PJ 名を含む時は本文側の PJ 判定を保留する。
+    # 背景:
+    #   - ユーザー依頼意図: 開発用終了整理プロンプト（;cchikidev）を jtt-apps の cwd で
+    #     貼ると、「PJの判定」節の例示・条件分岐に出る jtt-cafe-pj を本文の PJ と誤認し
+    #     「cwd と本文の PJ が食い違う」と誤警告した。実際の作業は jtt-apps だけ。
+    #   - 守るべき業務ルール: scope は従来どおり cwd 優先で変えない。警告が出なくなるだけ。
+    #     本文が別 PJ を1つだけ指す時の食い違い警告（#3302）は従来どおり出す。
+    #   - 他案不採用理由: 「〜の場合」「など」の近くの PJ 名を数えない案は、
+    #     「project は jtt-cafe-pj 固定」のような例示以外の言及を止められず再発する。
+    prompt_deferred = False
+    if app is not None and len(mentioned) >= 2:
+        app_project = str(app.get("project") or "")
+        if app_project and app_project != cwd_project:
+            # 本文が単一 PJ を指さない（例示・条件分岐が混在）ため、
+            # 「本文の PJ」自体を確定できない。警告せず app も採用しない。
+            prompt_deferred = True
+            app = None
 
     if app is not None:
         prompt_project = str(app.get("project") or "")
@@ -530,7 +581,10 @@ def print_hint(app: dict[str, object] | None, forced: bool) -> None:
         # 自己申告する。配布物同士の食い違いを出せば原因切り分けが 1 手で済む。
         others = ", ".join(str(path) for path in resolver_differs)
         print(f"- warn: 別候補の resolver と内容が異なります（使用中: {used_resolver} / 相違: {others}）。どちらかの配布物が古い可能性があります")
-    if forced and app is None:
+    if prompt_deferred:
+        joined = " / ".join(mentioned)
+        print(f"- app: 本文に複数のPJ名（{joined}）があるため本文側のPJ判定を保留（cwd優先）")
+    elif forced and app is None:
         print("- alias: 未検出。cwdから推定")
     elif project_mismatch:
         print(f"- app: cwd優先（本文は {prompt_label or '未検出'}）")
@@ -549,12 +603,14 @@ if not forced and not positive_trigger_spans(prompt):
     raise SystemExit(0)
 
 aliases_path = find_aliases_path()
-app = None
+matched: list[dict[str, object]] = []
 if aliases_path is not None:
     try:
-        app = matched_app(prompt, load_apps(aliases_path))
+        matched = matched_apps(prompt, load_apps(aliases_path))
     except Exception:
-        app = None
+        matched = []
+app = matched[0] if matched else None
+mentioned = mentioned_projects(prompt, matched)
 
-print_hint(app, forced)
+print_hint(app, forced, mentioned)
 PY

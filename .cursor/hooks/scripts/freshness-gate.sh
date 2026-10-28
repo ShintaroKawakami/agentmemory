@@ -183,6 +183,47 @@ check_pwa_principles() {
   fi
 }
 
+# [2026-10-27][feat] この worktree（feature 枝）が origin/main より遅れていたら AI に届く形で案内する。
+# 背景:
+#   - ユーザー依頼意図: 伸太郎さん「main 最新を取り込む skill を作り、取り込むタイミングもトリガーで、
+#     AI が必要なら勝手にやる」。Orca で複数 PJ を worktree 並行作業していて、枝の土台が古いと
+#     関係のない検査が落ち原因調査で時間を失う（Tech G-Brain stale-base-repo-wide-guard-recheck 等）。
+#   - 守るべき業務ルール: 案内だけで git に書き込まない（取り込みは main-intake スキルの役目）。
+#     SessionStart は常に exit 0・fail-open（オフライン・origin/main 無し・detached・main 上では何も出さない）。
+#     案内は linked worktree の時だけ（共有 checkout は他セッションが使うため main-intake も動かない）。
+#     案内は stdout に出す。Claude Code は SessionStart の stdout を文脈に足し、stderr（exit 0）は
+#     モデルに見せない（公式 hooks ドキュメント）。Codex も SessionStart の stdout を developer context に足す。
+#   - 他案不採用理由: 新しい hook を1本足す案は登録が増える割に役目が freshness-gate と重なるため不採用。
+#     hook 自身が取り込む案は SessionStart で作業ツリーを書き換えるため不採用。
+# 対応: check_main_behind の fetch 成功直後から repo root を引数で渡して呼ぶ（fetch は増やさない）。
+#   set -u で落ちないよう引数は ${1:-} で受け、必ず return 0。
+check_branch_behind() {
+  local repo_root="${1:-}" branch n gitdir commondir
+  [ -n "$repo_root" ] || return 0
+  branch="$(git -C "$repo_root" branch --show-current 2>/dev/null)" || return 0
+  if [ -z "$branch" ] || [ "$branch" = "main" ]; then
+    return 0
+  fi
+  # 共有 checkout（primary）は他セッションが使うので案内しない。linked worktree の時だけ出す
+  # （git-dir と git-common-dir が同じなら primary。判定できない時も出さない）。
+  gitdir="$(git -C "$repo_root" rev-parse --path-format=absolute --git-dir 2>/dev/null)" || return 0
+  commondir="$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 0
+  if [ -z "$gitdir" ] || [ -z "$commondir" ] || [ "$gitdir" = "$commondir" ]; then
+    return 0
+  fi
+  git -C "$repo_root" rev-parse --verify -q refs/remotes/origin/main >/dev/null 2>&1 || return 0
+  n="$(git -C "$repo_root" rev-list --count HEAD..origin/main 2>/dev/null)" || return 0
+  case "$n" in ''|*[!0-9]*) return 0 ;; esac
+  if [ "$n" -gt 0 ]; then
+    # [2026-10-27][fix] 案内の先頭を `[` にしない。Codex の SessionStart は `[` で始まる stdout を
+    #   JSON として読もうとして失敗し hook が「SessionStart Failed」になり、案内がモデルに届かない
+    #   （実測 codex-cli 0.164.0）。先頭を `main-intake: ` に変えると Completed になり、案内が届いて
+    #   スキルを見つけ --apply まで実行できた。約束: この hook が stdout へ出す行は `[` や `{` で始めない。
+    echo "main-intake: この worktree（${branch}）は origin/main より ${n} 件遅れています。main-intake スキル（--apply）で取り込んでください。未コミットなし・衝突なしなら本人に聞かずに実行してよく、止まったら理由を報告して止まります。"
+  fi
+  return 0
+}
+
 # [2026-08-02][feat] ローカル main の behind をセッション開始時に警告する（issue #1327）。
 # 背景:
 #   - ユーザー依頼意図: セッション開始時のシステムプロンプトにはローカルの git log が載るため、
@@ -219,12 +260,15 @@ check_main_behind() {
     waited=$((waited + 1))
   done
   wait "$fetch_pid" 2>/dev/null || return 0
+  # [2026-10-27] fetch 成功直後に、この枝の遅れも案内する（stdout・fetch は増やさない）。
+  check_branch_behind "$repo_root" || true
   behind="$(git -C "$repo_root" rev-list --count main..origin/main 2>/dev/null)" || return 0
   case "$behind" in ''|*[!0-9]*) return 0 ;; esac
   if [ "$behind" -gt 0 ]; then
-    echo "  ⚠ ローカル main が origin/main より ${behind} コミット遅れています（fetch 実行済み）。" >&2
-    echo "    冒頭の Recent commits はローカル基準です。古いベースへのコミットを避けるため、" >&2
-    echo "    worktree / branch は origin/main から作成してください。" >&2
+    # [2026-10-27] stderr（exit 0）は Claude に届かないため stdout へ寄せる（P1 実測: 公式 hooks ドキュメント）。
+    echo "  ⚠ ローカル main が origin/main より ${behind} コミット遅れています（fetch 実行済み）。"
+    echo "    冒頭の Recent commits はローカル基準です。古いベースへのコミットを避けるため、"
+    echo "    worktree / branch は origin/main から作成してください。"
   fi
   return 0
 }

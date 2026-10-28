@@ -26,7 +26,8 @@ globs:
 
 ## 参照型の実例
 
-- **設計思想**: `~/business/AGENT-HUB/docs/design/design-philosophy.md` に集約し、UI/デザインに関わる各所（stitch-screen-creator 等のサブエージェント、UI 作成フロー）からライブ参照する。思想を各 PJ の rule や skill に複製しない。
+- **本人の好み・判断軸**（言葉選び・呼び方・見せ方・UI の好み）: 正本は My GBrain の source `shintaro-gbrain`。skill / rule には好みの中身を書かず、索引ページの slug を書いて読ませる。好みが変わったら G-Brain だけを直す（2026-10-27 伸太郎さん指示）。書き方は `~/business/AGENT-HUB/skills/ai-project-rules/SKILL.md`「(e) 本人の好みはスキルに書かず My GBrain から読む」。業務の事実・決まり（権限表・GID・価格・禁止事項）はリポジトリ正本のまま。
+- **設計思想**: 正本は My GBrain。`~/business/AGENT-HUB/docs/design/design-philosophy.md` は G-Brain から作った派生ファイルで、再生成日より新しい好みは入っていない。UI/デザインに関わる各所は G-Brain を先に読み、派生ファイルは補助に使う。思想を各 PJ の rule や skill に複製しない。
 - **MCP キー**: `~/.config/agent-hub/.env` に実値を集約し、各 PJ の `.mcp.json` や sync スクリプトはそこから展開する（`.claude/rules/general/mcp-key-management.md`）。`~/mcp-servers/<svc>/.env` への直書きは禁止。
 - **スキル手順**: 各 rule は手順を複製せず、手順 SSOT（skill）をライブ読みで参照する（例: `plan-approval-gate.md` が `skills/plan-approval/SKILL.md` を参照する二段構え）。
 
