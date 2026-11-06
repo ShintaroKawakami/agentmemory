@@ -382,6 +382,20 @@ echo init > "$third_party_repo/README.md"
 git -C "$third_party_repo" add README.md
 git -C "$third_party_repo" commit -q -m init
 
+# [2026-11-06][test] issue #4531: 非 ASCII（日本語）を含む feature ブランチ名の
+#   `git -C <wt> push -u origin <branch>` 回帰用フィクスチャ。
+nonascii_repo="$tmp/nonascii"
+mkdir -p "$nonascii_repo"
+git -C "$nonascii_repo" init -q
+git -C "$nonascii_repo" checkout -q -b 'ShintaroKawakami/widget作成'
+git -C "$nonascii_repo" config user.email test@example.com
+git -C "$nonascii_repo" config user.name "Test User"
+git -C "$nonascii_repo" remote add origin git@github.com:TestOwner/nonascii.git
+echo init > "$nonascii_repo/README.md"
+git -C "$nonascii_repo" add README.md
+git -C "$nonascii_repo" commit -q -m init
+git -C "$nonascii_repo" update-ref refs/remotes/origin/main HEAD
+
 owner_home="$HOME"
 export HOME="$tmp/empty-home"
 export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
@@ -664,6 +678,42 @@ expect_allow \
   "-C 経由 + redirect(2>&1) 付きの安全な push も許可" \
   "$main_repo" \
   "git -C $feature_repo push origin feature/test 2>&1"
+
+# [2026-11-06][test] issue #4531: 非 ASCII（日本語）を含む feature ブランチ名の
+#   単発 `git -C <wt> push -u origin <branch>` は、`-C` 先のブランチが非 main で
+#   宛先が自分の fork なら許可する。従来は has_unsafe_push の ASCII 限定
+#   refspec 判定が unsafe に倒し、main 文言で誤拒否していた（Orca 実測と同じ
+#   引用付き -C パス＋worktree 自身が cwd の形と、main cwd からの形の両方で固定）。
+expect_allow \
+  "非ASCIIブランチ名の -C push は許可（worktree 自身が cwd）" \
+  "$nonascii_repo" \
+  "git -C \"$nonascii_repo\" push -u origin ShintaroKawakami/widget作成"
+
+expect_allow \
+  "非ASCIIブランチ名の -C push は許可（main cwd から）" \
+  "$main_repo" \
+  "git -C \"$nonascii_repo\" push -u origin ShintaroKawakami/widget作成"
+
+expect_allow \
+  "非ASCIIブランチ名の -C push は許可（-C パス非引用）" \
+  "$main_repo" \
+  "git -C $nonascii_repo push -u origin ShintaroKawakami/widget作成"
+
+# 許可の対称として、引用・force・ブレース展開経由の main 宛ては従来どおり拒否。
+expect_block \
+  "引用付き 'main' refspec の -C push は拒否" \
+  "$main_repo" \
+  "git -C $feature_repo push origin 'main'"
+
+expect_block \
+  "force 接頭辞 +main の -C push は拒否" \
+  "$main_repo" \
+  "git -C $feature_repo push origin '+main'"
+
+expect_block \
+  "ブレース展開 {feature,main} の -C push は拒否" \
+  "$main_repo" \
+  "git -C $feature_repo push origin '{feature,main}'"
 
 expect_block \
   "-C 経由でも main 宛て push は拒否" \
@@ -953,6 +1003,13 @@ expect_allow \
   "無害GIT_CONFIG環境のremote省略pushは許可" \
   "$feature_repo" \
   "git push"
+# [2026-11-06][test] issue #4531: 無害 GIT_CONFIG_* 環境でも単発の正当な
+#   `git -C <feature> push -u origin <branch>` が単純形ゲートを通り、
+#   通常経路の宛先 owner 検査を経て許可されることを固定する。
+expect_allow \
+  "無害GIT_CONFIG環境の -C feature pushは許可" \
+  "$main_repo" \
+  "git -C $feature_repo push -u origin feature/test"
 expect_block \
   "無害GIT_CONFIG環境でもcd先third-party pushは拒否" \
   "$feature_repo" \
@@ -1333,6 +1390,36 @@ else
   printf '[FAIL] %s: %s\n' "未知サブコマンドは分類不能メッセージで拒否（upstream文言と混同しない）" "$unclassified_out"
   FAIL=$((FAIL + 1))
 fi
+
+# [2026-10-31][test] issue #4652: ls-tree 等の read-only 既知サブコマンドを誤停止しない
+# 背景:
+#   - ユーザー依頼意図: `git -C <repo> ls-tree --name-only <sha> <path>` が
+#     「unknown Git subcommand ls-tree」で止まり、read-only の調査コマンドが
+#     実行できなかった。既知サブコマンドとして補完し、main 上の
+#     `cd repo && git commit -m x` は従来どおり拒否する回帰も固定する。
+#   - 守るべき業務ルール: read-only の既知サブコマンドは許可。未知サブコマンド
+#     （直前の not-a-real-subcommand 検査）と main 直 commit は拒否のまま。
+#   - 他案不採用理由: ls-tree 単体だけの検査では、cat-file / rev-parse / show 等の
+#     代表的な read-only plumbing が複合でも通ることを固定できないため対で置く。
+expect_allow \
+  "git -C 経由の ls-tree --name-only は許可" \
+  "$main_repo" \
+  "git -C $feature_repo ls-tree --name-only HEAD README.md"
+
+expect_allow \
+  "ls-tree/cat-file/rev-parse/show の複合 read-only は許可" \
+  "$feature_repo" \
+  "git ls-tree --name-only HEAD && git cat-file -t HEAD && git rev-parse --abbrev-ref HEAD && git show --stat HEAD"
+
+expect_allow \
+  "feature cwd での -C main 向け ls-tree は read-only のため許可" \
+  "$feature_repo" \
+  "git -C $main_repo ls-tree -r --name-only origin/main"
+
+expect_block \
+  "cd main_repo && git commit -m x は従来どおり拒否" \
+  "$main_repo" \
+  "cd $main_repo && git commit -m x"
 
 # [2026-08-13][test] issue #1746: own-repo 証明不能（HEREDOC/複合cd/パイプ）は upstream 文言と混ぜない
 # 背景:

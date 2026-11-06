@@ -38,6 +38,11 @@
         "type": "command",
         "command": "CURSOR_BRIDGE_EVENT=beforeMCPExecution bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/block-main-commit.sh\"'",
         "timeout": 20
+      },
+      {
+        "type": "command",
+        "command": "CURSOR_BRIDGE_EVENT=beforeMCPExecution bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/block-physical-pointer.sh\"'",
+        "timeout": 10
       }
     ],
     "preToolUse": [
@@ -120,6 +125,11 @@
         "type": "command",
         "command": "CURSOR_BRIDGE_EVENT=beforeSubmitPrompt bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/pre-implementation-check.sh\"'",
         "timeout": 5
+      },
+      {
+        "type": "command",
+        "command": "CURSOR_BRIDGE_EVENT=beforeSubmitPrompt bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'python3 \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/stop-goal-check.py\" --goal-start'",
+        "timeout": 15
       }
     ],
     "subagentStop": [
@@ -141,6 +151,12 @@
         "type": "command",
         "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'bash \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/stop-quality-check.sh\"'",
         "timeout": 30,
+        "loop_limit": 10
+      },
+      {
+        "type": "command",
+        "command": "bash \"${CURSOR_PROJECT_DIR:-.}/.cursor/hooks/scripts/cursor-command-bridge.sh\" 'python3 \"${CLAUDE_PROJECT_DIR:-.}/.cursor/hooks/scripts/stop-explain-check.py\"'",
+        "timeout": 15,
         "loop_limit": 10
       },
       {

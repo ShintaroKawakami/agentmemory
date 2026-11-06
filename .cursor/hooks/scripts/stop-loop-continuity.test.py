@@ -231,7 +231,9 @@ class MidSentence(_Base):
                      "この形でよければ、PR 作成まで進めます。",
                      "押し直したら教えてください。届いたかをすぐ確認します。",
                      "これで実装に進めてよいですか。「進めて」で着手します。",
-                     "気になる場合は確認します。"):
+                     "気になる場合は確認します。",
+                     # [2026-10-30][fix] 「X」と一言 の依頼も本人の返事待ち（openmessage 機内モード確認で誤停止）
+                     "試したら「おくった」と一言ください。来なければ Mac mini のログを見ます。"):
             self.assertIsNone(self.decide([user("お願い"), assistant(text)]), text)
 
     def test_system_condition_ending_still_blocks(self):

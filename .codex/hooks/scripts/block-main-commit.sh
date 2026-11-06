@@ -187,6 +187,29 @@
 #   - 他案不採用理由: `env` 後の任意トークンを許す正規表現は `env echo git ...` まで誤検知するため不採用。
 # 対応: command/envの標準形とenv代入だけをコマンド位置で消費し、その後のgitサブコマンドを既存判定へ渡す。
 
+# [2026-11-06][fix] issue #4531
+# 背景:
+#   - ユーザー依頼意図: Orca 作業場所からの単発
+#     `git -C "/path/日本語worktree" push -u origin <owner>/<日本語branch>` が
+#     block-main-commit の main 文言（「mainブランチへの直接コミット/プッシュは
+#     ブロックされました」）で誤拒否された。押そうとしたのは非 main の単一
+#     feature ブランチで、ブランチ名に非 ASCII（日本語）を含む。
+#   - 根本原因: has_unsafe_push() の refspec 文字集合 `^[A-Za-z0-9._/-]+$` が
+#     ASCII 限定のため、git refname 規則で正当な非 ASCII 文字を含むブランチ名を
+#     `:`（dst すり替え）や `*`（wildcard）と同じ unsafe 判定に倒し、-C 先は
+#     解決済みなのに早期許可されず main 文言で止まっていた。
+#   - 守るべき業務ルール: main 宛て・colon refspec・wildcard・複数 ref・
+#     引用/展開経由（'main' +main ${v} {a,main} 等）の push は従来どおり deny。
+#   - 他案不採用理由:
+#     1) 危険文字の denylist 列挙に切り替える案は、シェルが refspec トークンを
+#        再解釈する経路（引用符剥がし・変数展開・ブレース展開）を列挙し切れず
+#        fail-open になり得るため不採用。許可集合の維持が安全。
+#     2) `git check-ref-format` へ委譲する案は、`'` や `$` が refname 規則上は
+#        有効でありシェル再解釈の穴を残すため不採用。
+# 対応: refspec から非 ASCII バイトだけを除いた残り（ASCII 部分）に従来の
+#       許可集合を適用する。日本語等の非 ASCII ブランチ名は許容し、
+#       危険な ASCII 文字は従来どおり unsafe を維持する。
+
 set -euo pipefail
 
 # [2026-05-27][fix] issue #201
@@ -2398,7 +2421,13 @@ has_unsafe_push() {
       esac
       continue
     fi
-    echo "$ref" | grep -qE '^[A-Za-z0-9._/-]+$' || return 0  # : や * を含む → unsafe
+    # [2026-11-06][fix] issue #4531: 非 ASCII バイトを除いた ASCII 部分に
+    #   従来の許可集合を適用する。`ShintaroKawakami/widget作成` のような
+    #   日本語ブランチ名は許可し、`:` `*` 引用符・展開系文字は従来どおり unsafe。
+    #   トークンは word split 済みで引用符が生文字として残るため、`'main'` のような
+    #   引用経由の main 宛ても `'` が引っかかり unsafe に倒れる。
+    local ref_ascii="${ref//[! -~]/}"
+    echo "$ref_ascii" | grep -qE '^[A-Za-z0-9._/-]*$' || return 0  # : や * 引用/展開系を含む → unsafe
     [ "$ref" = "main" ] && return 0
     echo "$ref" | grep -qE '(^|/)main$' && return 0  # refs/heads/main 等 → unsafe
   done <<< "$segs"

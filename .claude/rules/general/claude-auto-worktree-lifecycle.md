@@ -39,6 +39,7 @@
     リポジトリ運用の安全境界を緩めるため不採用。
 対応: 起動リポジトリと対象 worktree のリポジトリが異なる場合の例外と、実測済みの代替経路を明記。
   実測詳細は docs/worktree-operations.md へ記録。
+
 -->
 
 # Claude Code auto mode：EnterWorktree / ExitWorktree は必須
@@ -69,7 +70,8 @@ AI セッション（cwd=main）から既存の feature worktree へ移る場合
 
 対象 worktree そのものの作成と cleanup は `git -C <repo> worktree add` / `git worktree remove` 等の単発コマンドで行い、この経路でも main checkout・他セッションの worktree・削除系 action の自動化禁止は同じく守る。
 
-隔離 worktree セッション内から共有 checkout の read-only 確認（終了整理の各PJ clean / branch 機械確認など）が必要な場合は、`git -C` が本体ガードに拒否されるため `bash ~/business/AGENT-HUB/scripts/pj-clean-check.sh <checkoutパス>...`（`--all` で全PJ）を使う（Issue #1511）。書き込み系を同じ方式で潜らせることは禁止。
+隔離セッションの共有 checkout read-only 確認は `git -C` 拒否のため `scripts/pj-clean-check.sh`（`--all` 可）を使う（#1511）。書き込み系の同方式は禁止。
 
-サブエージェントの worktree が古いベース（origin/main 以前）から切られる問題への対処、外側隔離 worktree の残存・cleanup 手順、fallback・session lifecycle・merge-pr.py headRefOid 要件の実測経緯は
-`~/business/AGENT-HUB/docs/worktree-operations.md` を参照。
+隔離 catch-up（#1984）: `ExitWorktree`（`action:"keep"`）→ plain pull＋grep（隔離中 `git -C` 禁止）。詳細 docs。
+
+サブエージェント worktree の古いベース・外側隔離の残存/cleanup・fallback・headRefOid 等の実測は `docs/worktree-operations.md` を参照。

@@ -52,6 +52,23 @@
 # 対応: 初回リマインド（strict/soft）と再リマインド（strict/soft）の4文面へ、
 #   文書の整形・反復修正は sonnet サブエージェントへ委譲する既定があることと、
 #   delegate_prompt の在り処を示す共通の1文を添える。
+#
+# [2026-11-05][fix] Issue #4833: 委譲先サブエージェントの編集と auto-memory への
+#   書き込みを PM の実装編集として数えない。
+# 背景:
+#   - Opus セッションで、委譲先サブエージェント（haiku）が docs へ追記した PostToolUse でも
+#     本 hook が「実装編集が続いている。文書の整形は sonnet サブエージェントへ委譲」を出し、
+#     委譲された側へ委譲を促す誤リマインドになった。同じセッションで auto-memory
+#     （~/.claude/projects/*/memory/）への Write でも発火した。セッションマーカーは親の
+#     session_id で共有されるため、サブエージェントの編集が PM 本体の編集回数へ混入していた。
+#   - 守るべき業務ルール: PM 本体がリポジトリのファイルを直接編集した時だけ数える
+#     （after_edits / repeat_edits による検知は従来どおり維持する）。
+#   - 根拠: インストール済み Claude Code 2.1.318 の hook 入力スキーマ記述で、agent_id は
+#     "Present only when the hook fires from within a subagent ... Use this field (not
+#     agent_type) to distinguish subagent calls" と明記されている。agent_type は --agent
+#     セッションの本スレッドにも載るため、サブエージェント判定には agent_id を使う。
+# 対応: stdin JSON に非空の agent_id（互換で agentId）がある呼び出しは即 exit 0。
+#   tool_input.file_path が $HOME/.claude/projects/<slug>/memory/ 配下なら数えず exit 0。
 
 set -uo pipefail
 
@@ -80,11 +97,13 @@ CACHE_DIR="$(resolve_delegation_reminder_cache_dir "$PROJECT_DIR")"
 mkdir -p "$CACHE_DIR" 2>/dev/null || true
 
 # python スクリプト1: session_id を sha256 hex 化し、stdin JSON 直下の "model" /
-# "transcript_path" を拾う（プロセス置換でファイル引数として渡す。stdin は RAW_INPUT 専用）。
+# "transcript_path" / "agent_id" / "tool_input.file_path" を拾う
+# （プロセス置換でファイル引数として渡す。stdin は RAW_INPUT 専用）。
 FABLE_GUARD_PARSE_INPUT_PY() {
   cat <<'PY'
 import hashlib
 import json
+import os
 import sys
 
 
@@ -93,11 +112,24 @@ def _clean(value: str) -> str:
     return value.replace("\t", " ").replace("\n", " ").replace("\r", " ")
 
 
+def _is_auto_memory_path(file_path: str) -> bool:
+    # auto-memory（~/.claude/projects/<slug>/memory/）配下かを判定する。
+    # slug 直下の "memory" ディレクトリだけを対象にし、同名の別パスは除外しない。
+    expanded = os.path.expanduser(file_path).replace("\\", "/")
+    prefix = os.path.expanduser("~").replace("\\", "/") + "/.claude/projects/"
+    if not expanded.startswith(prefix):
+        return False
+    parts = expanded[len(prefix):].split("/")
+    return len(parts) >= 2 and bool(parts[0]) and parts[1] == "memory"
+
+
 def main() -> None:
     raw = sys.stdin.read()
     session_hash = ""
     model = ""
     transcript_path = ""
+    in_subagent = ""
+    auto_memory = ""
     if raw.strip():
         try:
             payload = json.loads(raw)
@@ -117,17 +149,34 @@ def main() -> None:
             tp_value = payload.get("transcript_path")
             if isinstance(tp_value, str) and tp_value:
                 transcript_path = _clean(tp_value)
+            # [2026-11-05][fix] Issue #4833: サブエージェント内の PostToolUse には
+            # agent_id が載る（agent_type は --agent 本スレッドにも載るため使わない）。
+            for key in ("agent_id", "agentId"):
+                value = payload.get(key)
+                if isinstance(value, str) and value:
+                    in_subagent = "1"
+                    break
+            tool_input = payload.get("tool_input")
+            if isinstance(tool_input, dict):
+                fp_value = tool_input.get("file_path")
+                if isinstance(fp_value, str) and fp_value:
+                    if _is_auto_memory_path(fp_value):
+                        auto_memory = "1"
     # 1行1フィールドで出力する（tab区切りは bash の read が tab を IFS-whitespace
     # として連続デリミタ扱いし、空フィールドを消し去るため不採用。改行区切りなら
     # グループ化した複数回の `read -r` で空行も正しく1フィールドとして拾える）。
     print(session_hash)
     print(model)
     print(transcript_path)
+    print(in_subagent)
+    print(auto_memory)
 
 
 try:
     main()
 except Exception:
+    print("")
+    print("")
     print("")
     print("")
     print("")
@@ -144,11 +193,22 @@ fi
 SESSION_HASH=""
 MODEL=""
 TRANSCRIPT_PATH=""
+IN_SUBAGENT=""
+AUTO_MEMORY=""
 {
   IFS= read -r SESSION_HASH || true
   IFS= read -r MODEL || true
   IFS= read -r TRANSCRIPT_PATH || true
+  IFS= read -r IN_SUBAGENT || true
+  IFS= read -r AUTO_MEMORY || true
 } <<< "$PARSED"
+
+# [2026-11-05][fix] Issue #4833: 委譲先サブエージェント内の呼び出し（agent_id 付き）と
+# auto-memory 配下への書き込みは PM の実装編集ではない。カウンタへ載せる前に抜ける
+# （マーカー・カウンタの混入と誤リマインドの両方を防ぐ）。
+if [ "$IN_SUBAGENT" = "1" ] || [ "$AUTO_MEMORY" = "1" ]; then
+  exit 0
+fi
 
 # stdin 直下に model が無ければ transcript_path の JSONL 末尾（最大200行）から拾う。
 # transcript 全体は読み込まない（tail コマンドでディスク末尾のみ走査する）。

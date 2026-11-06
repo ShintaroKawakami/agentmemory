@@ -27,6 +27,16 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; BLOCK_PHYSICAL_POINTER_FORCE_DENY=1 bash \"$PROJECT_DIR/.codex/hooks/scripts/block-physical-pointer.sh\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "Bash|Edit|MultiEdit|Shell|StrReplaceFile|Write|WriteFile",
         "hooks": [
           {
@@ -112,6 +122,17 @@
             "type": "command",
             "command": "PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; bash \"$PROJECT_DIR/.codex/hooks/scripts/handover-preflight.sh\"",
             "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; SCRIPT=\"$PROJECT_DIR/.codex/hooks/scripts/stop-explain-check.py\"; if [ -f \"$SCRIPT\" ]; then python3 \"$SCRIPT\"; fi",
+            "timeout": 15
           }
         ]
       }

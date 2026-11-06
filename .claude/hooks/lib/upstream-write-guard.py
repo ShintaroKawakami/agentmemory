@@ -915,16 +915,29 @@ def has_git_target_environment(tokens: list[str], git_index: int) -> bool:
 # [2026-08-13][fix] issue #1733: `git cherry` は read-only（upstream との未取り込みコミット比較）。
 # `cherry-pick` だけ既知だと closeout 監査の複合 read-only が「unknown Git subcommand cherry」で
 # third-party write と誤表示される。書き込み系を増やさず比較専用 cherry だけ追加する。
+# [2026-10-31][fix] issue #4652: `git -C <repo> ls-tree …` が「unknown Git
+# subcommand ls-tree」で fail-closed し、read-only の調査コマンドが止まっていた。
+# cat-file / rev-parse / show は既知だが、ls-tree 等の読み取り専用 plumbing が
+# 欠けていたため補完する。本一覧は「解析対象として既知」の登録であり、
+# commit/push/config 等の書込判定（_GIT_TARGET_WRITE_SUBCOMMANDS と検査分岐）や
+# block-main-commit.sh 側の main 保護は変えない。資格情報・実行・サーバ系
+# （credential / daemon / upload-pack / send-pack / pack-objects 等）は
+# 従来どおり未登録=fail-closed のままにする。
 KNOWN_GIT_SUBCOMMANDS = {
-    "add", "am", "apply", "archive", "bisect", "blame", "branch", "bundle",
-    "cat-file", "check-ignore", "check-ref-format", "checkout", "cherry",
-    "cherry-pick", "clean", "clone", "commit", "config", "describe", "diff",
-    "diff-tree", "fetch", "for-each-ref", "format-patch", "fsck", "gc", "grep",
-    "hash-object", "init", "lfs", "log", "ls-files", "ls-remote", "maintenance",
-    "merge", "merge-base", "mv", "notes", "pull", "push", "range-diff", "rebase",
-    "reflog", "remote", "reset", "restore", "rev-list", "rev-parse", "revert",
-    "rm", "show", "show-ref", "sparse-checkout", "stash", "status", "submodule",
-    "switch", "tag", "update-index", "update-ref", "worktree",
+    "add", "am", "annotate", "apply", "archive", "bisect", "blame", "branch",
+    "bundle", "cat-file", "check-attr", "check-ignore", "check-mailmap",
+    "check-ref-format", "checkout", "cherry", "cherry-pick", "clean", "clone",
+    "commit", "config", "count-objects", "describe", "diff", "diff-files",
+    "diff-index", "diff-tree", "fetch", "fmt-merge-msg", "for-each-ref",
+    "format-patch", "fsck", "gc", "get-tar-commit-id", "grep", "hash-object",
+    "help", "init", "interpret-trailers", "lfs", "log", "ls-files", "ls-remote",
+    "ls-tree", "mailinfo", "mailsplit", "maintenance", "merge", "merge-base",
+    "mv", "name-rev", "notes", "patch-id", "pull", "push", "range-diff",
+    "rebase", "reflog", "remote", "reset", "restore", "rev-list", "rev-parse",
+    "revert", "rm", "shortlog", "show", "show-branch", "show-ref",
+    "sparse-checkout", "stash", "status", "stripspace", "submodule", "switch",
+    "tag", "update-index", "update-ref", "var", "verify-commit", "verify-pack",
+    "verify-tag", "whatchanged", "worktree",
 }
 
 KNOWN_GH_GROUPS = {

@@ -72,6 +72,147 @@
   書かない。承認待ちは返事待ち（担当付き）として扱う。報告は未達理由＋次の一手の候補に限り、
   承認済み前提の命令形の実行指示を書かない」を足す。さらに出力時に、承認が出た前提の文を
   取り除く後処理 _strip_approval_assumed を reason へかける（禁止を書いた文は残す）。
+
+[2026-10-31][fix] Issue #4055: 残り手順が本人の承認待ちだけになっても連続して未達判定を返す。
+背景:
+  - jtt-cms（2026-10-14）・jtt-apps（2026-10-22）の /goal で、残りが本番投稿・本番タグ等の
+    本人承認待ちだけになった後も、Stop hook が同じ理由で6回以上「未達」差し戻しを返した。
+    AI は承認なしに進めないルール上、毎回同じ「承認待ち」を返すしかなく進展の無い往復になった。
+  - 承認待ちが「[明示保留] owner:…」（旧書式）・「owner: 伸太郎さん」・「本人の明示承認が要る」
+    等の宣言、または台帳ファイル・進捗ページの保留行だけに書かれると、重複抑制の材料
+    （担当付き返事待ちの行一覧）に載らず、同一状態でも毎回止まった。
+守るべき業務ルール:
+  - 承認の証拠は本人のユーザー発言だけ。承認待ちを完了扱いする逃げ道は作らない
+    （完了判定・札の書式は #3595〜#4423 のまま、1回は未達として差し戻す）。
+  - 札の無い未完了は従来どおり毎回止める。同一阻止状態の重複抑制の境界（#4137）も変えない。
+他案不採用理由:
+  1) 承認待ち行を完了根拠にする案は、宣言だけで Goal を閉じる道を開くため不採用
+     （同じ状態の繰り返しだけを止める）。
+  2) 阻止文に承認済み前提の文言を足す案は安全側を緩めるため不採用（#4423 の禁止を維持）。
+対応: 「明示保留」「owner:／担当=」「本人の（明示）承認が要る」等の人待ち宣言を
+  _is_human_wait で認め、本文・タスク・Markdown 台帳・進捗ページ・HTML 台帳の
+  保留行を重複抑制の材料に載せる。同じ理由での未達差し戻しは1回まで、
+  2回目以降は systemMessage で残件を知らせて終わる（待機扱い）。
+
+[2026-11-02][fix] Issue #3993(2): 正式な Goal が無いのに、圧縮要約の /goal 文で
+  Goal 継続と判断し続ける。
+背景:
+  - mixpost 警告修正セッション（2026-10-13 実測）で、/goal clear を打つと
+    「No goal set」と表示されたのに、Stop hook が「Goal の完了を確認できません」を
+    出し続けた。要約に残った /goal 文（GOAL_ACTIVE_RE / SUMMARY_GOAL_RE）だけを
+    根拠に Goal 継続と読んでいた。
+  - 実 transcript では /goal clear は type=user ではなく type=system・
+    subtype=local_command のエントリ（<command-args>clear</command-args>）に残る
+    （2026-10-16 lineworks 実測）。#4156 の user 型だけの clear 判定では拾えず、
+    要約側の /goal 文がそのまま活き続けた。出力側は <local-command-stdout> の
+    「Goal cleared:」「No goal set」に残る。
+守るべき業務ルール:
+  - 正式な Goal の記録（local_command の /goal clear 入力、stdout の
+    「Goal cleared:」「No goal set」）を要約の文字より優先し、その記録がある時は
+    要約の /goal 文だけでは Goal 継続と判断しない。
+  - clear の記録が無い・分からない時は従来どおり安全側で止める
+    （要約だけで Goal 継続とする既存の判定は緩めない）。
+他案不採用理由:
+  1) 要約の /goal 文を開始根拠から外す案は、clear 記録の無い継続中の Goal まで
+     見逃すため不採用。
+  2) stdout の「Goal set:」や local_command 入力の /goal を開始根拠に足す案は、
+     今回の範囲（clear 後の誤継続）を超えるため不採用。typed /goal の開始検出は
+     従来どおり user 型だけにする。
+対応: _goal_scope の clear 判定を user 型に加えて system+local_command 型にも
+  広げ、stdout の「Goal cleared:」「No goal set」と貼り付け形式の /goal clear も
+  正式な Goal 終了記録として扱う。
+
+[2026-11-03][fix] Issue #3993(3): 合格した証拠が圧縮要約の手前へ押し出され、
+  要約後の Stop で再び止まる。
+背景:
+  - jtt-system ぺりかん終了時（2026-10-23 実測）に、assistant 本文の証拠
+    （台帳全行照合・タスク化証拠＋行頭の担当付き返事待ち）で Stop が通った直後に
+    圧縮要約エントリが入ると、次の Stop で同じ証拠が「最後の要約より後」の範囲外に
+    なり再び止まった。証拠の探索範囲が最後の圧縮要約より後に固定されているため。
+守るべき業務ルール:
+  - 要約より前の assistant 本文をそのまま証拠に戻す拡張はしない
+    （合格していない transcript まで通る道を開くため）。
+    実際に合格した判定だけを状態ファイルに残し、同じ Goal 範囲かつ
+    開いた台帳（Markdown/進捗ページ）が無い時だけ使う。
+  - 阻止判定（未完了タスク・開いた台帳・証拠なし）が1度出たら記録は捨て、
+    新しい証拠を求める（安全側は緩めない）。
+    Goal 範囲の開始エントリ uuid が取れない時は記録・利用しない
+    （同名 Goal のやり直しに旧合格を使い回せない）。
+他案不採用理由:
+  1) 台帳ファイルの ☐0 と保留一覧が揃えば本文再掲を求めない案は、
+     見た記録（seen marker）を持たない旧台帳まで通す Issue の「1.」と
+     同じ穴を開けるため不採用。
+  2) 証拠の探索範囲を要約より前へ広げる案は、合格していない transcript
+     （証拠の後に要約だけが来た初回判定）まで通してしまうため不採用。
+対応: prose 経路の合格を scope 開始 uuid 付きの passed- 記録として state_dir に残し、
+  要約を挟んだ後の判定ではその記録を合格の根拠に使う。阻止判定が出たら記録を消す。
+
+[2026-11-03][fix] Issue #3993(1): Goal 開始から一度も Stop が無いまま台帳が全 ☑ になると、
+  ☐ を見た記録が無いので終われない。
+背景:
+  - .seen 記録は Stop 判定で ☐ が残る台帳を見た時だけ作られる。/goal を始めてから
+    途中の Stop が一度も無いまま全 ☑ になると記録が無く、安全側で止まり続けた
+    （PR #3992 codex レビュー Warning 2 由来）。
+守るべき業務ルール:
+  - 旧台帳を無条件に通す形にしない。/goal を受け付けた時点で「台帳と Goal の対応」と
+    「☐ が残っている」ことを記録し、その記録がある時だけ全 ☑ を終了の根拠にする。
+  - 記録は会話ID＋Goal 原文＋台帳の組で区切り、中身の anchor で Goal 範囲の開始
+    エントリに結ぶ。別会話・別 Goal・同名 Goal のやり直しに使い回さない。
+    分からない時は記録しない・使わない（従来どおり安全側で止める）。
+他案不採用理由:
+  1) 初回判定の全 ☑ をそのまま通す案は、旧 Goal の全 ☑ 台帳を使い回す穴を
+     開けるため不採用。
+  2) mtime で新旧を分ける案は、再組み立てで時刻が新しくなるため不採用（#3992 と同じ）。
+対応: UserPromptSubmit 入口（--goal-start）で、受理した /goal の原文から data-goal
+  完全一致の台帳を1組だけ引き、既知の印で ☐ が残る時だけ goalstart- 記録を
+  state_dir に残す。記録は transcript の最後尾エントリを anchor にし、
+  Stop 側では「その anchor 以後で最初に始まる Goal 範囲が今の範囲」な時だけ
+  全 ☑ の根拠にする。/goal clear の受理時は記録を消す。
+
+[2026-11-04][fix] Issue #4344（後半）: 権限の拒否で読めない Markdown 台帳の控えが
+  一時置きの台帳まで止め続ける。
+背景:
+  - jtt-apps 面談モーダル（2026-10-22〜24 実測）で、書類フォルダに置いた台帳の控えが
+    許可消失のため stat は通るが中身は読めない状態（Operation not permitted）になった。
+    _md_ledger_state はこれを "unreadable"→"open"（未完了と同じ）と読み、scratchpad 側の
+    同名台帳が全行 ☑ でも3日間止まり続けた。
+守るべき業務ルール:
+  - 権限の拒否（PermissionError）で読めない台帳は "open" ではなく "none"（証拠なし）と
+    して扱う。読める同名の台帳がほかにあればそちらを優先する（本人の希望・Issue コメント）。
+    読めた台帳の ☐ 残り・不明な印・表の崩れは従来どおり "open" で止める（判定を緩めない）。
+  - 止める時の阻止文には、読めなかったパスと理由を出す。
+他案不採用理由:
+  1) stat/read 不可の全エラーを証拠なしにする案は、読めるのに権限外の理由で読めない
+     ファイルまで見逃すため不採用。PermissionError のみを外す。
+  2) 台帳の場所を名前以外で推測して広げる案は、従来の「台帳の場所を推測で広げない」
+     境界を崩すため不採用（一時置きは従来どおり候補名規則で拾う）。
+対応: _md_ledger_status_cells は PermissionError を呼び出し側へ返し、
+  _md_ledger_state は拒否された候補の「パス（理由）」一覧を返す。_evaluate がそれを
+  main へ渡し、阻止文の末尾に読めなかった台帳と理由を付記する。
+
+[2026-11-05][fix] Issue #4830: const D の無い status ページ1枚で進捗ページの完了を
+  認めず止め続ける。
+背景:
+  - 進捗ボードのスマホ対応 Goal（2026-11-04〜05 実測）で、台帳が全行 done /
+    担当付き hold の進捗ページがあるのに Stop が完了を認めなかった。
+    _status_page_state が Goal 中に Write/Edit した ~/AI-Work/status/*.html を
+    すべて候補にし、const D の無い確認用ページ（duo-diag.html）が「読めない」
+    ＝ open になったため。阻止文に原因のページ名も出ず、hook を手元で動かして
+    特定するしかなかった。
+守るべき業務ルール:
+  - const D を持たないページは進捗ページではない。ledger キーの無いページを
+    "absent" で外す扱いと揃えて候補から外す。
+  - const D はあるが読めないページ（リテラルの壊れ・dict 以外・ledger が配列
+    以外・空台帳）は従来どおり "open" で止める。壊れた進捗ページを素通りしない。
+  - 阻止文に open と判定したページのパスを出す。
+他案不採用理由:
+  1) 読めないページ全部を証拠なしにする案は、壊れた進捗ページまで通すため不採用
+     （「const D 無し」と「const D あり・読めない」を分ける）。
+  2) ファイル名等で進捗ページか推測する案は、判定を複雑にし誤判定の道を開くため
+     不採用（const D の有無だけで分ける）。
+対応: _status_page_ledger は const D 無しを "absent" で返す。_status_page_state は
+  open と判定したページの「パス（理由）」一覧を返し、_evaluate が main へ渡して
+  阻止文に付記する。
 """
 
 from __future__ import annotations
@@ -84,6 +225,17 @@ import sys
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Iterable
+
+# [2026-11-02][refactor] 圧縮要約の判定と本文の取り出しは共通部品（session_transcript_lib.py）へ移した。
+# 背景: stop-explain-check.py も同じ判定を使う。ハイフン名のファイルは import できないので共通部品の側へ置く。
+# 守る: 判定結果は移す前と同じ。ここでの名前（_is_compaction_entry 等）は別名として残す。
+# 不採用: 複写（片方だけ直って食い違う）。
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from session_transcript_lib import (  # noqa: E402
+    combined_transcript_text,
+    is_compaction_entry as _is_compaction_entry,
+    walk_strings,
+)
 
 # [2026-10-04][fix] 文書名だけの閲覧依頼は Goal 開始の根拠ではない。
 # 文書名で起動する案は通常の読取依頼を止めるため採らない。明示のGoal根拠は維持する。
@@ -208,38 +360,8 @@ def _iter_transcript_lines(transcript_path: str) -> Iterable[Any]:
                 continue
 
 
-def walk_strings(obj: Any) -> Iterable[str]:
-    if isinstance(obj, str):
-        yield obj
-        return
-    if isinstance(obj, dict):
-        for value in obj.values():
-            yield from walk_strings(value)
-        return
-    if isinstance(obj, list):
-        for value in obj:
-            yield from walk_strings(value)
-
-
-def combined_transcript_text(entries: list[Any]) -> str:
-    return "\n".join(walk_strings(entries))
-
-
 def is_goal_active(text: str) -> bool:
     return bool(GOAL_ACTIVE_RE.search(text) or SUMMARY_GOAL_RE.search(text))
-
-
-def _is_compaction_entry(entry: Any) -> bool:
-    return isinstance(entry, dict) and (
-        entry.get("isCompactSummary") is True
-        or entry.get("isSummary") is True
-        or entry.get("type") == "summary"
-        or (entry.get("type") == "system" and (
-            "compactMetadata" in entry
-            or re.search(r"(?i)compaction summary|continued from a previous conversation",
-                         combined_transcript_text([entry]))
-        ))
-    )
 
 
 def _without_goal_annotations(text: str) -> str | None:
@@ -430,7 +552,12 @@ def _goal_scope(entries: list[Any]) -> tuple[bool, list[Any], set[str]]:
                 if not active:
                     start = index
                 active = True
-            user_clear = role == "user" and _is_goal_clear(text)
+            # [2026-11-02][fix] Issue #3993(2): 実 transcript の /goal clear は
+            #   type=system・subtype=local_command にも残る（2026-10-16 lineworks 実測）。
+            #   user 型だけの判定では拾えず、要約の /goal 文で Goal 継続と誤判定し続けた。
+            official_record = role == "user" or (role == "system" and entry.get("subtype") == "local_command")
+            user_clear = official_record and (
+                _is_goal_clear(text) or bool(_GOAL_OFF_STDOUT_RE.match(text)))
             user_start = role == "user" and not user_clear and bool(re.match(r"(?i)^\s*(?:/goal\b|Goal[:：])", text)
                                                 or re.fullmatch(r"(?:このプランを)?全部[✓✔](?:にして(?:ください)?)?[。!！ \t]*", text.strip())
                                                 or re.match(r"^(?:このプランを)?全部[✓✔]にして(?:ください)?(?=$|[。!！\s])", text.strip())
@@ -473,6 +600,31 @@ def is_explicit_hold(text: str) -> bool:
     """Only an explicit §6 label authorizes a hold; prose is not task state."""
     marker = HOLD_RE.search(text or "")
     return bool(marker and marker.group("owner").strip("\"'"))
+
+
+# [2026-10-31][fix] Issue #4055: 人待ち（本人の承認・操作・返事待ち）の宣言を拾う目印。
+# §6 の札（[返事待ち] 担当=）だけでは、旧書式の「[明示保留] owner:…」・「owner: 伸太郎さん」・
+# 「本人の明示承認が要る」等の宣言が重複抑制の材料に載らず、承認待ちだけ残る状態で毎回止まった
+# （jtt-cms 2026-10-14 / jtt-apps 2026-10-22 実測）。完了根拠には使わず、同一阻止状態の
+# 再差し戻しを止める判定だけに使う（安全側は緩めない）。
+_APPROVAL_WAIT_RE = re.compile(
+    r"明示保留|返事待ち|承認待ち|承認を待"
+    r"|(?:owner|担当)[ \t]*[=：:][ \t]*[^\s/、，,。．]+"
+    r"|承認(?:が|は)(?:要る|必要)"
+    r"|(?:人|オーナー|本人)の(?:承認|操作|確認|返事)(?:が|は)?(?:要る|必要|待ち)"
+)
+
+
+def _is_human_wait(text: str) -> bool:
+    """担当付き返事待ち、または本人の承認・操作・返事待ちの宣言か（Issue #4055 の待機判定用）。
+    完了・保留の根拠には使わない。同じ理由での差し戻しを止める材料だけに使う。"""
+    if not text:
+        return False
+    return bool(
+        is_explicit_hold(text)
+        or _LEDGER_HOLD_RE.search(text)
+        or _APPROVAL_WAIT_RE.search(text)
+    )
 
 
 # Issue #3595: 台帳の「照合」（全行確認）もタスク化宣言と同じ証拠の語として扱う。
@@ -524,7 +676,9 @@ def _prose_wait_evidence(scoped: list[Any]) -> tuple[list[str], bool]:
             continue
         clean = _normalize_goal_field_format(_summary_goal_fields(text, allow_quoted_state=False))
         entry_holds = [line.strip() for line in clean.splitlines() if is_explicit_hold(line)]
-        holds.extend(entry_holds)
+        # [2026-10-31][fix] Issue #4055: 証拠化（paired）は厳格な札だけで判定し、
+        # 重複抑制の材料（holds）には旧書式・owner:/本人承認待ち等の人待ち宣言も載せる。
+        holds.extend(line.strip() for line in clean.splitlines() if _is_human_wait(line))
         if entry_holds and _has_ledger_reference(clean):
             paired = True
     return holds, paired and not tool_used
@@ -963,12 +1117,21 @@ def _wrapped_goal_args(text: str) -> str | None:
 
 
 def _is_goal_clear(text: str) -> bool:
-    """user の `/goal clear`（打ち込み形式・素の文面）。引数なしや別の引数は clear ではない。"""
-    match = _GOAL_COMMAND_RE.match(text)
+    """`/goal clear`（打ち込み・貼り付け形式・素の文面）。引数なしや別の引数は clear ではない。"""
+    match = _GOAL_COMMAND_RE.match(text) or _GOAL_PASTE_RE.match(text)
     if match:
         first = next((line.strip() for line in match.group(1).splitlines() if line.strip()), "")
         return first.lower() == "clear"
     return bool(re.fullmatch(r"\s*/goal[ \t]+clear[ \t]*", text, re.IGNORECASE))
+
+
+# [2026-11-02][fix] Issue #3993(2): ネイティブ Goal の stdout 記録。
+#   local_command の出力に残る「Goal cleared:」「No goal set」は、その時点で
+#   正式な Goal が無い記録。要約の /goal 文より優先する（両方とも値だけの一致で、
+#   「Goal set:」等の開始側は別扱いにして変えない）。
+_GOAL_OFF_STDOUT_RE = re.compile(
+    r"(?i)\A\s*<local-command-stdout>\s*(?:No[ \t]+goal[ \t]+set|Goal[ \t]+cleared)\b"
+)
 
 
 # [2026-10-17][fix] Issue #4156: タスク道具が無い環境の台帳は Markdown の表（状態列が ☐/☑/[明示保留] owner=）。
@@ -977,7 +1140,7 @@ def _is_goal_clear(text: str) -> bool:
 #   守るべき業務ルール: 台帳の場所を推測で広げない。今回の Goal 中に assistant が Write/Edit した、
 #   または返答本文に絶対パスで書いた「ledger/台帳」を含む .md だけを読む。
 #   存在する候補はすべて読めて全行 ☑/保留の時だけ通す。読めない・状態列が無い・不明な印・☐ 残りは従来どおり止める。
-#   他案不採用理由: ~/Downloads/AI-Work 等を走査する案は別 Goal の台帳を拾うため不採用。
+#   他案不採用理由: ~/AI-Work 等を走査する案は別 Goal の台帳を拾うため不採用。
 #   返答本文の宣言だけで通す案は #3604 の穴を開け直すため不採用（ファイルの状態を読む）。
 _LEDGER_WRITE_TOOLS = frozenset({"write", "edit", "multiedit"})
 _MD_LEDGER_PATH_RE = re.compile(r"(?:~|(?<![\w.~]))/[^\s`\"'|()（）<>\[\]、。,;]*")
@@ -1016,15 +1179,18 @@ def _md_ledger_candidates(scoped: list[Any]) -> list[Path]:
     return [Path(path) for path in found]
 
 
-def _md_ledger_marks(path: Path) -> list[str] | None:
-    """Markdown 台帳の「状態」列の分類済みの印。状態列のある表が無い・崩れている時は None。"""
+def _md_ledger_status_cells(path: Path) -> list[str] | None:
+    """Markdown 台帳の「状態」列の生の文言。状態列のある表が無い・崩れている時は None。
+    権限の拒否（PermissionError）は呼び出し側へ投げる（Issue #4344: 証拠なし扱いにするため）。"""
     try:
         if path.stat().st_size > _MAX_MD_LEDGER_BYTES:
             return None
         lines = path.read_text(encoding="utf-8").splitlines()
+    except PermissionError:
+        raise
     except (OSError, ValueError):
         return None
-    marks: list[str] = []
+    status_cells: list[str] = []
     fence = ""
     index = 0
 
@@ -1062,31 +1228,55 @@ def _md_ledger_marks(path: Path) -> list[str] | None:
             continue                                   # 状態列の無い表（記録など）は台帳として読まない
         if not rows or any(len(row) != len(header) for row in rows):
             return None                                # 空の台帳・列ずれは読取失敗
-        marks.extend(_classify_ledger_cell(row[column]) for row in rows)
-    return marks or None
+        status_cells.extend(row[column] for row in rows)
+    return status_cells or None
 
 
-def _md_ledger_state(scoped: list[Any]) -> str:
-    """"complete"（候補がすべて全行 ☑/保留）/ "open"（読めた台帳に未完了・不明な印）/ "none"（証拠なし・読めない）。"""
+def _md_ledger_marks(path: Path) -> list[str] | None:
+    """Markdown 台帳の「状態」列の分類済みの印。状態列のある表が無い・崩れている時は None。"""
+    cells = _md_ledger_status_cells(path)
+    if cells is None:
+        return None
+    return [_classify_ledger_cell(cell) for cell in cells]
+
+
+def _md_ledger_state(scoped: list[Any]) -> tuple[str, list[str], list[str]]:
+    """("complete"（候補がすべて全行 ☑/保留）/ "open"（読めた台帳に未完了・不明な印）/
+    "none"（証拠なし・読めない）, 人待ちと分かる状態列の文言一覧,
+    権限の拒否で読めなかった候補の「パス（理由）」一覧)。
+    [2026-10-31][fix] Issue #4055: 旧書式の保留行など §6 の札に載らない人待ちも
+    重複抑制の材料にするため、状態列の文言を併せて返す（完了判定は変えない）。
+    [2026-11-04][fix] Issue #4344: 権限の拒否（PermissionError）で読めない台帳は
+    "open" ではなく証拠なしとして扱い、読める他の候補を優先する。止める時の阻止文に
+    読めなかったパスと理由を出すため、拒否された候補の一覧も返す。"""
     states: list[str] = []
+    waits: list[str] = []
+    denied: list[str] = []
     for path in _md_ledger_candidates(scoped):
         try:
             if not path.is_file():
                 continue                               # 存在しない候補（例示パス等）は無視
         except OSError:
             continue
-        marks = _md_ledger_marks(path)
-        if marks is None:
+        try:
+            cells = _md_ledger_status_cells(path)
+        except PermissionError as exc:
+            denied.append(f"{path}（{exc.strerror or 'PermissionError'}）")
+            continue                                 # 権限の拒否は証拠なし。読める他の候補を優先する
+        if cells is None:
             states.append("unreadable")
-        elif all(mark in ("☑", LEDGER_HOLD) for mark in marks):
+            continue
+        marks = [_classify_ledger_cell(cell) for cell in cells]
+        waits.extend(cell.strip() for cell in cells if _is_human_wait(cell))
+        if all(mark in ("☑", LEDGER_HOLD) for mark in marks):
             states.append("complete")
         else:
             states.append("open")
     if "open" in states or "unreadable" in states:
-        return "open"                                  # 読めない台帳は未完了と同じ扱い（本文の宣言で通さない）
+        return "open", waits, denied                     # 読めない台帳は未完了と同じ扱い（本文の宣言で通さない）
     if states and all(state == "complete" for state in states):
-        return "complete"
-    return "none"
+        return "complete", waits, denied
+    return "none", waits, denied
 
 
 # [2026-10-24][feat] 完了の根拠に「進捗ページの台帳」を足す（session-status）。
@@ -1249,14 +1439,16 @@ def _status_page_candidates(scoped: list[Any]) -> list[Path]:
 
 
 def _status_page_ledger(path: Path) -> list[Any] | str:
-    """進捗ページの const D の ledger（行の配列）。読めない時は "unreadable"、キー無しは "absent"。"""
+    """進捗ページの const D の ledger（行の配列）。
+    const D 無し・ledger キー無しは "absent"（進捗ページではない・証拠なし）、
+    const D はあるが読めない・壊れている時は "unreadable"。"""
     try:
         if path.stat().st_size > _STATUS_PAGE_MAX_BYTES:
             return "unreadable"
         text = path.read_text(encoding="utf-8")
         match = _JS_CONST_D_RE.search(text)
         if not match:
-            return "unreadable"
+            return "absent"                          # const D の無いページは進捗ページではない（Issue #4830）
         data = _JsLiteralParser(text, match.end()).value()
     except (OSError, ValueError, _JsLiteralError, RecursionError):
         return "unreadable"
@@ -1268,9 +1460,16 @@ def _status_page_ledger(path: Path) -> list[Any] | str:
     return rows if isinstance(rows, list) else "unreadable"
 
 
-def _status_page_state(scoped: list[Any]) -> str:
-    """"complete"（候補が全て 全行 done / 担当付き hold）/ "open"（未完了・不明・読めない）/ "none"（証拠なし）。"""
+def _status_page_state(scoped: list[Any]) -> tuple[str, list[str], list[str]]:
+    """("complete"（候補が全て 全行 done / 担当付き hold）/ "open"（未完了・不明・読めない）/
+    "none"（証拠なし）, 人待ちと分かる行の文言一覧, open と判定したページの「パス（理由）」一覧)。
+    [2026-10-31][fix] Issue #4055: 担当付き hold 行や承認待ちと書かれた行を
+    重複抑制の材料にするため、行の文言を併せて返す（完了判定は変えない）。
+    [2026-11-05][fix] Issue #4830: open と判定したページのパスを阻止文へ出すため
+    「パス（理由）」一覧も併せて返す。"""
     states: list[str] = []
+    waits: list[str] = []
+    open_pages: list[str] = []
     for path in _status_page_candidates(scoped):
         try:
             if not path.is_file():
@@ -1282,22 +1481,31 @@ def _status_page_state(scoped: list[Any]) -> str:
             continue
         if not isinstance(rows, list) or not rows:
             states.append("open")                      # 読めない・空の台帳は未完了と同じ（宣言で通さない）
+            open_pages.append(f"{path}（読めない・空の台帳）")
             continue
         complete = True
         for row in rows:
             state = row.get("s") if isinstance(row, dict) else None
             who = row.get("who") if isinstance(row, dict) else None
+            row_text = (" / ".join(str(value) for value in row.values()
+                                   if isinstance(value, str))
+                        if isinstance(row, dict) else "")
             if state == "done":
                 continue
             if state == "hold" and isinstance(who, str) and who.strip():
+                waits.append(row_text or "hold")
                 continue
             complete = False                           # open・未知の状態・担当なしの hold
+            if row_text and _is_human_wait(row_text):
+                waits.append(row_text)
         states.append("complete" if complete else "open")
+        if not complete:
+            open_pages.append(f"{path}（未完了の行あり）")
     if "open" in states:
-        return "open"
+        return "open", waits, open_pages
     if states and all(state == "complete" for state in states):
-        return "complete"
-    return "none"
+        return "complete", waits, open_pages
+    return "none", waits, open_pages
 
 
 def _goal_run(start_entry: Any, conversation_id: str) -> GoalRun | None:
@@ -1506,8 +1714,8 @@ class _LedgerParser(HTMLParser):
             self.invalid = True                  # セルの外の文字は項目行として読めない
 
 
-def _ledger_item_marks(path: Path) -> list[str] | None:
-    """各項目行の最後の列の分類済みの印（☐ / ☑ / hold / 不明は先頭1文字）。表が1つでない・読めない時は None。"""
+def _ledger_item_cells(path: Path) -> list[str] | None:
+    """各項目行の最後の列の生の文言。表が1つでない・読めない時は None。"""
     try:
         parser = _LedgerParser()
         parser.feed(_read_plan(path))
@@ -1520,7 +1728,15 @@ def _ledger_item_marks(path: Path) -> list[str] | None:
         return None
     if len(set(parser.widths)) > 1:
         return None                              # 項目行のセル数が揃わない（列ずれ）
-    return [_classify_ledger_cell(cell) for cell in parser.last_cells]
+    return parser.last_cells
+
+
+def _ledger_item_marks(path: Path) -> list[str] | None:
+    """各項目行の最後の列の分類済みの印（☐ / ☑ / hold / 不明は先頭1文字）。表が1つでない・読めない時は None。"""
+    cells = _ledger_item_cells(path)
+    if cells is None:
+        return None
+    return [_classify_ledger_cell(cell) for cell in cells]
 
 
 def _classify_ledger_cell(cell: str) -> str:
@@ -1537,33 +1753,70 @@ def _touch(path: Path) -> None:
     path.touch()
 
 
-def _ledger_file_complete(goal: GoalRun | None, plans_dir: Path, state_dir: Path,
-                          project_dir: Path | None = None) -> bool:
-    if goal is None:
-        return False                                   # 今の Goal を特定できなければ使わない
-    group = _single_plan_group(plans_dir, goal.text)   # 名前で相方をそろえ、全ファイルの data-goal 一致・1組だけ
+def _ledger_group_for_goal(goal_text: str, plans_dir: Path,
+                           project_dir: Path | None = None) -> tuple[Path, ...] | None:
+    """Goal 原文の data-goal 完全一致の台帳を1組だけ返す。既定の場所で見つからない時だけ
+    project_dir/claude-plans を試す（両方を合わせて曖昧にしない）。"""
+    group = _single_plan_group(plans_dir, goal_text)   # 名前で相方をそろえ、全ファイルの data-goal 一致・1組だけ
     # [2026-10-14][fix] worktree で作業すると台帳はその作業フォルダの claude-plans/（gitignore 済み）にあり、
     #   ~/.claude/plans だけでは見つからず Stop が止め続けた（伸太郎さん「hookも直しましょう」2026-10-14）。
     #   既定の場所で1組見つからない時だけ project_dir/claude-plans を試す（両方を合わせて曖昧にしない）。
     #   他案不採用理由: 両方を集めて1組判定する案は、同じ Goal が両方にあると曖昧で止まり続けるため不採用。
     if group is None and project_dir is not None:
-        group = _single_plan_group(project_dir / "claude-plans", goal.text)
-    if group is None:
-        return False
-    statuses = [_ledger_item_marks(path) for path in group]
+        group = _single_plan_group(project_dir / "claude-plans", goal_text)
+    return group
+
+
+def _ledger_group_marks(group: tuple[Path, ...]) -> list[list[str]] | None:
+    """組の各ファイルの項目行の印。読めない相方がある・空欄・不明な印は None。"""
+    cell_lists = [_ledger_item_cells(path) for path in group]
+    if any(cells is None for cells in cell_lists):
+        return None                                    # 読めない相方がある組は曖昧なので止める（文言も採らない）
+    statuses = [[_classify_ledger_cell(cell) for cell in cells] for cells in cell_lists]
     if any(not marks or any(mark not in LEDGER_MARKS and mark != LEDGER_HOLD for mark in marks)
            for marks in statuses):
-        return False                                   # 空欄・不明な印（owner 無しの保留を含む）は記録も作らず止める
+        return None                                    # 空欄・不明な印（owner 無しの保留を含む）
+    return statuses
+
+
+def _ledger_file_state(goal: GoalRun | None, plans_dir: Path, state_dir: Path,
+                       project_dir: Path | None = None,
+                       entries: list[Any] | None = None,
+                       scope_start: Any | None = None) -> tuple[bool, list[str]]:
+    """(完了根拠になるか, 人待ちと分かる項目行の最後の列の文言一覧)。
+    [2026-10-31][fix] Issue #4055: 旧書式の「[明示保留] owner:…」など §6 の札に載らない
+    人待ち行も重複抑制の材料にするため、項目行の文言を併せて返す（完了判定は変えない）。"""
+    if goal is None:
+        return False, []                               # 今の Goal を特定できなければ使わない
+    group = _ledger_group_for_goal(goal.text, plans_dir, project_dir)
+    if group is None:
+        return False, []
+    cell_lists = [_ledger_item_cells(path) for path in group]
+    if any(cells is None for cells in cell_lists):
+        return False, []                               # 読めない相方がある組は曖昧なので止める（文言も採らない）
+    waits = [cell.strip() for cells in cell_lists for cell in cells
+             if _is_human_wait(cell)]
+    statuses = _ledger_group_marks(group)
+    if statuses is None:
+        return False, waits                            # 空欄・不明な印（owner 無しの保留を含む）は記録も作らず止める
     marker = state_dir / goal.marker_name(group)
     try:
         if any("☐" in marks for marks in statuses):
             _touch(marker)                             # 既知の印だけで ☐ が残る時だけ「今回見た」と記録して止める
-            return False
+            return False, waits
         # ☐ が無く ☑ と有効な保留だけ（全行が保留で ☑ が0の場合も同じ扱い）でも、
         # 今回 ☐ を見た記録がある時だけ通す（記録は自動で消さない）。記録が無ければ止める（安全側）。
-        return marker.exists()
+        if marker.exists():
+            return True, waits
+        # [2026-11-03][fix] Issue #3993(1): /goal 受理時に作った goalstart- 記録も
+        #   「今回 ☐ を見た」根拠にする（anchor が今の Goal 範囲を指す時だけ）。
+        if entries is not None and scope_start is not None:
+            goalstart = _goalstart_marker_path(state_dir, goal.conversation_id, goal.text, group)
+            if goalstart.is_file() and _goalstart_record_valid(goalstart, scope_start, entries):
+                return True, waits
+        return False, waits
     except OSError:
-        return False
+        return False, waits
 
 
 def _block_fingerprint(phase: str, pending: list[str], holds: list[str]) -> str:
@@ -1579,25 +1832,267 @@ def _blocked_marker_path(state_dir: Path, conversation_id: str) -> Path:
     return state_dir / f"blocked-{digest[:40]}.txt"
 
 
+# [2026-11-03][fix] Issue #3993(3): prose 経路の合格を記録する。
+#   会話ID＋Goal 範囲の開始エントリ uuid で1つに決まるので、別会話・
+#   別 Goal（同名のやり直しを含む）の記録を使い回さない。
+def _passed_marker_path(state_dir: Path, conversation_id: str, scope_uuid: str) -> Path:
+    digest = hashlib.sha256(
+        "\0".join((conversation_id or "unknown", scope_uuid)).encode("utf-8")).hexdigest()
+    return state_dir / f"passed-{digest[:40]}.txt"
+
+
+def _drop_pass_marker(marker: Path | None) -> None:
+    """阻止判定が1度出たら合格記録を捨てる。退行した状態で旧合格を使い回せない。"""
+    if marker is None:
+        return
+    try:
+        marker.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+# [2026-11-03][fix] Issue #3993(1): UserPromptSubmit 入口（/goal 受理側）。
+#   「☐ を見た」記録は Stop 判定でしか作れず、一度も Stop が無いまま全 ☑ になると
+#   終われなかった。/goal の受理時に台帳と Goal の対応・☐ 残りを記録する。
+#   記録は会話ID＋Goal 原文＋台帳の組で1つに決まり、中身の anchor で Goal 範囲の
+#   開始エントリに結ぶ（別会話・別 Goal・同名のやり直しは使い回せない）。
+_GOALSTART_RECORD_VERSION = 1
+
+
+def _goal_text_from_raw(text: str) -> str | None:
+    """/goal の入力文（素の文面・打ち込み形式・貼り付け形式）から Goal 原文の最初の1行。
+    開始でなければ None。_goal_run の取り方と同じ。"""
+    if not text or _is_goal_clear(text):
+        return None
+    raw = _wrapped_goal_args(text)
+    if raw is None:
+        match = re.match(r"(?is)^\s*/goal\b(.*)$", text)
+        if not match:
+            return None
+        raw = next((line.strip() for line in match.group(1).splitlines() if line.strip()), "")
+    if len(raw) >= 2 and _GOAL_QUOTES.get(raw[0]) == raw[-1]:
+        raw = raw[1:-1].strip()
+    return raw or None
+
+
+def _recent_submission(entries: list[Any]) -> tuple[str, Any | None]:
+    """今回の入力に当たる transcript 記録を最後尾から探す。
+    ("start", エントリ) = Goal 開始 / ("clear", None) = Goal 終了 / ("other", None) = 見つからない。"""
+    for entry in reversed(entries):
+        if not isinstance(entry, dict):
+            continue
+        role = entry.get("type", entry.get("role"))
+        if role == "system":
+            # local_command は /goal clear の正式な記録（Issue #3993(2)）。開始側は
+            # _goal_scope が Goal 開始として扱わないので、clear 以外は飛ばす。
+            if entry.get("subtype") != "local_command":
+                continue
+            text = _entry_text(entry)
+            if _is_goal_clear(text) or _GOAL_OFF_STDOUT_RE.match(text):
+                return "clear", None
+            continue
+        if role != "user":
+            continue                                     # assistant・attachment・summary 等は飛ばす
+        message = entry.get("message", entry)
+        content = message.get("content") if isinstance(message, dict) else None
+        if isinstance(content, list) and any(
+                isinstance(block, dict) and block.get("type") == "tool_result" for block in content):
+            continue                                     # tool_result はユーザー入力ではない
+        text = _entry_text(entry)
+        if _is_goal_clear(text) or _GOAL_OFF_STDOUT_RE.match(text):
+            return "clear", None
+        if _goal_text_from_raw(text) is not None:
+            return "start", entry
+        return "other", None                             # 直近のユーザー入力が Goal 系でない
+    return "other", None
+
+
+def _goalstart_marker_path(state_dir: Path, conversation_id: str, goal_text: str,
+                           group: tuple[Path, ...]) -> Path:
+    """会話ID＋Goal 原文＋台帳の組で1つに決まる記録のパス。"""
+    conv = hashlib.sha256((conversation_id or "unknown").encode("utf-8")).hexdigest()[:16]
+    names = "|".join(sorted(path.name for path in group))
+    scope = hashlib.sha256("\0".join((goal_text, names)).encode("utf-8")).hexdigest()
+    return state_dir / f"goalstart-{conv}-{scope[:40]}.seen"
+
+
+def _drop_goalstart_markers(state_dir: Path, conversation_id: str) -> None:
+    """/goal clear の受理時に、この会話の goalstart- 記録を消す。"""
+    conv = hashlib.sha256((conversation_id or "unknown").encode("utf-8")).hexdigest()[:16]
+    try:
+        for marker in state_dir.glob(f"goalstart-{conv}-*.seen"):
+            try:
+                marker.unlink(missing_ok=True)
+            except OSError:
+                pass
+    except OSError:
+        pass
+
+
+def _is_scope_start_entry(entry: Any) -> bool:
+    """Goal 範囲を始めうるエントリ（_goal_scope の開始判定と同じ集合。anchor 以後で
+    最初の Goal 範囲を特定するためのもの）。clear 等の終了記録は開始ではない。"""
+    if not isinstance(entry, dict):
+        return False
+    if _is_compaction_entry(entry):
+        return True                                      # 要約も範囲の切れ目として扱う（安全側）
+    role = entry.get("type", entry.get("role"))
+    if role == "user":
+        text = _entry_text(entry)
+        if _is_goal_clear(text) or _GOAL_OFF_STDOUT_RE.match(text):
+            return False
+        return bool(
+            re.match(r"(?i)^\s*(?:/goal\b|Goal[:：])", text)
+            or re.fullmatch(r"(?:このプランを)?全部[✓✔](?:にして(?:ください)?)?[。!！ \t]*", text.strip())
+            or re.match(r"^(?:このプランを)?全部[✓✔]にして(?:ください)?(?=$|[。!！\s])", text.strip())
+            or _wrapped_goal_args(text) is not None)
+    if role == "assistant" and re.match(r"(?i)^\s*Goal[:：]", _entry_text(entry)):
+        return True
+    for node in _walk_objects(entry):
+        if node.get("type") == "tool_use":
+            name = str(node.get("name", ""))
+            if name.rsplit("__", 1)[-1].rsplit(".", 1)[-1].replace("_", "").lower() == "creategoal":
+                return True
+    return False
+
+
+def _goalstart_bound_entry(entries: list[Any], anchor: str) -> Any | None:
+    """anchor 以後で最初に Goal 範囲を始めるエントリ。anchor が空なら先頭から探す。
+    anchor のエントリが transcript に無い時は None（結べない＝使わない）。"""
+    index = -1
+    if anchor:
+        index = next((i for i, entry in enumerate(entries)
+                      if isinstance(entry, dict) and entry.get("uuid") == anchor), None)
+        if index is None:
+            return None
+    for entry in entries[index + 1:]:
+        if _is_scope_start_entry(entry):
+            return entry
+    return None
+
+
+def _goalstart_record_valid(path: Path, scope_start: Any, entries: list[Any]) -> bool:
+    """goalstart- 記録が今の Goal 範囲を指すか。
+    bind: 記録時に /goal エントリが transcript にあった（その uuid 自身に結ぶ）。
+    after: /goal エントリがまだ無かった（その uuid 以後で最初に始まる範囲に結ぶ）。
+    anchor が解けない・別の範囲を指す時は False（従来どおり安全側）。"""
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(record, dict) or record.get("v") != _GOALSTART_RECORD_VERSION:
+        return False
+    start_uuid = scope_start.get("uuid") if isinstance(scope_start, dict) else None
+    if not isinstance(start_uuid, str) or not start_uuid:
+        return False                                     # uuid が取れない範囲は使い回せない
+    bind = record.get("bind")
+    if isinstance(bind, str) and bind:
+        return bind == start_uuid
+    after = record.get("after")
+    if not isinstance(after, str):
+        return False
+    bound = _goalstart_bound_entry(entries, after)
+    return isinstance(bound, dict) and bound.get("uuid") == start_uuid
+
+
+def record_goal_start(payload: dict, *, plans_dir: Path | None = None,
+                      state_dir: Path | None = None,
+                      project_dir: Path | None = None) -> int:
+    """UserPromptSubmit 入口。/goal の受理時に台帳の対応と ☐ 残りを記録する。
+    常に fail-open（入力を止めない）。分からない時は記録しない。"""
+    conversation_id = str(payload.get("session_id") or payload.get("sessionId") or "")
+    if not conversation_id:
+        return 0
+    transcript_path = payload.get("transcript_path") or payload.get("transcriptPath")
+    try:
+        entries = list(_iter_transcript_lines(str(transcript_path))) if transcript_path else []
+    except Exception:
+        entries = []
+    state_dir = state_dir or _default_state_dir()
+    prompt = str(payload.get("prompt") or "")
+    signal, start_entry = _recent_submission(entries)
+    if signal == "clear":
+        _drop_goalstart_markers(state_dir, conversation_id)
+        return 0
+    bind = ""
+    after = ""
+    if signal == "start":
+        goal_text = _goal_text_from_raw(_entry_text(start_entry))
+        uuid = start_entry.get("uuid")
+        bind = uuid if isinstance(uuid, str) else ""
+    else:
+        if _is_goal_clear(prompt):
+            _drop_goalstart_markers(state_dir, conversation_id)
+            return 0
+        goal_text = _goal_text_from_raw(prompt)
+        last = entries[-1] if entries else None
+        after = last.get("uuid") if isinstance(last, dict) and isinstance(last.get("uuid"), str) else ""
+    if not goal_text or (signal == "start" and not bind):
+        return 0                                         # uuid の無い開始は結べない（記録しない）
+    project = project_dir
+    if project is None:
+        project_raw = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR")
+        project = Path(str(project_raw)) if project_raw else None
+    group = _ledger_group_for_goal(
+        goal_text, plans_dir or _default_plans_dir(),
+        None if os.environ.get(LEDGER_PLANS_ENV) else project)
+    marker = _goalstart_marker_path(state_dir, conversation_id, goal_text, group) if group else None
+    marks = _ledger_group_marks(group) if group else None
+    if group and marks and any("☐" in group_marks for group_marks in marks):
+        # ☐ が残る時だけ記録する。anchor は記録を Goal 範囲に結ぶ目印。
+        try:
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            record = {"v": _GOALSTART_RECORD_VERSION}
+            if bind:
+                record["bind"] = bind
+            else:
+                record["after"] = after
+            marker.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
+        except OSError:
+            pass
+    elif marker is not None:
+        # 受理時に ☐ が無い・台帳が読めない時は、同名 Goal の古い記録を残さない。
+        try:
+            marker.unlink(missing_ok=True)
+        except OSError:
+            pass
+    return 0
+
+
 def _evaluate(entries: list[Any], *, conversation_id: str = "",
               plans_dir: Path | None = None, state_dir: Path | None = None,
-              project_dir: Path | None = None) -> tuple[bool, str, list[str]]:
-    """(阻止するか, 阻止状態の指紋, 担当付き返事待ちの行一覧) を返す。"""
+              project_dir: Path | None = None) -> tuple[bool, str, list[str], list[str], list[str]]:
+    """(阻止するか, 阻止状態の指紋, 担当付き返事待ちの行一覧,
+    権限の拒否で読めなかった台帳の「パス（理由）」一覧,
+    open と判定した進捗ページの「パス（理由）」一覧) を返す。"""
     active, scoped, previous_ids = _goal_scope(entries)
     if not active:
-        return False, "", []
+        return False, "", [], [], []
+    # [2026-11-03][fix] Issue #3993(3): prose 経路の合格を scope 開始 uuid 付きで
+    #   記録し、圧縮要約で証拠が範囲外になっても同じ Goal 範囲では認める。
+    #   uuid が取れない範囲は記録・利用しない（同名 Goal のやり直しに旧合格を使い回せない）。
+    scope_uuid = ""
+    if scoped and isinstance(scoped[0], dict):
+        entry_uuid = scoped[0].get("uuid")
+        if isinstance(entry_uuid, str):
+            scope_uuid = entry_uuid
+    pass_marker = (_passed_marker_path(state_dir or _default_state_dir(),
+                                       conversation_id, scope_uuid)
+                   if scope_uuid else None)
     tasks, confirmed_listing = _extract_task_state(scoped, previous_ids)
     prose_holds, prose_paired = _prose_wait_evidence(scoped)
+    # [2026-10-31][fix] Issue #4055: 重複抑制の材料には厳格な札以外の人待ち宣言も載せる。
+    # （task_list_is_complete の完了判定は従来どおり is_explicit_hold のみ）。
     task_holds = [
         text.strip()
         for item in tasks
         for text in _task_text(item)
-        if is_explicit_hold(text)
+        if _is_human_wait(text)
     ]
     holds = prose_holds + task_holds
     if tasks:
         if task_list_is_complete(tasks):
-            return False, "", holds
+            return False, "", holds, [], []
         pending = sorted({
             "|".join((
                 str(item.get("id", "")),
@@ -1608,37 +2103,62 @@ def _evaluate(entries: list[Any], *, conversation_id: str = "",
             if _task_status(item) not in COMPLETED_STATUSES
             and not any(is_explicit_hold(text) for text in _task_text(item))
         })
-        return True, _block_fingerprint("tasks", pending, holds), holds
+        _drop_pass_marker(pass_marker)
+        return True, _block_fingerprint("tasks", pending, holds), holds, [], []
     # 空一覧は、現在Goalの起票と、その直前の完了を確認した時だけ終了根拠になる。
     if confirmed_listing:
-        return False, "", holds
+        return False, "", holds, [], []
     evidence_entries = [entry for entry in scoped if _is_compaction_entry(entry)]
     evidence_text = _normalize_goal_field_format(_summary_goal_fields(
         combined_transcript_text(evidence_entries), allow_quoted_state=False))
     if has_plan_ledger_evidence(_current_summary_goal_text(evidence_text)):
-        return False, "", holds
+        return False, "", holds, [], []
     # 4つ目の終了根拠: HTML 台帳ファイル（既存3判定が止める時だけ確かめる）。
     # 環境変数 AGENT_HUB_STOP_GOAL_PLANS_DIR が設定されている時（テスト）は従来どおりそれだけを見る。
-    if _ledger_file_complete(
-            _goal_run(scoped[0] if scoped else None, conversation_id),
-            plans_dir or _default_plans_dir(), state_dir or _default_state_dir(),
-            None if os.environ.get(LEDGER_PLANS_ENV) else project_dir):
-        return False, "", holds
+    # [2026-10-31][fix] Issue #4055: 台帳・ページの人待ち行も重複抑制の材料に載せる。
+    ledger_complete, ledger_waits = _ledger_file_state(
+        _goal_run(scoped[0] if scoped else None, conversation_id),
+        plans_dir or _default_plans_dir(), state_dir or _default_state_dir(),
+        None if os.environ.get(LEDGER_PLANS_ENV) else project_dir,
+        entries=entries, scope_start=scoped[0] if scoped else None)
+    holds += ledger_waits
+    if ledger_complete:
+        return False, "", holds, [], []
     # 6つ目（Issue #4156）: 今回の Goal 中に書いた/示した Markdown 台帳ファイルの状態列を読む。
     #   全行 ☑/保留なら通す。読めた台帳に ☐ や不明な印が残るなら、本文の宣言（5つ目）より台帳を優先して止める。
-    md_state = _md_ledger_state(scoped)
+    md_state, md_waits, md_denied = _md_ledger_state(scoped)
+    holds += md_waits
     if md_state == "complete":
-        return False, "", holds
+        return False, "", holds, [], []
     # 5つ目の終了根拠: タスク道具を使っていない領域で、同一 assistant メッセージに
     # 「台帳照合・タスク化証拠 + 担当付き返事待ち」がある時だけ通す（Issue #3595）。
     # 7つ目（2026-10-24）: 今回の Goal 中に更新した進捗ページ（session-status）の台帳。
     #   全行 done / 担当付き hold なら通す。open が残るページは本文の宣言（5つ目）より優先して止める。
-    status_state = _status_page_state(scoped)
+    status_state, status_waits, status_open = _status_page_state(scoped)
+    holds += status_waits
     if status_state == "complete":
-        return False, "", holds
-    if prose_paired and md_state != "open" and status_state != "open":
-        return False, "", holds
-    return True, _block_fingerprint("evidence", [], holds), holds
+        return False, "", holds, [], []
+    # [2026-11-03][fix] Issue #3993(3): 合格記録は「最後の要約より前に合格した」
+    #   根拠。開いた台帳が無い時だけ合格を維持する（開いた台帳は退行の証拠）。
+    recorded_pass = False
+    if pass_marker is not None:
+        try:
+            recorded_pass = pass_marker.is_file()
+        except OSError:
+            recorded_pass = False
+    if (prose_paired or recorded_pass) and md_state != "open" and status_state != "open":
+        if prose_paired and pass_marker is not None:
+            try:
+                pass_marker.parent.mkdir(parents=True, exist_ok=True)
+                pass_marker.write_text(
+                    json.dumps({"scope": scope_uuid, "holds": sorted(set(holds))},
+                               ensure_ascii=False),
+                    encoding="utf-8")
+            except OSError:
+                pass
+        return False, "", holds, [], []
+    _drop_pass_marker(pass_marker)
+    return True, _block_fingerprint("evidence", [], holds), holds, md_denied, status_open
 
 
 def should_block(entries: list[Any], *, conversation_id: str = "",
@@ -1665,6 +2185,14 @@ def main() -> int:
     except Exception:
         return 0
 
+    # [2026-11-03][fix] Issue #3993(1): UserPromptSubmit 入口。
+    #   /goal の受理時に「台帳と Goal の対応＋☐ 残り」を記録し、一度も Stop が無いまま
+    #   全 ☑ になっても記録で終われるようにする（記録が無い時は従来どおり止める）。
+    if "--goal-start" in sys.argv[1:]:
+        project_raw = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR")
+        return record_goal_start(
+            payload, project_dir=Path(str(project_raw)) if project_raw else None)
+
     if _stop_already_active(payload):
         return 0
 
@@ -1685,7 +2213,7 @@ def main() -> int:
     project_raw = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR")
     project_dir = Path(str(project_raw)) if project_raw else None
     state_dir = _default_state_dir()
-    blocked, fingerprint, holds = _evaluate(
+    blocked, fingerprint, holds, denied, open_pages = _evaluate(
         entries, conversation_id=conversation_id,
         state_dir=state_dir, project_dir=project_dir)
     marker = _blocked_marker_path(state_dir, conversation_id)
@@ -1714,8 +2242,17 @@ def main() -> int:
             pass
 
     # 承認済み前提の文が混ざったら出力前に除く（Issue #4423）。
-    print(json.dumps({"decision": "block", "reason": _strip_approval_assumed(BLOCK_REASON)},
-                     ensure_ascii=False))
+    # 権限の拒否で読めなかった台帳は、止める時の阻止文にパスと理由を出す（Issue #4344）。
+    # open と判定した進捗ページも、止める時の阻止文にパスと理由を出す（Issue #4830）。
+    reason = _strip_approval_assumed(BLOCK_REASON)
+    if denied:
+        reason += (" 権限の拒否で読めない台帳は証拠から外しました: "
+                   + "、".join(denied)
+                   + "。読める同名の台帳が他にあればそちらを優先します。")
+    if open_pages:
+        reason += (" open と判定した進捗ページ: "
+                   + "、".join(open_pages) + "。")
+    print(json.dumps({"decision": "block", "reason": reason}, ensure_ascii=False))
     return 0
 
 
