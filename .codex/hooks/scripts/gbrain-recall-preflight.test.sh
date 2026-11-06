@@ -18,10 +18,28 @@ run_hook() {
   printf '{"user_prompt": "%s"}' "$prompt" | bash "$HOOK"
 }
 
+# [2026-10-30][feat] 現在日時の1行は発火語に関係なく毎回出る。それ以外（preflight 本体）は無音のまま。
+NOW_LINE_RE='^現在日時: [0-9]{4}-[0-9]{2}-[0-9]{2}（(月|火|水|木|金|土|日)）[0-9]{2}:[0-9]{2} JST'
+only_now_line() {
+  # 現在日時の1行だけで、preflight 本体が出ていないことを確かめる
+  local out="$1"
+  [ "$(wc -l <<< "$out" | tr -d ' ')" = "1" ] || return 1
+  grep -qE "$NOW_LINE_RE" <<< "$out" || return 1
+  ! grep -q "gbrain-recall preflight:" <<< "$out"
+}
+
 normal_output="$(run_hook "今日は天気だけ確認")"
-[ -z "$normal_output" ] || fail "通常プロンプトは無音であるべき: $normal_output"
+only_now_line "$normal_output" || fail "通常プロンプトは現在日時の1行だけであるべき: $normal_output"
+
+# 日付と曜日が date コマンドの値と一致する（日本語曜日は %u から）
+expected_wd="$(TZ=Asia/Tokyo LC_ALL=C date +%u)"
+expected_date="$(TZ=Asia/Tokyo LC_ALL=C date +%Y-%m-%d)"
+case "$expected_wd" in 1) wd=月;; 2) wd=火;; 3) wd=水;; 4) wd=木;; 5) wd=金;; 6) wd=土;; 7) wd=日;; esac
+grep -q "現在日時: ${expected_date}（${wd}）" <<< "$normal_output" \
+  || fail "現在日時が date の値と合わない（期待 ${expected_date}（${wd}））: $normal_output"
 
 fix_both_output="$(run_hook "修正して")"
+grep -qE "$NOW_LINE_RE" <<< "$fix_both_output" || fail "発火語ありでも現在日時の1行が出る: $fix_both_output"
 grep -q "My GBrainでsource shintaro-gbrain と tech-gbrain-shared の両方を検索してから着手" <<< "$fix_both_output" \
   || fail "修正プロンプトで両方の案内が出ない: $fix_both_output"
 
@@ -63,14 +81,39 @@ grep -q "区分・権限の正本は出パンダ。スキル depanda-staff-roles
   || fail "区分・権限プロンプトで depanda-staff-roles 案内が出ない: $depanda_hit_output"
 
 depanda_nohit_output="$(run_hook "今日は天気だけ確認")"
-[ -z "$depanda_nohit_output" ] \
+only_now_line "$depanda_nohit_output" \
   || fail "無関係なプロンプトで depanda-staff-roles 案内が出てはいけない: $depanda_nohit_output"
 
 depanda_missing_json_output="$(DEPANDA_ROLES_POLICY_PATH=/tmp/does-not-exist-depanda-roles-policy.json run_hook "権限を変えたい")"
-[ -z "$depanda_missing_json_output" ] \
+only_now_line "$depanda_missing_json_output" \
   || fail "depanda-roles-policy.json が無い時は無言で終わるべき: $depanda_missing_json_output"
 
 grep -q "depanda-staff-roles" <<< "$fix_both_output" \
   && fail "既存の相談・判断プロンプトで depanda-staff-roles 案内が意図せず出ている: $fix_both_output"
+
+# --- [2026-11-02][feat] 説明の依頼の案内（独立 policy） ----------------------------------
+
+EXPLAIN_MSG_RE="説明の依頼: 先に My GBrain『分かりやすいのレパートリー』を読む"
+
+explain_hit_output="$(run_hook "やった内容をわかりやすくビフォーアフターで教えて")"
+grep -q "$EXPLAIN_MSG_RE" <<< "$explain_hit_output" \
+  || fail "説明の依頼プロンプトで説明の案内が出ない: $explain_hit_output"
+
+explain_plain_output="$(run_hook "これを分かりやすくまとめて")"
+grep -q "$EXPLAIN_MSG_RE" <<< "$explain_plain_output" \
+  || fail "「分かりやすく」だけの依頼で説明の案内が出ない: $explain_plain_output"
+
+explain_nohit_output="$(run_hook "今日の天気を教えて")"
+only_now_line "$explain_nohit_output" \
+  || fail "「教えて」だけの依頼で説明の案内が出てはいけない: $explain_nohit_output"
+
+explain_missing_json_output="$(EXPLAIN_VISUAL_POLICY_PATH=/tmp/does-not-exist-explain-visual-policy.json run_hook "分かりやすく説明して修正して")"
+grep -q "$EXPLAIN_MSG_RE" <<< "$explain_missing_json_output" \
+  && fail "explain-visual-policy.json が無い時に説明の案内が出てはいけない: $explain_missing_json_output"
+grep -q "My GBrainでsource shintaro-gbrain と tech-gbrain-shared の両方を検索してから着手" <<< "$explain_missing_json_output" \
+  || fail "台帳が無い時も既存の相談・判断の案内は変わってはいけない: $explain_missing_json_output"
+
+grep -q "$EXPLAIN_MSG_RE" <<< "$fix_both_output" \
+  && fail "既存の相談・判断プロンプトで説明の案内が意図せず出ている: $fix_both_output"
 
 echo "PASS: gbrain-recall-preflight"

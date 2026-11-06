@@ -118,9 +118,10 @@ CARD 00 の話し方 → 返答・Plan・承認 → 変更・検証 → 完了�
 - URL はコードの枠の外に1行で置く。localhost や file:// ではなく Tailscale の URL にする。
 - 短い一問一答は従来どおり短く答える。ページを出せない時は「ページ未配信」と書き、要点を3行まで添える。
 - 型の正本は My GBrain `判断軸/作業中は現在地を毎回チャットに図で示す`。手順は `skills/session-status/SKILL.md` と `skills/visual-companion/SKILL.md`。
+- 「分かりやすく」「ビフォーアフター」「振り返り」などの説明の依頼は、進捗ページで代用しない。先に My GBrain の `分かりやすいのレパートリー` を読み、図つきの説明ページを作って `skills/visual-companion/scripts/check-explain-html.py` に通し、その Tailscale の URL を返す。進捗ページからはリンクだけ張る。手順は `skills/visual-companion/SKILL.md`。
 
 ## 変更前の判断
-- 探索は Global Codebase Context Engine の入口規則に従う。新規実装は既存資産、導入済みライブラリ、標準機能、実績ある追加、自前実装の順に検討する。
+- 呼び出し関係・影響範囲を調べる時は Global Codebase Context Engine に従う。新規実装は既存資産、導入済みライブラリ、標準機能、実績ある追加、自前実装の順に検討する。
 - 新規ファイル・関数・コンポーネントを作る場合は、既存資産で足りない理由、保守負担、単純な代替、想定バグと確認方法を整理する。
 - 4行宣言（再利用／標準機能・ライブラリ／新規部分／自前実装を避ける部分）は、実質的な実装や設計判断を始めるときだけ示す。難しい自前実装・保守負担の大きい設計は一度だけ承認を求める。
 - 依頼された範囲と完了条件を満たしたら止め、追加の堅牢化・最適化・リファクタリングは別依頼にする。
@@ -138,8 +139,11 @@ CARD 00 の話し方 → 返答・Plan・承認 → 変更・検証 → 完了�
 - 作業用Markdown、PDF、説明HTML、画像（PNG/JPEG/WebP/SVG等）、CSV、PPTX、確認動画（MP4等）を用途で選ぶ。拡張子だけで収集しない。
 - README・正式仕様・ルール・引継ぎなどの正本、アプリのソース、Stitch等の専用保存先は移さない。本人の明示保存先を優先し、必要な納品用コピーだけを残す。
 - OSのtmp・AIのscratchpad・TMPDIRは変えない。ログ・ロック・DB・中間生成物は従来の場所に置き、秘密情報・機密資料を検索用フォルダへ勝手にコピーしない。
-- scratchpadやrepo内のGit管理外フォルダで作っても、本人へ渡す前に選んだ成果物を上記へ保存する。原本は残し、コピーの内容一致を確認する。Markdown/HTMLの相対参照画像・CSS等も一緒に保持し、自己完結HTMLは既存の組立処理を使う。
-- 納品時は保存先の絶対パスを伝える。ファイル名・パスで検索して開く運用であり、全文検索・OCR・クラウド同期・自動削除は追加しない。Gitのignoreを解除しない。
+
+- MCP（chrome-devtools 等）のファイル出力でセッションの scratchpad をワークスペース外として拒否された時は、その PJ 配下の gitignore 済み一時パス（PJ に既存の決まりがあればそれ。無ければ `.agent-tmp/` を gitignore に足したもの）へ書き、使い終わったら消す。
+
+- 一時ファイルはセッションの scratchpad、本人へ渡す最終成果物は上記の保存先、と役割を分ける。scratchpadやrepo内のGit管理外フォルダで作っても、本人へ渡す前に選んだ成果物を上記へ保存する。原本は残し、コピーの内容一致を確認する。Markdown/HTMLの相対参照画像・CSS等も一緒に保持し、自己完結HTMLは既存の組立処理を使う。
+- 納品時は保存先の絶対パスを伝え、macOS では `open -R <path>` で Finder に表示して渡してよい。ファイル名・パスで検索して開く運用であり、全文検索・OCR・クラウド同期・自動削除は追加しない。Gitのignoreを解除しない。
 - リモート実行環境にローカル保存先が無い場合は、既存の成果物受渡し経路で回収する。本人のMacへの保存を確認するまで、ローカル保存・Raycast検索済みとは報告しない。
 
 - 書類フォルダ（~/Documents）は使わない。古い `~/Documents/AI-Work` の中身は、許可が戻った時に一度だけ `~/AI-Work` へ移す。
@@ -172,30 +176,28 @@ AIが残す記憶（各AIの自動メモリ・AgentMemory・agent-gbrain・My GB
 
 ## 30秒地図
 ```
-いつ: コードの場所・呼び出し・影響を探すとき
+いつ: 誰が呼ぶか・変えるとどこに響くかを調べるとき
   ↓
-何を: codebase-context-engine を先に（grep/Read/Exploreより前）
+何を: codebase-memory-ja を読み、search_graph / trace_path を使う
   ↓
-できた状態: resolved_project を確認して候補が絞れ、当日新規分だけ Read 併用
+できた状態: resolved_project を確認し、0件や少ない時は search_code か grep で裏取りしている
 ```
 
 ## いつ
-実装repoで、場所・呼び出し関係・影響範囲が未知の探索を始めるとき（`jtt-cms` / `jtt-apps` / `jtt-system` / `AGENT-HUB` / `hermes` 等）。
+実装repoで、呼び出し元・呼び出し先・影響範囲を調べるとき（`jtt-cms` / `jtt-apps` / `jtt-system` / `AGENT-HUB` / `hermes` 等）。
 
-指定されたファイルや既知のパスを内容確認するだけなら、直接 `Read` してよい。既知の場所から呼び出し関係・影響範囲を広げるときは下の入口へ戻る。
+場所・文字・識別子を探すだけなら、ふつうの Grep / Read でよい。この道具を先に使う決まりはない。
 
 ## 何を（3手まで）
-1. context-engine をロードし、`hybrid_search` を `project` 省略で呼ぶ（自PJ）。他PJは `project` に短い名前（例 `jtt-cms`。一覧は `list_projects` の `scope="all"`）
-2. 応答の `resolved_project` が意図したPJか確認する（不明・曖昧は候補一覧付きで停止する。対象に実体が無ければ「実体なし」と明示して通常検索へ）
-3. 当日の新規・未索引分だけ `Read`。大量の `rg` は、context-engine が Pending・停止・不自然な結果のときだけ理由を添えて使う
+1. `codebase-memory-ja` を読む。`project` は省略で自PJ、他PJは短い名前（例 `jtt-cms`。一覧は `list_projects` の `scope="all"`）
+2. 呼び出し関係は `search_graph`・`trace_path`。**必ず `max_output_tokens` を付ける**。応答の `resolved_project` が意図したPJか確認する（不明・曖昧は候補一覧付きで停止する。対象に実体が無ければ「実体なし」と明示して通常検索へ）
+3. 取りこぼすことがあるので、0件や少ない時は `search_code` か Grep で裏取りする。当日の新規・未索引分は `Read`
 
 ## できた状態
-- 探索入口が context-engine になっている
-- `resolved_project` を確認済み（repo が複数に跨る作業では対象ごとに確認）
-- サブエージェントにも「project 省略で自PJ、他PJは短い名前」を伝えている
-- Pending/停止/不自然な結果のときだけ通常検索へ戻り、理由を一言書いている
+- 呼び出し関係を調べる時に使い、`resolved_project` を確認済み（repo が複数に跨る作業では対象ごとに確認）
+- サブエージェントにも同じ使い分けを伝えている（「project 省略で自PJ、他PJは短い名前」「`max_output_tokens` を付ける」）
 
-詳細 SSOT: `skills/codebase-context-engine/SKILL.md`
+使い方: `skills/codebase-memory-ja/SKILL.md`（上流公式 skill への日本語入口）。Mac mini 側の運用: `skills/codebase-context-engine/SKILL.md`
 
 
 

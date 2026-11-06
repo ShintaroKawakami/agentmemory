@@ -37,6 +37,16 @@
         ]
       },
       {
+        "matcher": "mcp__computer-use__.*|mcp__remote-devices__computer_.*|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/block-physical-pointer.sh\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {
@@ -213,6 +223,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/stop-goal-check.py\" --goal-start",
+            "timeout": 15
+          }
+        ]
       }
     ],
     "SubagentStop": [
@@ -243,6 +262,15 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/stop-quality-check.sh\"",
             "timeout": 30
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scripts/stop-explain-check.py\"",
+            "timeout": 15
           }
         ]
       },

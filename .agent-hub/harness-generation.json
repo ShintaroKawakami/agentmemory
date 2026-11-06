@@ -7,22 +7,22 @@
   ],
   "canonical_project": "agentmemory",
   "effective_hashes": {
-    "antigravity": "e980b188f60d9d9269f53ac87470b89fbc3b9ea4161d084060f297649fd0f4b0",
-    "claude": "e980b188f60d9d9269f53ac87470b89fbc3b9ea4161d084060f297649fd0f4b0",
-    "codex": "e980b188f60d9d9269f53ac87470b89fbc3b9ea4161d084060f297649fd0f4b0",
-    "cursor": "e980b188f60d9d9269f53ac87470b89fbc3b9ea4161d084060f297649fd0f4b0",
-    "kimi": "e980b188f60d9d9269f53ac87470b89fbc3b9ea4161d084060f297649fd0f4b0",
-    "opencode": "e980b188f60d9d9269f53ac87470b89fbc3b9ea4161d084060f297649fd0f4b0",
-    "warp": "e980b188f60d9d9269f53ac87470b89fbc3b9ea4161d084060f297649fd0f4b0"
+    "antigravity": "52c6021cab12f3778e073974aaa611e04ba4db481b4f08067756ab3b2fa1db22",
+    "claude": "52c6021cab12f3778e073974aaa611e04ba4db481b4f08067756ab3b2fa1db22",
+    "codex": "52c6021cab12f3778e073974aaa611e04ba4db481b4f08067756ab3b2fa1db22",
+    "cursor": "52c6021cab12f3778e073974aaa611e04ba4db481b4f08067756ab3b2fa1db22",
+    "kimi": "52c6021cab12f3778e073974aaa611e04ba4db481b4f08067756ab3b2fa1db22",
+    "opencode": "52c6021cab12f3778e073974aaa611e04ba4db481b4f08067756ab3b2fa1db22",
+    "warp": "52c6021cab12f3778e073974aaa611e04ba4db481b4f08067756ab3b2fa1db22"
   },
   "harness_type": "mcp-server",
   "ledger_writer": {
     "writer_id": "sync-agents",
-    "writer_version": "sha256:e612261845e3ec3d0de006105d849b3853be83983d63cdc810e3cc19c2bbebca"
+    "writer_version": "sha256:64d7d762dfe612ec6115782d36b13ebcdfd3d71d42e97de5a90cbe9ff17c8b3c"
   },
   "resolver_version": "1.1.0",
   "schema_version": 2,
-  "source_fingerprint": "sha256:c7b9d4ed1a0c0c47bb2fc9a9c5409c1e29be36a07ed0af71f2cde74c99388b24",
+  "source_fingerprint": "sha256:256945b386e28f0ffbeb8feb13e7d7e08dcc9e8147fbcf39e8078caf99d86a60",
   "surfaces": [
     {
       "asset_revisions": [
@@ -60,9 +60,9 @@
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:1cdd678e10ffe5514ea7aba42631bf504e03f578105719d26d2ad704b621c342",
+      "content_digest": "sha256:6c5b4f26d466cb07474d17d388b2ccbbf7c13480d1b4d5bb44e107e2e0af96c1",
       "kind": "ai_client",
-      "materialization_digest": "sha256:8f190be72b396f893faa4fc3aa2d1d421a1f8a087545bda958f1c351d5e9618d",
+      "materialization_digest": "sha256:a81511aa962b25c96899e407a15bfb754100763dba8dba7763f45cdc25f7f56f",
       "probe": "stable-sync-state",
       "source_revision": "sha256:b71e6da24d61a307438d0fa13b957885ccb8e4d6340f06f9e1491f0e62c31337",
       "symlink_policy": "forbidden",
@@ -166,9 +166,9 @@
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:d545f0f194d417f8eae381bda4c62588f8278660ea09232686770639d05b3ea7",
+      "content_digest": "sha256:a78a0a9ff40242df720f7b1e9dd5b7ecc2da4f13b07d487cdbe4728cdf3dada3",
       "kind": "command",
-      "materialization_digest": "sha256:69d899435113fa1d88927b0c22b5dfa54618fcf452e136a7dc4e973621a3681d",
+      "materialization_digest": "sha256:f6d1a019bf7a42aef4bb242f6221132e6ebf47235cd314079fc0ab34a6607132",
       "probe": "fresh-command-discovery",
       "source_revision": "sha256:4a06d34f4a4fc11eefc11f00bc5f124b8bb3090860c7f54e72cdf925403348de",
       "symlink_policy": "forbidden",
@@ -188,9 +188,9 @@
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:fe4956c67587a34c5135d53e9a141715f39d1152379dc8ec32b22f854cc025e2",
+      "content_digest": "sha256:20b7e397a1b79edcec4a275ee4a87b1a51bc20d3e19bcaeea65086bc12634a26",
       "kind": "constitution",
-      "materialization_digest": "sha256:15fe4a65151e48aa1ddae2fe38794256692f34ebddd9bc7f13745ba02b9f18b8",
+      "materialization_digest": "sha256:aa724fb7beeb6cdc2d076aec05eed79a02945b496f12f787f5309cd361444189",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:84556fce4f422c96be97f32ac7e8c639f51e9854e32e3f28fce9ec115b90b11e",
       "symlink_policy": "forbidden",
@@ -210,15 +210,19 @@
         },
         {
           "asset_id": "block-main-commit",
-          "source_revision": "c5c70460a26b92772e63c8895980f3e88a2cc30360a5288ffb5e8f118e8c0711"
+          "source_revision": "90ad51b2451303c13cb757fe855f1cffc88b7489bd26869f36942487da9999ab"
+        },
+        {
+          "asset_id": "block-physical-pointer",
+          "source_revision": "982376ab772a295fcbee764b4b7e72f952d9e7750e1272e8f44e496f1154e7c3"
         },
         {
           "asset_id": "block-skill-reverse-edit",
-          "source_revision": "a2e603590b202a857068b13887c51a258247c93383d0b3625bb1f6b791c2f679"
+          "source_revision": "10784b916bd1eeb234b2d6174e503da114e6e28b261c480e88d929af3916dd19"
         },
         {
           "asset_id": "block-unauthorized-docs-file",
-          "source_revision": "af2a2f7c29d77bad467cff5816c7aca21795c7a98b8dfc8f4f2fd32c4f5fa67e"
+          "source_revision": "ea6de945025cdb3fe607fd87c74772b6dd541080e89e1524e2c550f8f2b52276"
         },
         {
           "asset_id": "cloud-hub-bootstrap",
@@ -230,7 +234,7 @@
         },
         {
           "asset_id": "delegation-routing-backstop",
-          "source_revision": "02d54bfdd5b13e1fde9006e7ff54b64a9460b3389151e5f6ad4bdddbe2658850"
+          "source_revision": "ac1a4d4a837e24195a07a8789c32abaeb855bc6d74427208341fbe54895fbb01"
         },
         {
           "asset_id": "delegation-routing-reminder",
@@ -238,43 +242,47 @@
         },
         {
           "asset_id": "fable-implementation-guard",
-          "source_revision": "e3f9d539cfa1ca4b8889e8c37e6d173d2c5eb2fdba87f4f2a344881882752072"
+          "source_revision": "9300d0a47bf1d5dbb272d5bc4f6b44154d2fa95ba08a3d4e0a1dc4ef4f7b3a0a"
         },
         {
           "asset_id": "freshness-gate",
-          "source_revision": "b84994294108a3cfab60bb22018989274234f95fcf90df23cef492341f257c80"
+          "source_revision": "c137cb26d1045bd05db87bd2da593c15d65688c2dd861e73927bece7747984e1"
         },
         {
           "asset_id": "gbrain-recall-preflight",
-          "source_revision": "ac52713f94c848649fc0d85783bae73c520a5d7a1696f8b390a553c2ba412c18"
+          "source_revision": "ea560ffbd214c11fcb832297fb6d184a7d03d2774c487a0d32244497b217256a"
         },
         {
           "asset_id": "handover-preflight",
-          "source_revision": "c8e92d6898a7f9e834f5d322be2004bc0f6a60cdcba375d1b3db59bb13343405"
+          "source_revision": "a3b28cfb72df59b754af4580982fcb1fcc338dca5f6c75b8f057d2c219f091c3"
         },
         {
           "asset_id": "post-merge-gate",
-          "source_revision": "5992930056dd4a3b015fce3fd99b996af3715e7a886c90f790e101332d5e585d"
+          "source_revision": "2a7331aebb70138d4b0d820f0912f3e52ba97959e1e6113b360247837f83efe5"
         },
         {
           "asset_id": "pre-implementation-check",
-          "source_revision": "b496ea36846f33167e3c63a30ec663c68e46f9e809596d900993c19e2776e3c7"
+          "source_revision": "730aaa6511624ec6e48114a3239913b4d519f5fa262b59866988dbb02e6113bd"
         },
         {
           "asset_id": "quality-gate",
-          "source_revision": "757536ff310fffb1bf5cb50fe1a57306d3e82e14f2f8cd0049c697e64f066be1"
+          "source_revision": "d6c86500ec99a8dda9522d11f303f6b8e164d1f830d8c7a0344700791bd5f8b1"
+        },
+        {
+          "asset_id": "stop-explain-check",
+          "source_revision": "4283e2ccb35290a78447353e7c410da8ac93d816287628b3093854b0c6fba813"
         },
         {
           "asset_id": "stop-goal-check",
-          "source_revision": "4124abdcfd0ffe99ce40c84d64de159806f68aae22831c4f1b3a2e8609c8f714"
+          "source_revision": "4ad41fd1f9d6afb3fe6a05d6c0f55da8af157562172b9acad2aafa3a029d1754"
         },
         {
           "asset_id": "stop-loop-continuity",
-          "source_revision": "a3c387596b0988a49b41054b432b54a520082437b6d4538ef5d516a634e0443c"
+          "source_revision": "ee672e9f5f95cf6f0799899442350d217e5e66bb278296e1123f4f565dad6030"
         },
         {
           "asset_id": "telemetry-log",
-          "source_revision": "f7cb6d80491698cb5493a822b77707c17ee904013c536775b87143da2eee92db"
+          "source_revision": "0a73d1af55b7d1d5759f69ee84361ee2221b2f842a44a375029621d0f4cb0b1e"
         },
         {
           "asset_id": "ui-registry-preflight",
@@ -286,11 +294,11 @@
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:33f048c32f17f61f2fc18884c91d79961ad62a34d8c921b4ea69848ee4748ea8",
+      "content_digest": "sha256:c9d64327fdcc7236a65c16d0549e64936c71c8f35915f35eb735ee59b79eac8a",
       "kind": "hook",
-      "materialization_digest": "sha256:c35bec9cb568c7829fda832d36770285116273eecbc9ef705bf0c5948ee6230c",
+      "materialization_digest": "sha256:72d5cef3329ca4e5f53cb2bfc8550b8b6f75e5823c68b1da0ad499708e9a386f",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:e2e0147bf69dec604d6e4a1a178e6e8f4422fdc0fa821b0f85648f8431985cb0",
+      "source_revision": "sha256:2e88b57cd7760e591eb6899a34108334c3aeb44eea9cf030ad81f07b2af75862",
       "symlink_policy": "forbidden",
       "target": ".gemini/hooks",
       "writer_id": "sync-antigravity-from-cc",
@@ -308,15 +316,19 @@
         },
         {
           "asset_id": "block-main-commit",
-          "source_revision": "c5c70460a26b92772e63c8895980f3e88a2cc30360a5288ffb5e8f118e8c0711"
+          "source_revision": "90ad51b2451303c13cb757fe855f1cffc88b7489bd26869f36942487da9999ab"
+        },
+        {
+          "asset_id": "block-physical-pointer",
+          "source_revision": "982376ab772a295fcbee764b4b7e72f952d9e7750e1272e8f44e496f1154e7c3"
         },
         {
           "asset_id": "block-skill-reverse-edit",
-          "source_revision": "a2e603590b202a857068b13887c51a258247c93383d0b3625bb1f6b791c2f679"
+          "source_revision": "10784b916bd1eeb234b2d6174e503da114e6e28b261c480e88d929af3916dd19"
         },
         {
           "asset_id": "block-unauthorized-docs-file",
-          "source_revision": "af2a2f7c29d77bad467cff5816c7aca21795c7a98b8dfc8f4f2fd32c4f5fa67e"
+          "source_revision": "ea6de945025cdb3fe607fd87c74772b6dd541080e89e1524e2c550f8f2b52276"
         },
         {
           "asset_id": "cloud-hub-bootstrap",
@@ -328,7 +340,7 @@
         },
         {
           "asset_id": "delegation-routing-backstop",
-          "source_revision": "02d54bfdd5b13e1fde9006e7ff54b64a9460b3389151e5f6ad4bdddbe2658850"
+          "source_revision": "ac1a4d4a837e24195a07a8789c32abaeb855bc6d74427208341fbe54895fbb01"
         },
         {
           "asset_id": "delegation-routing-reminder",
@@ -336,43 +348,47 @@
         },
         {
           "asset_id": "fable-implementation-guard",
-          "source_revision": "e3f9d539cfa1ca4b8889e8c37e6d173d2c5eb2fdba87f4f2a344881882752072"
+          "source_revision": "9300d0a47bf1d5dbb272d5bc4f6b44154d2fa95ba08a3d4e0a1dc4ef4f7b3a0a"
         },
         {
           "asset_id": "freshness-gate",
-          "source_revision": "b84994294108a3cfab60bb22018989274234f95fcf90df23cef492341f257c80"
+          "source_revision": "c137cb26d1045bd05db87bd2da593c15d65688c2dd861e73927bece7747984e1"
         },
         {
           "asset_id": "gbrain-recall-preflight",
-          "source_revision": "ac52713f94c848649fc0d85783bae73c520a5d7a1696f8b390a553c2ba412c18"
+          "source_revision": "ea560ffbd214c11fcb832297fb6d184a7d03d2774c487a0d32244497b217256a"
         },
         {
           "asset_id": "handover-preflight",
-          "source_revision": "c8e92d6898a7f9e834f5d322be2004bc0f6a60cdcba375d1b3db59bb13343405"
+          "source_revision": "a3b28cfb72df59b754af4580982fcb1fcc338dca5f6c75b8f057d2c219f091c3"
         },
         {
           "asset_id": "post-merge-gate",
-          "source_revision": "5992930056dd4a3b015fce3fd99b996af3715e7a886c90f790e101332d5e585d"
+          "source_revision": "2a7331aebb70138d4b0d820f0912f3e52ba97959e1e6113b360247837f83efe5"
         },
         {
           "asset_id": "pre-implementation-check",
-          "source_revision": "b496ea36846f33167e3c63a30ec663c68e46f9e809596d900993c19e2776e3c7"
+          "source_revision": "730aaa6511624ec6e48114a3239913b4d519f5fa262b59866988dbb02e6113bd"
         },
         {
           "asset_id": "quality-gate",
-          "source_revision": "757536ff310fffb1bf5cb50fe1a57306d3e82e14f2f8cd0049c697e64f066be1"
+          "source_revision": "d6c86500ec99a8dda9522d11f303f6b8e164d1f830d8c7a0344700791bd5f8b1"
+        },
+        {
+          "asset_id": "stop-explain-check",
+          "source_revision": "4283e2ccb35290a78447353e7c410da8ac93d816287628b3093854b0c6fba813"
         },
         {
           "asset_id": "stop-goal-check",
-          "source_revision": "4124abdcfd0ffe99ce40c84d64de159806f68aae22831c4f1b3a2e8609c8f714"
+          "source_revision": "4ad41fd1f9d6afb3fe6a05d6c0f55da8af157562172b9acad2aafa3a029d1754"
         },
         {
           "asset_id": "stop-loop-continuity",
-          "source_revision": "a3c387596b0988a49b41054b432b54a520082437b6d4538ef5d516a634e0443c"
+          "source_revision": "ee672e9f5f95cf6f0799899442350d217e5e66bb278296e1123f4f565dad6030"
         },
         {
           "asset_id": "telemetry-log",
-          "source_revision": "f7cb6d80491698cb5493a822b77707c17ee904013c536775b87143da2eee92db"
+          "source_revision": "0a73d1af55b7d1d5759f69ee84361ee2221b2f842a44a375029621d0f4cb0b1e"
         },
         {
           "asset_id": "ui-registry-preflight",
@@ -386,9 +402,9 @@
       "client": "antigravity",
       "content_digest": "sha256:a00d859c12147d8fc04b410cf69d7319ec2e647ddbc95a480d62760ba86c2b04",
       "kind": "hook",
-      "materialization_digest": "sha256:8249cd687eaa5fcd9e06c000eaaae6e5450f20db87281b52bd6050dfbd74491c",
+      "materialization_digest": "sha256:61e0552ec91377f358242893297799633bd7c0bc0e02f0d8625b79c20a2411e4",
       "probe": "stable-client-config",
-      "source_revision": "sha256:e2e0147bf69dec604d6e4a1a178e6e8f4422fdc0fa821b0f85648f8431985cb0",
+      "source_revision": "sha256:2e88b57cd7760e591eb6899a34108334c3aeb44eea9cf030ad81f07b2af75862",
       "symlink_policy": "forbidden",
       "target": ".gemini/settings.json",
       "writer_id": "sync-antigravity-from-cc",
@@ -448,11 +464,11 @@
       "asset_revisions": [
         {
           "asset_id": "ai-model-selection",
-          "source_revision": "1e0e1fc33a5fc1ec332fd94caa7d6de35366e9913e000c7dea61b09258efbd34"
+          "source_revision": "de0fe08d8cea37fb9153d2346f6ed3856e8e05ddce06a90029f1ddd97a4276cc"
         },
         {
           "asset_id": "ai-worker-watch",
-          "source_revision": "5c6cbf34bb33af544d6b502f45e7f5fe5ef688f33e4ab73d8a1f8d23cd0b7bb0"
+          "source_revision": "172825919aa56477cb0214b181f63ab3939a34fe1c478d4e1bb6c4f49303fe93"
         },
         {
           "asset_id": "branch-rule",
@@ -504,7 +520,7 @@
         },
         {
           "asset_id": "response-style",
-          "source_revision": "3385b09843b8f5fd72ca59100104cc98d2817d5a89772813375b28b2a7e8c042"
+          "source_revision": "ed2207edf9f410f1cfdf8ef61c461a5c5e16288b6a5f08b71a409443ddea27aa"
         },
         {
           "asset_id": "responsive-both-viewports",
@@ -516,7 +532,7 @@
         },
         {
           "asset_id": "sub-agent-scope-contract",
-          "source_revision": "9ddb1299a1c6722073964c88e36e8e5be2486b0c69a536c42f8eb867a77b1712"
+          "source_revision": "0fbf88d1c8fa1e16d09a41a78c92681013209e6019f54265749fa432283f120f"
         },
         {
           "asset_id": "test-kinds-and-cheap-loop",
@@ -540,15 +556,15 @@
         },
         {
           "asset_id": "worktree-rule",
-          "source_revision": "12a132e9f8dd55252c89d896be3b50b0a57ebe4d7692b50dfa9d37d7adc5113f"
+          "source_revision": "22fdd2cbea2bf9eded9833dd4884be21db05818966e46daa7dc58277548bfd9e"
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:1de791e49ea2a39dcc7e94a01e932bebd53b5ec8374e24f5226af7f1761f4ebb",
+      "content_digest": "sha256:34a3791873f69d5fcaee5ab5a93c585b337507af8466a91e9e731d6566b1a0b5",
       "kind": "rule",
-      "materialization_digest": "sha256:fc8dcbf0f25c507da14ef50be6b587f393ff54bd87d8ff26fca65ab9ce074eef",
+      "materialization_digest": "sha256:ac3e9b5b10978ebd2b3cb53e5055c15355ff12555e5e2fefc4a0871b016886ba",
       "probe": "antigravity-shared-instruction",
-      "source_revision": "sha256:1c3b54f01a46b0717ef90b6d0c4c97c68b6d607042d8a9ec22373019c8bcc264",
+      "source_revision": "sha256:c81cfc7d81712d5075d306a7e50c5b73c217c54fdf5faa06d815eee5a4655fd7",
       "symlink_policy": "forbidden",
       "target": ".agents/rules/AGENTS.md",
       "writer_id": "sync-antigravity-from-cc",
@@ -566,7 +582,7 @@
         },
         {
           "asset_id": "chatgpt-image-creator",
-          "source_revision": "d523ad90e612acda0d03d2278f9b6551d0a5082987c14fdd1a33917b0237edf8"
+          "source_revision": "7b01f6ad41a036fb5c1ef0ecaac6e0095d9db50153ccecef4feb4c58e27eb22f"
         },
         {
           "asset_id": "document-writer",
@@ -602,7 +618,7 @@
         },
         {
           "asset_id": "templates/implementation-auditor",
-          "source_revision": "9fe2d3ecefbdaf1a8f03b2afb2e7c357701d77330363d84fd929a80970d5e6a6"
+          "source_revision": "0c12e6b4dd8ad556addd7857fc0fe8da124eff6602ff6ff00498ef545470ee1b"
         },
         {
           "asset_id": "test-fixer",
@@ -614,11 +630,11 @@
         }
       ],
       "client": "antigravity",
-      "content_digest": "sha256:e650f5d5d07a99b21f45ae5b5995d8235a8d32744fa2516bb30d9938ef0a4cb3",
+      "content_digest": "sha256:21be739d48ca110026b9955b23e6f6bba9464ae22552191a8324a1c990fd26e4",
       "kind": "subagent",
-      "materialization_digest": "sha256:8cdccecb72ada7c5572799ed259fa09dba0c8351d7b0f60a8e83798bf0fd49cf",
+      "materialization_digest": "sha256:9da5144f8f99343ce47db9fe1e317d689142014b4c26210ce90aa5ec3ee2f462",
       "probe": "fresh-agent-discovery",
-      "source_revision": "sha256:4386f53275c1dd44543dc5f480f0f9b720a346786d082c396eb009cd2b400a8e",
+      "source_revision": "sha256:ea2837cb170619f3ff6ff6bfaf563d5e39a34349891db24903621cc38c25c2a1",
       "symlink_policy": "forbidden",
       "target": ".gemini/agents",
       "writer_id": "sync-antigravity-from-cc",
@@ -766,9 +782,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:d545f0f194d417f8eae381bda4c62588f8278660ea09232686770639d05b3ea7",
+      "content_digest": "sha256:a78a0a9ff40242df720f7b1e9dd5b7ecc2da4f13b07d487cdbe4728cdf3dada3",
       "kind": "command",
-      "materialization_digest": "sha256:a4c1e3b5df2ba8cefea1b2cb478bf992b07fd118cce7e6186ad3e540665971eb",
+      "materialization_digest": "sha256:7f85c18e27e10c81c34c458da9bf1ef9ce34020e33bd2be6a2a82a88381aaa32",
       "probe": "fresh-command-discovery",
       "source_revision": "sha256:4a06d34f4a4fc11eefc11f00bc5f124b8bb3090860c7f54e72cdf925403348de",
       "symlink_policy": "forbidden",
@@ -788,9 +804,9 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:fe4956c67587a34c5135d53e9a141715f39d1152379dc8ec32b22f854cc025e2",
+      "content_digest": "sha256:20b7e397a1b79edcec4a275ee4a87b1a51bc20d3e19bcaeea65086bc12634a26",
       "kind": "constitution",
-      "materialization_digest": "sha256:db3cf8efe9283e6ddb53cbb1fb9caab9e22974381e9120df3b21fd8bab7cb300",
+      "materialization_digest": "sha256:2631ec8d39a1d11b18dcd31b1fb9f87089b52bb7aac94eba5ef1a3a5f95bf68a",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:84556fce4f422c96be97f32ac7e8c639f51e9854e32e3f28fce9ec115b90b11e",
       "symlink_policy": "forbidden",
@@ -810,15 +826,19 @@
         },
         {
           "asset_id": "block-main-commit",
-          "source_revision": "c5c70460a26b92772e63c8895980f3e88a2cc30360a5288ffb5e8f118e8c0711"
+          "source_revision": "90ad51b2451303c13cb757fe855f1cffc88b7489bd26869f36942487da9999ab"
+        },
+        {
+          "asset_id": "block-physical-pointer",
+          "source_revision": "982376ab772a295fcbee764b4b7e72f952d9e7750e1272e8f44e496f1154e7c3"
         },
         {
           "asset_id": "block-skill-reverse-edit",
-          "source_revision": "a2e603590b202a857068b13887c51a258247c93383d0b3625bb1f6b791c2f679"
+          "source_revision": "10784b916bd1eeb234b2d6174e503da114e6e28b261c480e88d929af3916dd19"
         },
         {
           "asset_id": "block-unauthorized-docs-file",
-          "source_revision": "af2a2f7c29d77bad467cff5816c7aca21795c7a98b8dfc8f4f2fd32c4f5fa67e"
+          "source_revision": "ea6de945025cdb3fe607fd87c74772b6dd541080e89e1524e2c550f8f2b52276"
         },
         {
           "asset_id": "cloud-hub-bootstrap",
@@ -830,7 +850,7 @@
         },
         {
           "asset_id": "delegation-routing-backstop",
-          "source_revision": "02d54bfdd5b13e1fde9006e7ff54b64a9460b3389151e5f6ad4bdddbe2658850"
+          "source_revision": "ac1a4d4a837e24195a07a8789c32abaeb855bc6d74427208341fbe54895fbb01"
         },
         {
           "asset_id": "delegation-routing-reminder",
@@ -838,43 +858,47 @@
         },
         {
           "asset_id": "fable-implementation-guard",
-          "source_revision": "e3f9d539cfa1ca4b8889e8c37e6d173d2c5eb2fdba87f4f2a344881882752072"
+          "source_revision": "9300d0a47bf1d5dbb272d5bc4f6b44154d2fa95ba08a3d4e0a1dc4ef4f7b3a0a"
         },
         {
           "asset_id": "freshness-gate",
-          "source_revision": "b84994294108a3cfab60bb22018989274234f95fcf90df23cef492341f257c80"
+          "source_revision": "c137cb26d1045bd05db87bd2da593c15d65688c2dd861e73927bece7747984e1"
         },
         {
           "asset_id": "gbrain-recall-preflight",
-          "source_revision": "ac52713f94c848649fc0d85783bae73c520a5d7a1696f8b390a553c2ba412c18"
+          "source_revision": "ea560ffbd214c11fcb832297fb6d184a7d03d2774c487a0d32244497b217256a"
         },
         {
           "asset_id": "handover-preflight",
-          "source_revision": "c8e92d6898a7f9e834f5d322be2004bc0f6a60cdcba375d1b3db59bb13343405"
+          "source_revision": "a3b28cfb72df59b754af4580982fcb1fcc338dca5f6c75b8f057d2c219f091c3"
         },
         {
           "asset_id": "post-merge-gate",
-          "source_revision": "5992930056dd4a3b015fce3fd99b996af3715e7a886c90f790e101332d5e585d"
+          "source_revision": "2a7331aebb70138d4b0d820f0912f3e52ba97959e1e6113b360247837f83efe5"
         },
         {
           "asset_id": "pre-implementation-check",
-          "source_revision": "b496ea36846f33167e3c63a30ec663c68e46f9e809596d900993c19e2776e3c7"
+          "source_revision": "730aaa6511624ec6e48114a3239913b4d519f5fa262b59866988dbb02e6113bd"
         },
         {
           "asset_id": "quality-gate",
-          "source_revision": "757536ff310fffb1bf5cb50fe1a57306d3e82e14f2f8cd0049c697e64f066be1"
+          "source_revision": "d6c86500ec99a8dda9522d11f303f6b8e164d1f830d8c7a0344700791bd5f8b1"
+        },
+        {
+          "asset_id": "stop-explain-check",
+          "source_revision": "4283e2ccb35290a78447353e7c410da8ac93d816287628b3093854b0c6fba813"
         },
         {
           "asset_id": "stop-goal-check",
-          "source_revision": "4124abdcfd0ffe99ce40c84d64de159806f68aae22831c4f1b3a2e8609c8f714"
+          "source_revision": "4ad41fd1f9d6afb3fe6a05d6c0f55da8af157562172b9acad2aafa3a029d1754"
         },
         {
           "asset_id": "stop-loop-continuity",
-          "source_revision": "a3c387596b0988a49b41054b432b54a520082437b6d4538ef5d516a634e0443c"
+          "source_revision": "ee672e9f5f95cf6f0799899442350d217e5e66bb278296e1123f4f565dad6030"
         },
         {
           "asset_id": "telemetry-log",
-          "source_revision": "f7cb6d80491698cb5493a822b77707c17ee904013c536775b87143da2eee92db"
+          "source_revision": "0a73d1af55b7d1d5759f69ee84361ee2221b2f842a44a375029621d0f4cb0b1e"
         },
         {
           "asset_id": "ui-registry-preflight",
@@ -886,15 +910,15 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:35d7fcac78872f59c3b767359e34378c2534bce781ed2b6d009268b668c6fa3e",
+      "content_digest": "sha256:b9336110838e89df0d746e6c879155c00548eed22a2309b6c842797022dc88b4",
       "kind": "hook",
-      "materialization_digest": "sha256:5889ebb07f72343ca08fce31c2dbfbfc95249d6e31bc1cf2e217a3300ff9c877",
+      "materialization_digest": "sha256:9767aa93f08f369122cc42a5d35ce458099807908853368df4a2a6fdd4b8b736",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:e2e0147bf69dec604d6e4a1a178e6e8f4422fdc0fa821b0f85648f8431985cb0",
+      "source_revision": "sha256:2e88b57cd7760e591eb6899a34108334c3aeb44eea9cf030ad81f07b2af75862",
       "symlink_policy": "forbidden",
       "target": ".claude/hooks",
       "writer_id": "deploy-hooks",
-      "writer_version": "sha256:78a84462ab6f7718870213b50e551e7cce4618f49ce5e2e7125baf778f1e8640"
+      "writer_version": "sha256:7be48638c842a243cd090bd231ac712a56cb19d7eec3e12ff3917ef7acf86254"
     },
     {
       "asset_revisions": [
@@ -908,15 +932,19 @@
         },
         {
           "asset_id": "block-main-commit",
-          "source_revision": "c5c70460a26b92772e63c8895980f3e88a2cc30360a5288ffb5e8f118e8c0711"
+          "source_revision": "90ad51b2451303c13cb757fe855f1cffc88b7489bd26869f36942487da9999ab"
+        },
+        {
+          "asset_id": "block-physical-pointer",
+          "source_revision": "982376ab772a295fcbee764b4b7e72f952d9e7750e1272e8f44e496f1154e7c3"
         },
         {
           "asset_id": "block-skill-reverse-edit",
-          "source_revision": "a2e603590b202a857068b13887c51a258247c93383d0b3625bb1f6b791c2f679"
+          "source_revision": "10784b916bd1eeb234b2d6174e503da114e6e28b261c480e88d929af3916dd19"
         },
         {
           "asset_id": "block-unauthorized-docs-file",
-          "source_revision": "af2a2f7c29d77bad467cff5816c7aca21795c7a98b8dfc8f4f2fd32c4f5fa67e"
+          "source_revision": "ea6de945025cdb3fe607fd87c74772b6dd541080e89e1524e2c550f8f2b52276"
         },
         {
           "asset_id": "cloud-hub-bootstrap",
@@ -928,7 +956,7 @@
         },
         {
           "asset_id": "delegation-routing-backstop",
-          "source_revision": "02d54bfdd5b13e1fde9006e7ff54b64a9460b3389151e5f6ad4bdddbe2658850"
+          "source_revision": "ac1a4d4a837e24195a07a8789c32abaeb855bc6d74427208341fbe54895fbb01"
         },
         {
           "asset_id": "delegation-routing-reminder",
@@ -936,43 +964,47 @@
         },
         {
           "asset_id": "fable-implementation-guard",
-          "source_revision": "e3f9d539cfa1ca4b8889e8c37e6d173d2c5eb2fdba87f4f2a344881882752072"
+          "source_revision": "9300d0a47bf1d5dbb272d5bc4f6b44154d2fa95ba08a3d4e0a1dc4ef4f7b3a0a"
         },
         {
           "asset_id": "freshness-gate",
-          "source_revision": "b84994294108a3cfab60bb22018989274234f95fcf90df23cef492341f257c80"
+          "source_revision": "c137cb26d1045bd05db87bd2da593c15d65688c2dd861e73927bece7747984e1"
         },
         {
           "asset_id": "gbrain-recall-preflight",
-          "source_revision": "ac52713f94c848649fc0d85783bae73c520a5d7a1696f8b390a553c2ba412c18"
+          "source_revision": "ea560ffbd214c11fcb832297fb6d184a7d03d2774c487a0d32244497b217256a"
         },
         {
           "asset_id": "handover-preflight",
-          "source_revision": "c8e92d6898a7f9e834f5d322be2004bc0f6a60cdcba375d1b3db59bb13343405"
+          "source_revision": "a3b28cfb72df59b754af4580982fcb1fcc338dca5f6c75b8f057d2c219f091c3"
         },
         {
           "asset_id": "post-merge-gate",
-          "source_revision": "5992930056dd4a3b015fce3fd99b996af3715e7a886c90f790e101332d5e585d"
+          "source_revision": "2a7331aebb70138d4b0d820f0912f3e52ba97959e1e6113b360247837f83efe5"
         },
         {
           "asset_id": "pre-implementation-check",
-          "source_revision": "b496ea36846f33167e3c63a30ec663c68e46f9e809596d900993c19e2776e3c7"
+          "source_revision": "730aaa6511624ec6e48114a3239913b4d519f5fa262b59866988dbb02e6113bd"
         },
         {
           "asset_id": "quality-gate",
-          "source_revision": "757536ff310fffb1bf5cb50fe1a57306d3e82e14f2f8cd0049c697e64f066be1"
+          "source_revision": "d6c86500ec99a8dda9522d11f303f6b8e164d1f830d8c7a0344700791bd5f8b1"
+        },
+        {
+          "asset_id": "stop-explain-check",
+          "source_revision": "4283e2ccb35290a78447353e7c410da8ac93d816287628b3093854b0c6fba813"
         },
         {
           "asset_id": "stop-goal-check",
-          "source_revision": "4124abdcfd0ffe99ce40c84d64de159806f68aae22831c4f1b3a2e8609c8f714"
+          "source_revision": "4ad41fd1f9d6afb3fe6a05d6c0f55da8af157562172b9acad2aafa3a029d1754"
         },
         {
           "asset_id": "stop-loop-continuity",
-          "source_revision": "a3c387596b0988a49b41054b432b54a520082437b6d4538ef5d516a634e0443c"
+          "source_revision": "ee672e9f5f95cf6f0799899442350d217e5e66bb278296e1123f4f565dad6030"
         },
         {
           "asset_id": "telemetry-log",
-          "source_revision": "f7cb6d80491698cb5493a822b77707c17ee904013c536775b87143da2eee92db"
+          "source_revision": "0a73d1af55b7d1d5759f69ee84361ee2221b2f842a44a375029621d0f4cb0b1e"
         },
         {
           "asset_id": "ui-registry-preflight",
@@ -984,15 +1016,15 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:1ca792df52fbb787b139ec6fd41b9153cefca5fcc72d6c7bdfa214bc389cee79",
+      "content_digest": "sha256:54f21535706702b9b8dc994661b030523b9e93e9c3c0e2e20e88c3a822427987",
       "kind": "hook",
-      "materialization_digest": "sha256:1e1bf5a7f5d447ab8da52b1ba7c874a76d803e19111ac20ab84594810661c236",
+      "materialization_digest": "sha256:2642de213254712a80f695ad6b9d2ab0e453d87331b7507bb4159942a36cc6f6",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:e2e0147bf69dec604d6e4a1a178e6e8f4422fdc0fa821b0f85648f8431985cb0",
+      "source_revision": "sha256:2e88b57cd7760e591eb6899a34108334c3aeb44eea9cf030ad81f07b2af75862",
       "symlink_policy": "forbidden",
       "target": ".claude/settings.json",
       "writer_id": "deploy-hooks",
-      "writer_version": "sha256:78a84462ab6f7718870213b50e551e7cce4618f49ce5e2e7125baf778f1e8640"
+      "writer_version": "sha256:7be48638c842a243cd090bd231ac712a56cb19d7eec3e12ff3917ef7acf86254"
     },
     {
       "asset_revisions": [
@@ -1048,11 +1080,11 @@
       "asset_revisions": [
         {
           "asset_id": "ai-model-selection",
-          "source_revision": "1e0e1fc33a5fc1ec332fd94caa7d6de35366e9913e000c7dea61b09258efbd34"
+          "source_revision": "de0fe08d8cea37fb9153d2346f6ed3856e8e05ddce06a90029f1ddd97a4276cc"
         },
         {
           "asset_id": "ai-worker-watch",
-          "source_revision": "5c6cbf34bb33af544d6b502f45e7f5fe5ef688f33e4ab73d8a1f8d23cd0b7bb0"
+          "source_revision": "172825919aa56477cb0214b181f63ab3939a34fe1c478d4e1bb6c4f49303fe93"
         },
         {
           "asset_id": "branch-rule",
@@ -1060,7 +1092,7 @@
         },
         {
           "asset_id": "claude-auto-worktree-lifecycle",
-          "source_revision": "bb13a94dda74b7eb5835983d10498a0fcfc24ff5404a5621babce3062a14ef5d"
+          "source_revision": "53b7e56e5797e3ec9a0f81a433f90b81f5b4cc69c756fa0f223ea9f710737aa0"
         },
         {
           "asset_id": "constructive-dissent",
@@ -1108,7 +1140,7 @@
         },
         {
           "asset_id": "response-style",
-          "source_revision": "3385b09843b8f5fd72ca59100104cc98d2817d5a89772813375b28b2a7e8c042"
+          "source_revision": "ed2207edf9f410f1cfdf8ef61c461a5c5e16288b6a5f08b71a409443ddea27aa"
         },
         {
           "asset_id": "responsive-both-viewports",
@@ -1120,7 +1152,7 @@
         },
         {
           "asset_id": "sub-agent-scope-contract",
-          "source_revision": "9ddb1299a1c6722073964c88e36e8e5be2486b0c69a536c42f8eb867a77b1712"
+          "source_revision": "0fbf88d1c8fa1e16d09a41a78c92681013209e6019f54265749fa432283f120f"
         },
         {
           "asset_id": "test-kinds-and-cheap-loop",
@@ -1144,15 +1176,15 @@
         },
         {
           "asset_id": "worktree-rule",
-          "source_revision": "12a132e9f8dd55252c89d896be3b50b0a57ebe4d7692b50dfa9d37d7adc5113f"
+          "source_revision": "22fdd2cbea2bf9eded9833dd4884be21db05818966e46daa7dc58277548bfd9e"
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:bea58a22fd2fc2221c45b8c5779bb94fda0a011eec3358a85d9196b01fbea013",
+      "content_digest": "sha256:97c374f7c6bf7dc067229b879624e8409a9823ee7987e25fa82c52610483b168",
       "kind": "rule",
-      "materialization_digest": "sha256:e04d8eb8efd62b754f54a57bab8d069a4d6703040092d674e543eb72ab406baa",
+      "materialization_digest": "sha256:85dca686f5ae9270e53c8b1463f4b862252b5bb994a1033e381cc07f9c19fb31",
       "probe": "fresh-rule-discovery",
-      "source_revision": "sha256:c2baea2e621c39d485f50b4ece953bf84afd362ea2f9d12c4d3a675c5d9dfbbd",
+      "source_revision": "sha256:7dcfcefc463e0004c20ddbd52c9e492d006a9fb4f6854556d9f4af3fdb0ba1a1",
       "symlink_policy": "forbidden",
       "target": ".claude/rules",
       "writer_id": "deploy-rules",
@@ -1162,11 +1194,15 @@
       "asset_revisions": [
         {
           "asset_id": "adversarial-review",
-          "source_revision": "1ad25db5ea817d9611e717c8bcebe93e0911a670cc9bc346ff1d2d2fcc1de2e7"
+          "source_revision": "dc4ca14e9f26999bc2891551eedb5fa565e6193dd53c9b9829c1f4e5dcb0937a"
+        },
+        {
+          "asset_id": "agent-desktop",
+          "source_revision": "b12497d91ff4d54d947921c238f8fdf5ec9a27376c688573b6fa0666bdc64015"
         },
         {
           "asset_id": "agent-dispatch",
-          "source_revision": "55f60f46a778558a6cea28004856ebb13576a198d6118a3394de32f5bceabcf6"
+          "source_revision": "b4f09b9d7bec84ed8bdeaab772c9f45766ef6903c5f5c80b4d6eff31225bb629"
         },
         {
           "asset_id": "agentmemory-routing",
@@ -1205,36 +1241,44 @@
           "source_revision": "eab6d472e5141b6702de7043f4895e95565c2ebe454a7a0d21f3c5640001d597"
         },
         {
-          "asset_id": "cc-context-optimizer",
-          "source_revision": "a13a4e52476052ada5bcca49437f7f4925f96bce8896787960a127328fbe54cf"
-        },
-        {
           "asset_id": "ci-credit-optimizer",
           "source_revision": "f03a9b8bb652d96b879dfca10c95b993ec2ed623ff015c0b34da4ebef78acf98"
         },
         {
+          "asset_id": "codebase-memory-ja",
+          "source_revision": "2f9003f9ad2d569ff19c333ef5292ecc59587372aa5e610b70a0bc818f54a62e"
+        },
+        {
           "asset_id": "codex-review",
-          "source_revision": "a18f05c096d82df21d6fcb481290aaddd4b5b432e29d72a042ed24e421dc132d"
+          "source_revision": "3a85123081f68c18371675c9c7abb1d083524ddcf089c630cba26173b320f7a2"
         },
         {
           "asset_id": "create-pr",
           "source_revision": "50796780f373bf36c5749249f83a1e0e193335de1880b4d01c806a876532b9d2"
         },
         {
+          "asset_id": "critical-thinking",
+          "source_revision": "f10093d9a03d27fea214bc7fe456b8ee7d5f610016b9cbc118e5ac2ad2d0c768"
+        },
+        {
           "asset_id": "cursor-cloud",
-          "source_revision": "c2d9e7d9bcc3df33a506654db8806aaf0a2c4743929f78b9c908e116e4424b05"
+          "source_revision": "053b1d26c15a274e7290e27e219ee8647671683c7cd355aaac1db87ef460f53c"
         },
         {
           "asset_id": "depanda-staff-roles",
           "source_revision": "30c73a90a390c51f95729bef77d5b5ca57b42a392127ce6aabbf0d652b364a9c"
         },
         {
+          "asset_id": "design-guardrails",
+          "source_revision": "8465c1047bddf2d391cbec642738586dee16de084ac551a499de19387f51972f"
+        },
+        {
           "asset_id": "dev-guardrails",
-          "source_revision": "b19cb72604c5e80e602c6fe3e503ed7a00cea56950f79926490ae5b6476f52e4"
+          "source_revision": "1d59af0b32986c931b4b2ce2c8e5096f43c416f45dffb23f9af3e19d489f57e7"
         },
         {
           "asset_id": "handover-manual",
-          "source_revision": "61ca3f47b7d6797b09d58559d39d6686a291228a56edf3367726c628166ad5a6"
+          "source_revision": "246308f7d215e87206565cc561a9948b6e8c77738acedece1db33deae37d262f"
         },
         {
           "asset_id": "i-have-adhd",
@@ -1245,12 +1289,16 @@
           "source_revision": "be5b3793e91d711c8ca0d57538068b004a0dd17506d222a1ae52bcc5db455dbd"
         },
         {
+          "asset_id": "iphone-duo",
+          "source_revision": "9bcd561080ca8ce16398fe67bb9697422ef4f4648b5924089676aa54d326d303"
+        },
+        {
           "asset_id": "lineworks-talk",
           "source_revision": "1e81eb5c77edb5271b0e7340ebb7fbd1fd41173fb5fc3f79dfa4226de94d57b5"
         },
         {
           "asset_id": "main-intake",
-          "source_revision": "ed113021173cf41c680974f1387bced213a59252a87ff1ba17e7beaaf176f7b5"
+          "source_revision": "51be7602621a5224b1a12ec2584933aebb1bfbd1a0703dcc8849667905df7cfd"
         },
         {
           "asset_id": "mcp-dev-kit",
@@ -1262,7 +1310,7 @@
         },
         {
           "asset_id": "natural-japanese",
-          "source_revision": "3d2db2cc55aa36269e4536de5c099143662a4b3911e8ab74a4e00b294deae6fa"
+          "source_revision": "8e47883cbe5fa1942b29011e5608e46e9b4c9e5068629f7429403d9da2a99024"
         },
         {
           "asset_id": "new-project",
@@ -1274,43 +1322,39 @@
         },
         {
           "asset_id": "plan-approval",
-          "source_revision": "0b420f8322d315683551d754deb86f8ecdf6890ca028ddcc819ab43bf1be2c82"
+          "source_revision": "b9ece76d3677bea5f6e995a859a890edbabf716b3da3296d60452736fc4e7783"
         },
         {
           "asset_id": "post-merge",
-          "source_revision": "a8e67ed1f4cd7a81a26533870cb3ea38df1c11764f92f8e69c067e7ad68eb037"
+          "source_revision": "7117de7470d37e20ffe58a8797217abf388a02d16a202e694e3d59b44f9201aa"
         },
         {
-          "asset_id": "project-prompt-review",
-          "source_revision": "3eb6c977c7dd3494a28e1909bad7d7ec93b6d80f2debc1b40122399530ebb0ae"
+          "asset_id": "security-audit-ja",
+          "source_revision": "d55240b46bc81bae7f588951528fcd80a70e9fc41c1588fda8490b7346d4eeb5"
         },
         {
           "asset_id": "session-status",
-          "source_revision": "def12848919d7f105eda69b83b3a3da9d390b6d4eb5703e1fa57cd92c98ed0ae"
+          "source_revision": "5d06c9526edd9a6c79ff4d63ed94cb3af170ae985e6162629d794b5f5c977ff4"
         },
         {
           "asset_id": "shintaro-gbrain",
-          "source_revision": "e0002a61631dc91bae6fc1260cdea9ef93452d13dc4c677ab900a83ee2ea7534"
+          "source_revision": "0485b8c1f9f9d9d05543dc5796bd7edef9b406c4bcc04d14536ed112adb387f2"
         },
         {
           "asset_id": "shintaro-voice",
-          "source_revision": "3c383acf6436c8a7ca16646dd9a80f8389c288533295b1d11e0a96d91b129a4d"
+          "source_revision": "432e2f14aa12dd7ecd56f67726f0eecdd48af7277d2149b959f3fccdfad5cc8a"
         },
         {
           "asset_id": "skill-audit",
           "source_revision": "0f8e74500c9afb8efcbcea1a677dd86d9840a99ecb027255ca8621761917483e"
         },
         {
-          "asset_id": "skill-doctor",
-          "source_revision": "9f4a11b2cef96fb92b70ef1ad1be0e42a45ee2d4098f499e2258937eaea2f226"
-        },
-        {
-          "asset_id": "skill-doctor-ja",
-          "source_revision": "59c9e0891805002de2aff3c07eb8a6b406db7c48901f561afbabec2b84670f49"
-        },
-        {
           "asset_id": "slide-deck",
           "source_revision": "2d3b86cc196680acf82efa5f1e75f1fb1178ceac88dc4f620f843411370fbd66"
+        },
+        {
+          "asset_id": "stg-environment",
+          "source_revision": "57182b18f7cc4f97d2f883aaca0c584eca6e7cc6e3088262157142c4aa2a1208"
         },
         {
           "asset_id": "timebound-physical-feasibility",
@@ -1318,19 +1362,19 @@
         },
         {
           "asset_id": "verify-to-release",
-          "source_revision": "02f4bd54d429193b91a5338e2613a04c1e390206ec5c4d5fb2929ecd1c1b8f12"
+          "source_revision": "31a738bc7c09341dd8251b0d4fb98f7ae2e85c3d7d4d7291ed04c766552eca14"
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:8054c06542ef9742dfb1616b8c046d56c08e880dd42845da49ff07f98a40ead4",
+      "content_digest": "sha256:86b78b2d963e860c4f325cb7e418f336b7e5b22e71f2d871319fb6654ff3bcff",
       "kind": "skill",
-      "materialization_digest": "sha256:96b247c4d01acf7bd61dab097e8571b2bb44a4a7d25bce8aa31c5cf73380a8a1",
+      "materialization_digest": "sha256:270f7f73f3ff71f89c39d5607e18d72f37c69afe67ee29a8c6dd7b819ced0828",
       "probe": "fresh-skill-discovery",
-      "source_revision": "sha256:abac13a9ee19ec47e8e853cc10379c27b7ec39e96d67ca247b834426015fae80",
+      "source_revision": "sha256:f5955b02233511461b5398582cbe35eeb021310ccbace22a866a26e7a21e4064",
       "symlink_policy": "forbidden",
       "target": ".claude/skills",
       "writer_id": "sync-runtime-skills",
-      "writer_version": "sha256:89eeaafb4a5eda0dea4e6094ebe5e831b0051b5f0865d24ae4a1ece201bef3fe"
+      "writer_version": "sha256:3dd29c86ba94ab79b9574fa65ba2f351e4405caff648331a9b5577873c008ec4"
     },
     {
       "asset_revisions": [
@@ -1344,7 +1388,7 @@
         },
         {
           "asset_id": "chatgpt-image-creator",
-          "source_revision": "d523ad90e612acda0d03d2278f9b6551d0a5082987c14fdd1a33917b0237edf8"
+          "source_revision": "7b01f6ad41a036fb5c1ef0ecaac6e0095d9db50153ccecef4feb4c58e27eb22f"
         },
         {
           "asset_id": "document-writer",
@@ -1380,7 +1424,7 @@
         },
         {
           "asset_id": "templates/implementation-auditor",
-          "source_revision": "9fe2d3ecefbdaf1a8f03b2afb2e7c357701d77330363d84fd929a80970d5e6a6"
+          "source_revision": "0c12e6b4dd8ad556addd7857fc0fe8da124eff6602ff6ff00498ef545470ee1b"
         },
         {
           "asset_id": "test-fixer",
@@ -1392,11 +1436,11 @@
         }
       ],
       "client": "claude",
-      "content_digest": "sha256:cf2275f0c65c896f563167648c2ad366a9baa580049a9b724a54fedd06ed4a0a",
+      "content_digest": "sha256:c82b9abb319474ef26a3e1612738f6c4a7c2a56a207441062475facd8bea872e",
       "kind": "subagent",
-      "materialization_digest": "sha256:3d49b3e469d3d6eee23216fe9e0032e8e625d19c3db21444e18c3ef71f8676d4",
+      "materialization_digest": "sha256:0b97172b933c868bf671395d3757e7b5201fb8b0df801889a490c24c929f64b8",
       "probe": "fresh-agent-discovery",
-      "source_revision": "sha256:4386f53275c1dd44543dc5f480f0f9b720a346786d082c396eb009cd2b400a8e",
+      "source_revision": "sha256:ea2837cb170619f3ff6ff6bfaf563d5e39a34349891db24903621cc38c25c2a1",
       "symlink_policy": "forbidden",
       "target": ".claude/agents",
       "writer_id": "harness-link-planner",
@@ -1460,9 +1504,9 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:fe4956c67587a34c5135d53e9a141715f39d1152379dc8ec32b22f854cc025e2",
+      "content_digest": "sha256:20b7e397a1b79edcec4a275ee4a87b1a51bc20d3e19bcaeea65086bc12634a26",
       "kind": "constitution",
-      "materialization_digest": "sha256:dd3e2bff9f4e3bbc60839c183e360cb708d25e4f0c5428c60b76705cd027470e",
+      "materialization_digest": "sha256:c9e1ed234dcfe238dc12a5c0605e60d9a507db82f5186edb20d92ed7f27fa4cf",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:84556fce4f422c96be97f32ac7e8c639f51e9854e32e3f28fce9ec115b90b11e",
       "symlink_policy": "forbidden",
@@ -1482,15 +1526,19 @@
         },
         {
           "asset_id": "block-main-commit",
-          "source_revision": "c5c70460a26b92772e63c8895980f3e88a2cc30360a5288ffb5e8f118e8c0711"
+          "source_revision": "90ad51b2451303c13cb757fe855f1cffc88b7489bd26869f36942487da9999ab"
+        },
+        {
+          "asset_id": "block-physical-pointer",
+          "source_revision": "982376ab772a295fcbee764b4b7e72f952d9e7750e1272e8f44e496f1154e7c3"
         },
         {
           "asset_id": "block-skill-reverse-edit",
-          "source_revision": "a2e603590b202a857068b13887c51a258247c93383d0b3625bb1f6b791c2f679"
+          "source_revision": "10784b916bd1eeb234b2d6174e503da114e6e28b261c480e88d929af3916dd19"
         },
         {
           "asset_id": "block-unauthorized-docs-file",
-          "source_revision": "af2a2f7c29d77bad467cff5816c7aca21795c7a98b8dfc8f4f2fd32c4f5fa67e"
+          "source_revision": "ea6de945025cdb3fe607fd87c74772b6dd541080e89e1524e2c550f8f2b52276"
         },
         {
           "asset_id": "cloud-hub-bootstrap",
@@ -1502,7 +1550,7 @@
         },
         {
           "asset_id": "delegation-routing-backstop",
-          "source_revision": "02d54bfdd5b13e1fde9006e7ff54b64a9460b3389151e5f6ad4bdddbe2658850"
+          "source_revision": "ac1a4d4a837e24195a07a8789c32abaeb855bc6d74427208341fbe54895fbb01"
         },
         {
           "asset_id": "delegation-routing-reminder",
@@ -1510,43 +1558,47 @@
         },
         {
           "asset_id": "fable-implementation-guard",
-          "source_revision": "e3f9d539cfa1ca4b8889e8c37e6d173d2c5eb2fdba87f4f2a344881882752072"
+          "source_revision": "9300d0a47bf1d5dbb272d5bc4f6b44154d2fa95ba08a3d4e0a1dc4ef4f7b3a0a"
         },
         {
           "asset_id": "freshness-gate",
-          "source_revision": "b84994294108a3cfab60bb22018989274234f95fcf90df23cef492341f257c80"
+          "source_revision": "c137cb26d1045bd05db87bd2da593c15d65688c2dd861e73927bece7747984e1"
         },
         {
           "asset_id": "gbrain-recall-preflight",
-          "source_revision": "ac52713f94c848649fc0d85783bae73c520a5d7a1696f8b390a553c2ba412c18"
+          "source_revision": "ea560ffbd214c11fcb832297fb6d184a7d03d2774c487a0d32244497b217256a"
         },
         {
           "asset_id": "handover-preflight",
-          "source_revision": "c8e92d6898a7f9e834f5d322be2004bc0f6a60cdcba375d1b3db59bb13343405"
+          "source_revision": "a3b28cfb72df59b754af4580982fcb1fcc338dca5f6c75b8f057d2c219f091c3"
         },
         {
           "asset_id": "post-merge-gate",
-          "source_revision": "5992930056dd4a3b015fce3fd99b996af3715e7a886c90f790e101332d5e585d"
+          "source_revision": "2a7331aebb70138d4b0d820f0912f3e52ba97959e1e6113b360247837f83efe5"
         },
         {
           "asset_id": "pre-implementation-check",
-          "source_revision": "b496ea36846f33167e3c63a30ec663c68e46f9e809596d900993c19e2776e3c7"
+          "source_revision": "730aaa6511624ec6e48114a3239913b4d519f5fa262b59866988dbb02e6113bd"
         },
         {
           "asset_id": "quality-gate",
-          "source_revision": "757536ff310fffb1bf5cb50fe1a57306d3e82e14f2f8cd0049c697e64f066be1"
+          "source_revision": "d6c86500ec99a8dda9522d11f303f6b8e164d1f830d8c7a0344700791bd5f8b1"
+        },
+        {
+          "asset_id": "stop-explain-check",
+          "source_revision": "4283e2ccb35290a78447353e7c410da8ac93d816287628b3093854b0c6fba813"
         },
         {
           "asset_id": "stop-goal-check",
-          "source_revision": "4124abdcfd0ffe99ce40c84d64de159806f68aae22831c4f1b3a2e8609c8f714"
+          "source_revision": "4ad41fd1f9d6afb3fe6a05d6c0f55da8af157562172b9acad2aafa3a029d1754"
         },
         {
           "asset_id": "stop-loop-continuity",
-          "source_revision": "a3c387596b0988a49b41054b432b54a520082437b6d4538ef5d516a634e0443c"
+          "source_revision": "ee672e9f5f95cf6f0799899442350d217e5e66bb278296e1123f4f565dad6030"
         },
         {
           "asset_id": "telemetry-log",
-          "source_revision": "f7cb6d80491698cb5493a822b77707c17ee904013c536775b87143da2eee92db"
+          "source_revision": "0a73d1af55b7d1d5759f69ee84361ee2221b2f842a44a375029621d0f4cb0b1e"
         },
         {
           "asset_id": "ui-registry-preflight",
@@ -1558,15 +1610,15 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:f8b0572643787678f3b8c99aa0b7d7c6e49d527379aa27e714decb20a1dbf36f",
+      "content_digest": "sha256:7e3f11d323ed7eb49fc3b8f885cdf1d993afb6b46ada0be7470d2bfa91955e91",
       "kind": "hook",
-      "materialization_digest": "sha256:e3273a218ab572f511ce3bf038bf818b309bd86e4e8af5d252e3273e7aee7b4c",
+      "materialization_digest": "sha256:8b0fada169f0d4ae0249c422d35ed12d237a2842826e8e06c9fd609dfd977920",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:e2e0147bf69dec604d6e4a1a178e6e8f4422fdc0fa821b0f85648f8431985cb0",
+      "source_revision": "sha256:2e88b57cd7760e591eb6899a34108334c3aeb44eea9cf030ad81f07b2af75862",
       "symlink_policy": "forbidden",
       "target": ".codex/hooks",
       "writer_id": "deploy-hooks",
-      "writer_version": "sha256:78a84462ab6f7718870213b50e551e7cce4618f49ce5e2e7125baf778f1e8640"
+      "writer_version": "sha256:7be48638c842a243cd090bd231ac712a56cb19d7eec3e12ff3917ef7acf86254"
     },
     {
       "asset_revisions": [
@@ -1580,15 +1632,19 @@
         },
         {
           "asset_id": "block-main-commit",
-          "source_revision": "c5c70460a26b92772e63c8895980f3e88a2cc30360a5288ffb5e8f118e8c0711"
+          "source_revision": "90ad51b2451303c13cb757fe855f1cffc88b7489bd26869f36942487da9999ab"
+        },
+        {
+          "asset_id": "block-physical-pointer",
+          "source_revision": "982376ab772a295fcbee764b4b7e72f952d9e7750e1272e8f44e496f1154e7c3"
         },
         {
           "asset_id": "block-skill-reverse-edit",
-          "source_revision": "a2e603590b202a857068b13887c51a258247c93383d0b3625bb1f6b791c2f679"
+          "source_revision": "10784b916bd1eeb234b2d6174e503da114e6e28b261c480e88d929af3916dd19"
         },
         {
           "asset_id": "block-unauthorized-docs-file",
-          "source_revision": "af2a2f7c29d77bad467cff5816c7aca21795c7a98b8dfc8f4f2fd32c4f5fa67e"
+          "source_revision": "ea6de945025cdb3fe607fd87c74772b6dd541080e89e1524e2c550f8f2b52276"
         },
         {
           "asset_id": "cloud-hub-bootstrap",
@@ -1600,7 +1656,7 @@
         },
         {
           "asset_id": "delegation-routing-backstop",
-          "source_revision": "02d54bfdd5b13e1fde9006e7ff54b64a9460b3389151e5f6ad4bdddbe2658850"
+          "source_revision": "ac1a4d4a837e24195a07a8789c32abaeb855bc6d74427208341fbe54895fbb01"
         },
         {
           "asset_id": "delegation-routing-reminder",
@@ -1608,43 +1664,47 @@
         },
         {
           "asset_id": "fable-implementation-guard",
-          "source_revision": "e3f9d539cfa1ca4b8889e8c37e6d173d2c5eb2fdba87f4f2a344881882752072"
+          "source_revision": "9300d0a47bf1d5dbb272d5bc4f6b44154d2fa95ba08a3d4e0a1dc4ef4f7b3a0a"
         },
         {
           "asset_id": "freshness-gate",
-          "source_revision": "b84994294108a3cfab60bb22018989274234f95fcf90df23cef492341f257c80"
+          "source_revision": "c137cb26d1045bd05db87bd2da593c15d65688c2dd861e73927bece7747984e1"
         },
         {
           "asset_id": "gbrain-recall-preflight",
-          "source_revision": "ac52713f94c848649fc0d85783bae73c520a5d7a1696f8b390a553c2ba412c18"
+          "source_revision": "ea560ffbd214c11fcb832297fb6d184a7d03d2774c487a0d32244497b217256a"
         },
         {
           "asset_id": "handover-preflight",
-          "source_revision": "c8e92d6898a7f9e834f5d322be2004bc0f6a60cdcba375d1b3db59bb13343405"
+          "source_revision": "a3b28cfb72df59b754af4580982fcb1fcc338dca5f6c75b8f057d2c219f091c3"
         },
         {
           "asset_id": "post-merge-gate",
-          "source_revision": "5992930056dd4a3b015fce3fd99b996af3715e7a886c90f790e101332d5e585d"
+          "source_revision": "2a7331aebb70138d4b0d820f0912f3e52ba97959e1e6113b360247837f83efe5"
         },
         {
           "asset_id": "pre-implementation-check",
-          "source_revision": "b496ea36846f33167e3c63a30ec663c68e46f9e809596d900993c19e2776e3c7"
+          "source_revision": "730aaa6511624ec6e48114a3239913b4d519f5fa262b59866988dbb02e6113bd"
         },
         {
           "asset_id": "quality-gate",
-          "source_revision": "757536ff310fffb1bf5cb50fe1a57306d3e82e14f2f8cd0049c697e64f066be1"
+          "source_revision": "d6c86500ec99a8dda9522d11f303f6b8e164d1f830d8c7a0344700791bd5f8b1"
+        },
+        {
+          "asset_id": "stop-explain-check",
+          "source_revision": "4283e2ccb35290a78447353e7c410da8ac93d816287628b3093854b0c6fba813"
         },
         {
           "asset_id": "stop-goal-check",
-          "source_revision": "4124abdcfd0ffe99ce40c84d64de159806f68aae22831c4f1b3a2e8609c8f714"
+          "source_revision": "4ad41fd1f9d6afb3fe6a05d6c0f55da8af157562172b9acad2aafa3a029d1754"
         },
         {
           "asset_id": "stop-loop-continuity",
-          "source_revision": "a3c387596b0988a49b41054b432b54a520082437b6d4538ef5d516a634e0443c"
+          "source_revision": "ee672e9f5f95cf6f0799899442350d217e5e66bb278296e1123f4f565dad6030"
         },
         {
           "asset_id": "telemetry-log",
-          "source_revision": "f7cb6d80491698cb5493a822b77707c17ee904013c536775b87143da2eee92db"
+          "source_revision": "0a73d1af55b7d1d5759f69ee84361ee2221b2f842a44a375029621d0f4cb0b1e"
         },
         {
           "asset_id": "ui-registry-preflight",
@@ -1656,15 +1716,15 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:03546c3eb370d32b31479cdba58b3534914988c0b196d9f3f8d1be33d7f5df6d",
+      "content_digest": "sha256:a44a276c1d8fe4b12e9de9cd14a59bfcf37cd24e77e0353e0c80e89deeed68e3",
       "kind": "hook",
-      "materialization_digest": "sha256:0f9f5fa6c1271491864a488b68990bc934f7c5bca27b7dea1fcd4a5fcb130903",
+      "materialization_digest": "sha256:853769b77dbaf89f951a1b51703010f84b9c9ea9c2d952be4c955cae3590d32a",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:e2e0147bf69dec604d6e4a1a178e6e8f4422fdc0fa821b0f85648f8431985cb0",
+      "source_revision": "sha256:2e88b57cd7760e591eb6899a34108334c3aeb44eea9cf030ad81f07b2af75862",
       "symlink_policy": "forbidden",
       "target": ".codex/hooks.json",
       "writer_id": "deploy-hooks",
-      "writer_version": "sha256:78a84462ab6f7718870213b50e551e7cce4618f49ce5e2e7125baf778f1e8640"
+      "writer_version": "sha256:7be48638c842a243cd090bd231ac712a56cb19d7eec3e12ff3917ef7acf86254"
     },
     {
       "asset_revisions": [
@@ -1720,11 +1780,11 @@
       "asset_revisions": [
         {
           "asset_id": "ai-model-selection",
-          "source_revision": "1e0e1fc33a5fc1ec332fd94caa7d6de35366e9913e000c7dea61b09258efbd34"
+          "source_revision": "de0fe08d8cea37fb9153d2346f6ed3856e8e05ddce06a90029f1ddd97a4276cc"
         },
         {
           "asset_id": "ai-worker-watch",
-          "source_revision": "5c6cbf34bb33af544d6b502f45e7f5fe5ef688f33e4ab73d8a1f8d23cd0b7bb0"
+          "source_revision": "172825919aa56477cb0214b181f63ab3939a34fe1c478d4e1bb6c4f49303fe93"
         },
         {
           "asset_id": "branch-rule",
@@ -1780,7 +1840,7 @@
         },
         {
           "asset_id": "response-style",
-          "source_revision": "3385b09843b8f5fd72ca59100104cc98d2817d5a89772813375b28b2a7e8c042"
+          "source_revision": "ed2207edf9f410f1cfdf8ef61c461a5c5e16288b6a5f08b71a409443ddea27aa"
         },
         {
           "asset_id": "responsive-both-viewports",
@@ -1792,7 +1852,7 @@
         },
         {
           "asset_id": "sub-agent-scope-contract",
-          "source_revision": "9ddb1299a1c6722073964c88e36e8e5be2486b0c69a536c42f8eb867a77b1712"
+          "source_revision": "0fbf88d1c8fa1e16d09a41a78c92681013209e6019f54265749fa432283f120f"
         },
         {
           "asset_id": "test-kinds-and-cheap-loop",
@@ -1816,15 +1876,15 @@
         },
         {
           "asset_id": "worktree-rule",
-          "source_revision": "12a132e9f8dd55252c89d896be3b50b0a57ebe4d7692b50dfa9d37d7adc5113f"
+          "source_revision": "22fdd2cbea2bf9eded9833dd4884be21db05818966e46daa7dc58277548bfd9e"
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:fe4956c67587a34c5135d53e9a141715f39d1152379dc8ec32b22f854cc025e2",
+      "content_digest": "sha256:20b7e397a1b79edcec4a275ee4a87b1a51bc20d3e19bcaeea65086bc12634a26",
       "kind": "rule",
-      "materialization_digest": "sha256:5b5f921ceb58317b2dc849842ec962a3bb735fe6fe5dd1c88ff47ec6b47404b1",
+      "materialization_digest": "sha256:6665c7f21b749a038b0c48891620e32f4dbbcf24d929337deabc48d87e4b77bd",
       "probe": "fresh-rule-discovery",
-      "source_revision": "sha256:b1eafafc5ab349049147f1f07c2535b9f23d0024057a992f50d0e474ab16409a",
+      "source_revision": "sha256:404c9f45fb7cc462028e67a63185fd8cc3bd3f0f7028bcc2c9bf3d9d56477719",
       "symlink_policy": "forbidden",
       "target": "AGENTS.md",
       "writer_id": "generate-agents-md",
@@ -1834,11 +1894,15 @@
       "asset_revisions": [
         {
           "asset_id": "adversarial-review",
-          "source_revision": "1ad25db5ea817d9611e717c8bcebe93e0911a670cc9bc346ff1d2d2fcc1de2e7"
+          "source_revision": "dc4ca14e9f26999bc2891551eedb5fa565e6193dd53c9b9829c1f4e5dcb0937a"
+        },
+        {
+          "asset_id": "agent-desktop",
+          "source_revision": "b12497d91ff4d54d947921c238f8fdf5ec9a27376c688573b6fa0666bdc64015"
         },
         {
           "asset_id": "agent-dispatch",
-          "source_revision": "55f60f46a778558a6cea28004856ebb13576a198d6118a3394de32f5bceabcf6"
+          "source_revision": "b4f09b9d7bec84ed8bdeaab772c9f45766ef6903c5f5c80b4d6eff31225bb629"
         },
         {
           "asset_id": "agentmemory-routing",
@@ -1877,36 +1941,44 @@
           "source_revision": "eab6d472e5141b6702de7043f4895e95565c2ebe454a7a0d21f3c5640001d597"
         },
         {
-          "asset_id": "cc-context-optimizer",
-          "source_revision": "a13a4e52476052ada5bcca49437f7f4925f96bce8896787960a127328fbe54cf"
-        },
-        {
           "asset_id": "ci-credit-optimizer",
           "source_revision": "f03a9b8bb652d96b879dfca10c95b993ec2ed623ff015c0b34da4ebef78acf98"
         },
         {
+          "asset_id": "codebase-memory-ja",
+          "source_revision": "2f9003f9ad2d569ff19c333ef5292ecc59587372aa5e610b70a0bc818f54a62e"
+        },
+        {
           "asset_id": "codex-review",
-          "source_revision": "a18f05c096d82df21d6fcb481290aaddd4b5b432e29d72a042ed24e421dc132d"
+          "source_revision": "3a85123081f68c18371675c9c7abb1d083524ddcf089c630cba26173b320f7a2"
         },
         {
           "asset_id": "create-pr",
           "source_revision": "50796780f373bf36c5749249f83a1e0e193335de1880b4d01c806a876532b9d2"
         },
         {
+          "asset_id": "critical-thinking",
+          "source_revision": "f10093d9a03d27fea214bc7fe456b8ee7d5f610016b9cbc118e5ac2ad2d0c768"
+        },
+        {
           "asset_id": "cursor-cloud",
-          "source_revision": "c2d9e7d9bcc3df33a506654db8806aaf0a2c4743929f78b9c908e116e4424b05"
+          "source_revision": "053b1d26c15a274e7290e27e219ee8647671683c7cd355aaac1db87ef460f53c"
         },
         {
           "asset_id": "depanda-staff-roles",
           "source_revision": "30c73a90a390c51f95729bef77d5b5ca57b42a392127ce6aabbf0d652b364a9c"
         },
         {
+          "asset_id": "design-guardrails",
+          "source_revision": "8465c1047bddf2d391cbec642738586dee16de084ac551a499de19387f51972f"
+        },
+        {
           "asset_id": "dev-guardrails",
-          "source_revision": "b19cb72604c5e80e602c6fe3e503ed7a00cea56950f79926490ae5b6476f52e4"
+          "source_revision": "1d59af0b32986c931b4b2ce2c8e5096f43c416f45dffb23f9af3e19d489f57e7"
         },
         {
           "asset_id": "handover-manual",
-          "source_revision": "61ca3f47b7d6797b09d58559d39d6686a291228a56edf3367726c628166ad5a6"
+          "source_revision": "246308f7d215e87206565cc561a9948b6e8c77738acedece1db33deae37d262f"
         },
         {
           "asset_id": "i-have-adhd",
@@ -1917,12 +1989,16 @@
           "source_revision": "be5b3793e91d711c8ca0d57538068b004a0dd17506d222a1ae52bcc5db455dbd"
         },
         {
+          "asset_id": "iphone-duo",
+          "source_revision": "9bcd561080ca8ce16398fe67bb9697422ef4f4648b5924089676aa54d326d303"
+        },
+        {
           "asset_id": "lineworks-talk",
           "source_revision": "1e81eb5c77edb5271b0e7340ebb7fbd1fd41173fb5fc3f79dfa4226de94d57b5"
         },
         {
           "asset_id": "main-intake",
-          "source_revision": "ed113021173cf41c680974f1387bced213a59252a87ff1ba17e7beaaf176f7b5"
+          "source_revision": "51be7602621a5224b1a12ec2584933aebb1bfbd1a0703dcc8849667905df7cfd"
         },
         {
           "asset_id": "mcp-dev-kit",
@@ -1934,7 +2010,7 @@
         },
         {
           "asset_id": "natural-japanese",
-          "source_revision": "3d2db2cc55aa36269e4536de5c099143662a4b3911e8ab74a4e00b294deae6fa"
+          "source_revision": "8e47883cbe5fa1942b29011e5608e46e9b4c9e5068629f7429403d9da2a99024"
         },
         {
           "asset_id": "new-project",
@@ -1946,43 +2022,39 @@
         },
         {
           "asset_id": "plan-approval",
-          "source_revision": "0b420f8322d315683551d754deb86f8ecdf6890ca028ddcc819ab43bf1be2c82"
+          "source_revision": "b9ece76d3677bea5f6e995a859a890edbabf716b3da3296d60452736fc4e7783"
         },
         {
           "asset_id": "post-merge",
-          "source_revision": "a8e67ed1f4cd7a81a26533870cb3ea38df1c11764f92f8e69c067e7ad68eb037"
+          "source_revision": "7117de7470d37e20ffe58a8797217abf388a02d16a202e694e3d59b44f9201aa"
         },
         {
-          "asset_id": "project-prompt-review",
-          "source_revision": "3eb6c977c7dd3494a28e1909bad7d7ec93b6d80f2debc1b40122399530ebb0ae"
+          "asset_id": "security-audit-ja",
+          "source_revision": "d55240b46bc81bae7f588951528fcd80a70e9fc41c1588fda8490b7346d4eeb5"
         },
         {
           "asset_id": "session-status",
-          "source_revision": "def12848919d7f105eda69b83b3a3da9d390b6d4eb5703e1fa57cd92c98ed0ae"
+          "source_revision": "5d06c9526edd9a6c79ff4d63ed94cb3af170ae985e6162629d794b5f5c977ff4"
         },
         {
           "asset_id": "shintaro-gbrain",
-          "source_revision": "e0002a61631dc91bae6fc1260cdea9ef93452d13dc4c677ab900a83ee2ea7534"
+          "source_revision": "0485b8c1f9f9d9d05543dc5796bd7edef9b406c4bcc04d14536ed112adb387f2"
         },
         {
           "asset_id": "shintaro-voice",
-          "source_revision": "3c383acf6436c8a7ca16646dd9a80f8389c288533295b1d11e0a96d91b129a4d"
+          "source_revision": "432e2f14aa12dd7ecd56f67726f0eecdd48af7277d2149b959f3fccdfad5cc8a"
         },
         {
           "asset_id": "skill-audit",
           "source_revision": "0f8e74500c9afb8efcbcea1a677dd86d9840a99ecb027255ca8621761917483e"
         },
         {
-          "asset_id": "skill-doctor",
-          "source_revision": "9f4a11b2cef96fb92b70ef1ad1be0e42a45ee2d4098f499e2258937eaea2f226"
-        },
-        {
-          "asset_id": "skill-doctor-ja",
-          "source_revision": "59c9e0891805002de2aff3c07eb8a6b406db7c48901f561afbabec2b84670f49"
-        },
-        {
           "asset_id": "slide-deck",
           "source_revision": "2d3b86cc196680acf82efa5f1e75f1fb1178ceac88dc4f620f843411370fbd66"
+        },
+        {
+          "asset_id": "stg-environment",
+          "source_revision": "57182b18f7cc4f97d2f883aaca0c584eca6e7cc6e3088262157142c4aa2a1208"
         },
         {
           "asset_id": "timebound-physical-feasibility",
@@ -1990,19 +2062,19 @@
         },
         {
           "asset_id": "verify-to-release",
-          "source_revision": "02f4bd54d429193b91a5338e2613a04c1e390206ec5c4d5fb2929ecd1c1b8f12"
+          "source_revision": "31a738bc7c09341dd8251b0d4fb98f7ae2e85c3d7d4d7291ed04c766552eca14"
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:307d87ed3d4ab286b441d3eece3c6c28fdc49fe89be4edc61e2d385328f4d81b",
+      "content_digest": "sha256:cbe6a7f4e3b3f21ade5d9ed7d1d49da7fd7e5e304fc38e999c507c82435e54da",
       "kind": "skill",
-      "materialization_digest": "sha256:0a52f5a058d70d3356d1e97dd35b1375f5d5e7925187b203ffc7eddfe2d2be86",
+      "materialization_digest": "sha256:2e5fb90f3104840d5128d672238145e730f44bc73ebb62f899e11831e3a73cac",
       "probe": "fresh-skill-discovery",
-      "source_revision": "sha256:abac13a9ee19ec47e8e853cc10379c27b7ec39e96d67ca247b834426015fae80",
+      "source_revision": "sha256:f5955b02233511461b5398582cbe35eeb021310ccbace22a866a26e7a21e4064",
       "symlink_policy": "forbidden",
       "target": ".agents/skills",
       "writer_id": "sync-runtime-skills",
-      "writer_version": "sha256:89eeaafb4a5eda0dea4e6094ebe5e831b0051b5f0865d24ae4a1ece201bef3fe"
+      "writer_version": "sha256:3dd29c86ba94ab79b9574fa65ba2f351e4405caff648331a9b5577873c008ec4"
     },
     {
       "asset_revisions": [
@@ -2016,7 +2088,7 @@
         },
         {
           "asset_id": "chatgpt-image-creator",
-          "source_revision": "d523ad90e612acda0d03d2278f9b6551d0a5082987c14fdd1a33917b0237edf8"
+          "source_revision": "7b01f6ad41a036fb5c1ef0ecaac6e0095d9db50153ccecef4feb4c58e27eb22f"
         },
         {
           "asset_id": "document-writer",
@@ -2052,7 +2124,7 @@
         },
         {
           "asset_id": "templates/implementation-auditor",
-          "source_revision": "9fe2d3ecefbdaf1a8f03b2afb2e7c357701d77330363d84fd929a80970d5e6a6"
+          "source_revision": "0c12e6b4dd8ad556addd7857fc0fe8da124eff6602ff6ff00498ef545470ee1b"
         },
         {
           "asset_id": "test-fixer",
@@ -2064,11 +2136,11 @@
         }
       ],
       "client": "codex",
-      "content_digest": "sha256:cf2275f0c65c896f563167648c2ad366a9baa580049a9b724a54fedd06ed4a0a",
+      "content_digest": "sha256:c82b9abb319474ef26a3e1612738f6c4a7c2a56a207441062475facd8bea872e",
       "kind": "subagent",
-      "materialization_digest": "sha256:237f9126f9f29148010b5e464eb0b6960ea9f4782c9510b235e73a1146fa8459",
+      "materialization_digest": "sha256:a54a490c8bf41c7be58e6195c64d84c65551d2d9f82e76cbe7704478e70d7df7",
       "probe": "fresh-agent-discovery",
-      "source_revision": "sha256:4386f53275c1dd44543dc5f480f0f9b720a346786d082c396eb009cd2b400a8e",
+      "source_revision": "sha256:ea2837cb170619f3ff6ff6bfaf563d5e39a34349891db24903621cc38c25c2a1",
       "symlink_policy": "forbidden",
       "target": ".codex/agents",
       "writer_id": "harness-link-planner",
@@ -2118,7 +2190,7 @@
       "symlink_policy": "forbidden",
       "target": ".cursor/environment.json",
       "writer_id": "sync-cursor-from-cc",
-      "writer_version": "sha256:386ec3b5bebdea9fe15f51df766998edab2e80fbc6af63d1b5b02b0149be7391"
+      "writer_version": "sha256:9c56d1804d9f142697a021a4e988432316e485fd38c8ad0d13748a79d790b6ef"
     },
     {
       "asset_revisions": [
@@ -2156,15 +2228,15 @@
         }
       ],
       "client": "cursor",
-      "content_digest": "sha256:291d699116bd2df55e9ca8f97544026e9dc0aaf2e6cfb5ff77762eb3cdbf283c",
+      "content_digest": "sha256:9f250c60608faa24eb91e299b526ba4282ff01f7b94e6b52bf2374d24589beb5",
       "kind": "ai_client",
-      "materialization_digest": "sha256:714d7840e4cb1427d703ac547936d7885dc4527b45a40e9e45e33f11bc165c11",
+      "materialization_digest": "sha256:f931196fb6454d2b23974ad2c62f383d278b2b9fc1ca54f775d078837ae207bb",
       "probe": "stable-sync-state",
       "source_revision": "sha256:b71e6da24d61a307438d0fa13b957885ccb8e4d6340f06f9e1491f0e62c31337",
       "symlink_policy": "forbidden",
       "target": ".cursor/sync-state.json",
       "writer_id": "sync-cursor-from-cc",
-      "writer_version": "sha256:386ec3b5bebdea9fe15f51df766998edab2e80fbc6af63d1b5b02b0149be7391"
+      "writer_version": "sha256:9c56d1804d9f142697a021a4e988432316e485fd38c8ad0d13748a79d790b6ef"
     },
     {
       "asset_revisions": [
@@ -2178,9 +2250,9 @@
         }
       ],
       "client": "cursor",
-      "content_digest": "sha256:fe4956c67587a34c5135d53e9a141715f39d1152379dc8ec32b22f854cc025e2",
+      "content_digest": "sha256:20b7e397a1b79edcec4a275ee4a87b1a51bc20d3e19bcaeea65086bc12634a26",
       "kind": "constitution",
-      "materialization_digest": "sha256:55136265ae47917db2a6b26734b3a9fdd24daa85c16256e0358708d8271d3b7b",
+      "materialization_digest": "sha256:4f6b8039ad7c1a57d58339a07a8a56744dd8d6b975fedf2bacb906a83e17d079",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:84556fce4f422c96be97f32ac7e8c639f51e9854e32e3f28fce9ec115b90b11e",
       "symlink_policy": "forbidden",
@@ -2200,15 +2272,19 @@
         },
         {
           "asset_id": "block-main-commit",
-          "source_revision": "c5c70460a26b92772e63c8895980f3e88a2cc30360a5288ffb5e8f118e8c0711"
+          "source_revision": "90ad51b2451303c13cb757fe855f1cffc88b7489bd26869f36942487da9999ab"
+        },
+        {
+          "asset_id": "block-physical-pointer",
+          "source_revision": "982376ab772a295fcbee764b4b7e72f952d9e7750e1272e8f44e496f1154e7c3"
         },
         {
           "asset_id": "block-skill-reverse-edit",
-          "source_revision": "a2e603590b202a857068b13887c51a258247c93383d0b3625bb1f6b791c2f679"
+          "source_revision": "10784b916bd1eeb234b2d6174e503da114e6e28b261c480e88d929af3916dd19"
         },
         {
           "asset_id": "block-unauthorized-docs-file",
-          "source_revision": "af2a2f7c29d77bad467cff5816c7aca21795c7a98b8dfc8f4f2fd32c4f5fa67e"
+          "source_revision": "ea6de945025cdb3fe607fd87c74772b6dd541080e89e1524e2c550f8f2b52276"
         },
         {
           "asset_id": "cloud-hub-bootstrap",
@@ -2220,7 +2296,7 @@
         },
         {
           "asset_id": "delegation-routing-backstop",
-          "source_revision": "02d54bfdd5b13e1fde9006e7ff54b64a9460b3389151e5f6ad4bdddbe2658850"
+          "source_revision": "ac1a4d4a837e24195a07a8789c32abaeb855bc6d74427208341fbe54895fbb01"
         },
         {
           "asset_id": "delegation-routing-reminder",
@@ -2228,43 +2304,47 @@
         },
         {
           "asset_id": "fable-implementation-guard",
-          "source_revision": "e3f9d539cfa1ca4b8889e8c37e6d173d2c5eb2fdba87f4f2a344881882752072"
+          "source_revision": "9300d0a47bf1d5dbb272d5bc4f6b44154d2fa95ba08a3d4e0a1dc4ef4f7b3a0a"
         },
         {
           "asset_id": "freshness-gate",
-          "source_revision": "b84994294108a3cfab60bb22018989274234f95fcf90df23cef492341f257c80"
+          "source_revision": "c137cb26d1045bd05db87bd2da593c15d65688c2dd861e73927bece7747984e1"
         },
         {
           "asset_id": "gbrain-recall-preflight",
-          "source_revision": "ac52713f94c848649fc0d85783bae73c520a5d7a1696f8b390a553c2ba412c18"
+          "source_revision": "ea560ffbd214c11fcb832297fb6d184a7d03d2774c487a0d32244497b217256a"
         },
         {
           "asset_id": "handover-preflight",
-          "source_revision": "c8e92d6898a7f9e834f5d322be2004bc0f6a60cdcba375d1b3db59bb13343405"
+          "source_revision": "a3b28cfb72df59b754af4580982fcb1fcc338dca5f6c75b8f057d2c219f091c3"
         },
         {
           "asset_id": "post-merge-gate",
-          "source_revision": "5992930056dd4a3b015fce3fd99b996af3715e7a886c90f790e101332d5e585d"
+          "source_revision": "2a7331aebb70138d4b0d820f0912f3e52ba97959e1e6113b360247837f83efe5"
         },
         {
           "asset_id": "pre-implementation-check",
-          "source_revision": "b496ea36846f33167e3c63a30ec663c68e46f9e809596d900993c19e2776e3c7"
+          "source_revision": "730aaa6511624ec6e48114a3239913b4d519f5fa262b59866988dbb02e6113bd"
         },
         {
           "asset_id": "quality-gate",
-          "source_revision": "757536ff310fffb1bf5cb50fe1a57306d3e82e14f2f8cd0049c697e64f066be1"
+          "source_revision": "d6c86500ec99a8dda9522d11f303f6b8e164d1f830d8c7a0344700791bd5f8b1"
+        },
+        {
+          "asset_id": "stop-explain-check",
+          "source_revision": "4283e2ccb35290a78447353e7c410da8ac93d816287628b3093854b0c6fba813"
         },
         {
           "asset_id": "stop-goal-check",
-          "source_revision": "4124abdcfd0ffe99ce40c84d64de159806f68aae22831c4f1b3a2e8609c8f714"
+          "source_revision": "4ad41fd1f9d6afb3fe6a05d6c0f55da8af157562172b9acad2aafa3a029d1754"
         },
         {
           "asset_id": "stop-loop-continuity",
-          "source_revision": "a3c387596b0988a49b41054b432b54a520082437b6d4538ef5d516a634e0443c"
+          "source_revision": "ee672e9f5f95cf6f0799899442350d217e5e66bb278296e1123f4f565dad6030"
         },
         {
           "asset_id": "telemetry-log",
-          "source_revision": "f7cb6d80491698cb5493a822b77707c17ee904013c536775b87143da2eee92db"
+          "source_revision": "0a73d1af55b7d1d5759f69ee84361ee2221b2f842a44a375029621d0f4cb0b1e"
         },
         {
           "asset_id": "ui-registry-preflight",
@@ -2276,15 +2356,15 @@
         }
       ],
       "client": "cursor",
-      "content_digest": "sha256:185c402471c24e8e445b1b7e8ee5b9e48008ed5c624d6309716b517439a0a233",
+      "content_digest": "sha256:cb17068500d1c1f8936aa33eb712bd4a366e9eab00d560df4ef10906aa7584f2",
       "kind": "hook",
-      "materialization_digest": "sha256:116a6e10d9cf1bcab69b3a51602776fbb59ca2944b0a2c1cd92dbed3b1781c3f",
+      "materialization_digest": "sha256:0f436a961f92357b7de11520e968cc38a07434214b26cc7456887e6e4df8c03c",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:e2e0147bf69dec604d6e4a1a178e6e8f4422fdc0fa821b0f85648f8431985cb0",
+      "source_revision": "sha256:2e88b57cd7760e591eb6899a34108334c3aeb44eea9cf030ad81f07b2af75862",
       "symlink_policy": "forbidden",
       "target": ".cursor/hooks",
       "writer_id": "sync-cursor-from-cc",
-      "writer_version": "sha256:386ec3b5bebdea9fe15f51df766998edab2e80fbc6af63d1b5b02b0149be7391"
+      "writer_version": "sha256:9c56d1804d9f142697a021a4e988432316e485fd38c8ad0d13748a79d790b6ef"
     },
     {
       "asset_revisions": [
@@ -2298,15 +2378,19 @@
         },
         {
           "asset_id": "block-main-commit",
-          "source_revision": "c5c70460a26b92772e63c8895980f3e88a2cc30360a5288ffb5e8f118e8c0711"
+          "source_revision": "90ad51b2451303c13cb757fe855f1cffc88b7489bd26869f36942487da9999ab"
+        },
+        {
+          "asset_id": "block-physical-pointer",
+          "source_revision": "982376ab772a295fcbee764b4b7e72f952d9e7750e1272e8f44e496f1154e7c3"
         },
         {
           "asset_id": "block-skill-reverse-edit",
-          "source_revision": "a2e603590b202a857068b13887c51a258247c93383d0b3625bb1f6b791c2f679"
+          "source_revision": "10784b916bd1eeb234b2d6174e503da114e6e28b261c480e88d929af3916dd19"
         },
         {
           "asset_id": "block-unauthorized-docs-file",
-          "source_revision": "af2a2f7c29d77bad467cff5816c7aca21795c7a98b8dfc8f4f2fd32c4f5fa67e"
+          "source_revision": "ea6de945025cdb3fe607fd87c74772b6dd541080e89e1524e2c550f8f2b52276"
         },
         {
           "asset_id": "cloud-hub-bootstrap",
@@ -2318,7 +2402,7 @@
         },
         {
           "asset_id": "delegation-routing-backstop",
-          "source_revision": "02d54bfdd5b13e1fde9006e7ff54b64a9460b3389151e5f6ad4bdddbe2658850"
+          "source_revision": "ac1a4d4a837e24195a07a8789c32abaeb855bc6d74427208341fbe54895fbb01"
         },
         {
           "asset_id": "delegation-routing-reminder",
@@ -2326,43 +2410,47 @@
         },
         {
           "asset_id": "fable-implementation-guard",
-          "source_revision": "e3f9d539cfa1ca4b8889e8c37e6d173d2c5eb2fdba87f4f2a344881882752072"
+          "source_revision": "9300d0a47bf1d5dbb272d5bc4f6b44154d2fa95ba08a3d4e0a1dc4ef4f7b3a0a"
         },
         {
           "asset_id": "freshness-gate",
-          "source_revision": "b84994294108a3cfab60bb22018989274234f95fcf90df23cef492341f257c80"
+          "source_revision": "c137cb26d1045bd05db87bd2da593c15d65688c2dd861e73927bece7747984e1"
         },
         {
           "asset_id": "gbrain-recall-preflight",
-          "source_revision": "ac52713f94c848649fc0d85783bae73c520a5d7a1696f8b390a553c2ba412c18"
+          "source_revision": "ea560ffbd214c11fcb832297fb6d184a7d03d2774c487a0d32244497b217256a"
         },
         {
           "asset_id": "handover-preflight",
-          "source_revision": "c8e92d6898a7f9e834f5d322be2004bc0f6a60cdcba375d1b3db59bb13343405"
+          "source_revision": "a3b28cfb72df59b754af4580982fcb1fcc338dca5f6c75b8f057d2c219f091c3"
         },
         {
           "asset_id": "post-merge-gate",
-          "source_revision": "5992930056dd4a3b015fce3fd99b996af3715e7a886c90f790e101332d5e585d"
+          "source_revision": "2a7331aebb70138d4b0d820f0912f3e52ba97959e1e6113b360247837f83efe5"
         },
         {
           "asset_id": "pre-implementation-check",
-          "source_revision": "b496ea36846f33167e3c63a30ec663c68e46f9e809596d900993c19e2776e3c7"
+          "source_revision": "730aaa6511624ec6e48114a3239913b4d519f5fa262b59866988dbb02e6113bd"
         },
         {
           "asset_id": "quality-gate",
-          "source_revision": "757536ff310fffb1bf5cb50fe1a57306d3e82e14f2f8cd0049c697e64f066be1"
+          "source_revision": "d6c86500ec99a8dda9522d11f303f6b8e164d1f830d8c7a0344700791bd5f8b1"
+        },
+        {
+          "asset_id": "stop-explain-check",
+          "source_revision": "4283e2ccb35290a78447353e7c410da8ac93d816287628b3093854b0c6fba813"
         },
         {
           "asset_id": "stop-goal-check",
-          "source_revision": "4124abdcfd0ffe99ce40c84d64de159806f68aae22831c4f1b3a2e8609c8f714"
+          "source_revision": "4ad41fd1f9d6afb3fe6a05d6c0f55da8af157562172b9acad2aafa3a029d1754"
         },
         {
           "asset_id": "stop-loop-continuity",
-          "source_revision": "a3c387596b0988a49b41054b432b54a520082437b6d4538ef5d516a634e0443c"
+          "source_revision": "ee672e9f5f95cf6f0799899442350d217e5e66bb278296e1123f4f565dad6030"
         },
         {
           "asset_id": "telemetry-log",
-          "source_revision": "f7cb6d80491698cb5493a822b77707c17ee904013c536775b87143da2eee92db"
+          "source_revision": "0a73d1af55b7d1d5759f69ee84361ee2221b2f842a44a375029621d0f4cb0b1e"
         },
         {
           "asset_id": "ui-registry-preflight",
@@ -2374,15 +2462,15 @@
         }
       ],
       "client": "cursor",
-      "content_digest": "sha256:c007a8877e9eab7412cba27e725c6e69272e3de864cc3cf72094b73f7180912b",
+      "content_digest": "sha256:c24623720526fe42d162191a8e9dabf2e9ae89eadc5f9bea1407f86e856f9733",
       "kind": "hook",
-      "materialization_digest": "sha256:5524f1c36be518bb7daf4e18a7eccba7c99bc54172afc979a83d6f30af9f8dab",
+      "materialization_digest": "sha256:e084ac2765607b1c1a1d290495d3d0547c67950c89634125e205a299a6234fad",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:e2e0147bf69dec604d6e4a1a178e6e8f4422fdc0fa821b0f85648f8431985cb0",
+      "source_revision": "sha256:2e88b57cd7760e591eb6899a34108334c3aeb44eea9cf030ad81f07b2af75862",
       "symlink_policy": "forbidden",
       "target": ".cursor/hooks.json",
       "writer_id": "sync-cursor-from-cc",
-      "writer_version": "sha256:386ec3b5bebdea9fe15f51df766998edab2e80fbc6af63d1b5b02b0149be7391"
+      "writer_version": "sha256:9c56d1804d9f142697a021a4e988432316e485fd38c8ad0d13748a79d790b6ef"
     },
     {
       "asset_revisions": [
@@ -2438,11 +2526,11 @@
       "asset_revisions": [
         {
           "asset_id": "ai-model-selection",
-          "source_revision": "1e0e1fc33a5fc1ec332fd94caa7d6de35366e9913e000c7dea61b09258efbd34"
+          "source_revision": "de0fe08d8cea37fb9153d2346f6ed3856e8e05ddce06a90029f1ddd97a4276cc"
         },
         {
           "asset_id": "ai-worker-watch",
-          "source_revision": "5c6cbf34bb33af544d6b502f45e7f5fe5ef688f33e4ab73d8a1f8d23cd0b7bb0"
+          "source_revision": "172825919aa56477cb0214b181f63ab3939a34fe1c478d4e1bb6c4f49303fe93"
         },
         {
           "asset_id": "branch-rule",
@@ -2494,7 +2582,7 @@
         },
         {
           "asset_id": "response-style",
-          "source_revision": "3385b09843b8f5fd72ca59100104cc98d2817d5a89772813375b28b2a7e8c042"
+          "source_revision": "ed2207edf9f410f1cfdf8ef61c461a5c5e16288b6a5f08b71a409443ddea27aa"
         },
         {
           "asset_id": "responsive-both-viewports",
@@ -2506,7 +2594,7 @@
         },
         {
           "asset_id": "sub-agent-scope-contract",
-          "source_revision": "9ddb1299a1c6722073964c88e36e8e5be2486b0c69a536c42f8eb867a77b1712"
+          "source_revision": "0fbf88d1c8fa1e16d09a41a78c92681013209e6019f54265749fa432283f120f"
         },
         {
           "asset_id": "test-kinds-and-cheap-loop",
@@ -2530,29 +2618,33 @@
         },
         {
           "asset_id": "worktree-rule",
-          "source_revision": "12a132e9f8dd55252c89d896be3b50b0a57ebe4d7692b50dfa9d37d7adc5113f"
+          "source_revision": "22fdd2cbea2bf9eded9833dd4884be21db05818966e46daa7dc58277548bfd9e"
         }
       ],
       "client": "cursor",
-      "content_digest": "sha256:57a4b43c429ad387a461736af2c2cb993465d74d678f7126e48db927083c36e0",
+      "content_digest": "sha256:e2e18afd77df3c7cd6e0d11049e61ba04218dc529a85b9b0d0a65bd42e633734",
       "kind": "rule",
-      "materialization_digest": "sha256:13fc4772f5cff53b0b65a05ccca72515a29ceb6534350ff01a74f344812aaafa",
+      "materialization_digest": "sha256:307c80997d28eaa185bb846472f735fe5e34921c9137a4318e5e3588e74062b3",
       "probe": "fresh-rule-discovery",
-      "source_revision": "sha256:1c3b54f01a46b0717ef90b6d0c4c97c68b6d607042d8a9ec22373019c8bcc264",
+      "source_revision": "sha256:c81cfc7d81712d5075d306a7e50c5b73c217c54fdf5faa06d815eee5a4655fd7",
       "symlink_policy": "forbidden",
       "target": ".cursor/rules",
       "writer_id": "sync-cursor-from-cc",
-      "writer_version": "sha256:386ec3b5bebdea9fe15f51df766998edab2e80fbc6af63d1b5b02b0149be7391"
+      "writer_version": "sha256:9c56d1804d9f142697a021a4e988432316e485fd38c8ad0d13748a79d790b6ef"
     },
     {
       "asset_revisions": [
         {
           "asset_id": "adversarial-review",
-          "source_revision": "1ad25db5ea817d9611e717c8bcebe93e0911a670cc9bc346ff1d2d2fcc1de2e7"
+          "source_revision": "dc4ca14e9f26999bc2891551eedb5fa565e6193dd53c9b9829c1f4e5dcb0937a"
+        },
+        {
+          "asset_id": "agent-desktop",
+          "source_revision": "b12497d91ff4d54d947921c238f8fdf5ec9a27376c688573b6fa0666bdc64015"
         },
         {
           "asset_id": "agent-dispatch",
-          "source_revision": "55f60f46a778558a6cea28004856ebb13576a198d6118a3394de32f5bceabcf6"
+          "source_revision": "b4f09b9d7bec84ed8bdeaab772c9f45766ef6903c5f5c80b4d6eff31225bb629"
         },
         {
           "asset_id": "agentmemory-routing",
@@ -2591,36 +2683,44 @@
           "source_revision": "eab6d472e5141b6702de7043f4895e95565c2ebe454a7a0d21f3c5640001d597"
         },
         {
-          "asset_id": "cc-context-optimizer",
-          "source_revision": "a13a4e52476052ada5bcca49437f7f4925f96bce8896787960a127328fbe54cf"
-        },
-        {
           "asset_id": "ci-credit-optimizer",
           "source_revision": "f03a9b8bb652d96b879dfca10c95b993ec2ed623ff015c0b34da4ebef78acf98"
         },
         {
+          "asset_id": "codebase-memory-ja",
+          "source_revision": "2f9003f9ad2d569ff19c333ef5292ecc59587372aa5e610b70a0bc818f54a62e"
+        },
+        {
           "asset_id": "codex-review",
-          "source_revision": "a18f05c096d82df21d6fcb481290aaddd4b5b432e29d72a042ed24e421dc132d"
+          "source_revision": "3a85123081f68c18371675c9c7abb1d083524ddcf089c630cba26173b320f7a2"
         },
         {
           "asset_id": "create-pr",
           "source_revision": "50796780f373bf36c5749249f83a1e0e193335de1880b4d01c806a876532b9d2"
         },
         {
+          "asset_id": "critical-thinking",
+          "source_revision": "f10093d9a03d27fea214bc7fe456b8ee7d5f610016b9cbc118e5ac2ad2d0c768"
+        },
+        {
           "asset_id": "cursor-cloud",
-          "source_revision": "c2d9e7d9bcc3df33a506654db8806aaf0a2c4743929f78b9c908e116e4424b05"
+          "source_revision": "053b1d26c15a274e7290e27e219ee8647671683c7cd355aaac1db87ef460f53c"
         },
         {
           "asset_id": "depanda-staff-roles",
           "source_revision": "30c73a90a390c51f95729bef77d5b5ca57b42a392127ce6aabbf0d652b364a9c"
         },
         {
+          "asset_id": "design-guardrails",
+          "source_revision": "8465c1047bddf2d391cbec642738586dee16de084ac551a499de19387f51972f"
+        },
+        {
           "asset_id": "dev-guardrails",
-          "source_revision": "b19cb72604c5e80e602c6fe3e503ed7a00cea56950f79926490ae5b6476f52e4"
+          "source_revision": "1d59af0b32986c931b4b2ce2c8e5096f43c416f45dffb23f9af3e19d489f57e7"
         },
         {
           "asset_id": "handover-manual",
-          "source_revision": "61ca3f47b7d6797b09d58559d39d6686a291228a56edf3367726c628166ad5a6"
+          "source_revision": "246308f7d215e87206565cc561a9948b6e8c77738acedece1db33deae37d262f"
         },
         {
           "asset_id": "i-have-adhd",
@@ -2631,12 +2731,16 @@
           "source_revision": "be5b3793e91d711c8ca0d57538068b004a0dd17506d222a1ae52bcc5db455dbd"
         },
         {
+          "asset_id": "iphone-duo",
+          "source_revision": "9bcd561080ca8ce16398fe67bb9697422ef4f4648b5924089676aa54d326d303"
+        },
+        {
           "asset_id": "lineworks-talk",
           "source_revision": "1e81eb5c77edb5271b0e7340ebb7fbd1fd41173fb5fc3f79dfa4226de94d57b5"
         },
         {
           "asset_id": "main-intake",
-          "source_revision": "ed113021173cf41c680974f1387bced213a59252a87ff1ba17e7beaaf176f7b5"
+          "source_revision": "51be7602621a5224b1a12ec2584933aebb1bfbd1a0703dcc8849667905df7cfd"
         },
         {
           "asset_id": "mcp-dev-kit",
@@ -2648,7 +2752,7 @@
         },
         {
           "asset_id": "natural-japanese",
-          "source_revision": "3d2db2cc55aa36269e4536de5c099143662a4b3911e8ab74a4e00b294deae6fa"
+          "source_revision": "8e47883cbe5fa1942b29011e5608e46e9b4c9e5068629f7429403d9da2a99024"
         },
         {
           "asset_id": "new-project",
@@ -2660,43 +2764,39 @@
         },
         {
           "asset_id": "plan-approval",
-          "source_revision": "0b420f8322d315683551d754deb86f8ecdf6890ca028ddcc819ab43bf1be2c82"
+          "source_revision": "b9ece76d3677bea5f6e995a859a890edbabf716b3da3296d60452736fc4e7783"
         },
         {
           "asset_id": "post-merge",
-          "source_revision": "a8e67ed1f4cd7a81a26533870cb3ea38df1c11764f92f8e69c067e7ad68eb037"
+          "source_revision": "7117de7470d37e20ffe58a8797217abf388a02d16a202e694e3d59b44f9201aa"
         },
         {
-          "asset_id": "project-prompt-review",
-          "source_revision": "3eb6c977c7dd3494a28e1909bad7d7ec93b6d80f2debc1b40122399530ebb0ae"
+          "asset_id": "security-audit-ja",
+          "source_revision": "d55240b46bc81bae7f588951528fcd80a70e9fc41c1588fda8490b7346d4eeb5"
         },
         {
           "asset_id": "session-status",
-          "source_revision": "def12848919d7f105eda69b83b3a3da9d390b6d4eb5703e1fa57cd92c98ed0ae"
+          "source_revision": "5d06c9526edd9a6c79ff4d63ed94cb3af170ae985e6162629d794b5f5c977ff4"
         },
         {
           "asset_id": "shintaro-gbrain",
-          "source_revision": "e0002a61631dc91bae6fc1260cdea9ef93452d13dc4c677ab900a83ee2ea7534"
+          "source_revision": "0485b8c1f9f9d9d05543dc5796bd7edef9b406c4bcc04d14536ed112adb387f2"
         },
         {
           "asset_id": "shintaro-voice",
-          "source_revision": "3c383acf6436c8a7ca16646dd9a80f8389c288533295b1d11e0a96d91b129a4d"
+          "source_revision": "432e2f14aa12dd7ecd56f67726f0eecdd48af7277d2149b959f3fccdfad5cc8a"
         },
         {
           "asset_id": "skill-audit",
           "source_revision": "0f8e74500c9afb8efcbcea1a677dd86d9840a99ecb027255ca8621761917483e"
         },
         {
-          "asset_id": "skill-doctor",
-          "source_revision": "9f4a11b2cef96fb92b70ef1ad1be0e42a45ee2d4098f499e2258937eaea2f226"
-        },
-        {
-          "asset_id": "skill-doctor-ja",
-          "source_revision": "59c9e0891805002de2aff3c07eb8a6b406db7c48901f561afbabec2b84670f49"
-        },
-        {
           "asset_id": "slide-deck",
           "source_revision": "2d3b86cc196680acf82efa5f1e75f1fb1178ceac88dc4f620f843411370fbd66"
+        },
+        {
+          "asset_id": "stg-environment",
+          "source_revision": "57182b18f7cc4f97d2f883aaca0c584eca6e7cc6e3088262157142c4aa2a1208"
         },
         {
           "asset_id": "timebound-physical-feasibility",
@@ -2704,19 +2804,19 @@
         },
         {
           "asset_id": "verify-to-release",
-          "source_revision": "02f4bd54d429193b91a5338e2613a04c1e390206ec5c4d5fb2929ecd1c1b8f12"
+          "source_revision": "31a738bc7c09341dd8251b0d4fb98f7ae2e85c3d7d4d7291ed04c766552eca14"
         }
       ],
       "client": "cursor",
-      "content_digest": "sha256:307d87ed3d4ab286b441d3eece3c6c28fdc49fe89be4edc61e2d385328f4d81b",
+      "content_digest": "sha256:cbe6a7f4e3b3f21ade5d9ed7d1d49da7fd7e5e304fc38e999c507c82435e54da",
       "kind": "skill",
-      "materialization_digest": "sha256:39bd298383ead5c6f311a62da0965b42ffd914dbf082c54ea6c01440538d9f84",
+      "materialization_digest": "sha256:7ee107b092f6b1fc4523f34d8f922a35b12715bdb192274dfd9bec141a933ed3",
       "probe": "fresh-skill-discovery",
-      "source_revision": "sha256:abac13a9ee19ec47e8e853cc10379c27b7ec39e96d67ca247b834426015fae80",
+      "source_revision": "sha256:f5955b02233511461b5398582cbe35eeb021310ccbace22a866a26e7a21e4064",
       "symlink_policy": "forbidden",
       "target": ".cursor/skills",
       "writer_id": "sync-runtime-skills",
-      "writer_version": "sha256:89eeaafb4a5eda0dea4e6094ebe5e831b0051b5f0865d24ae4a1ece201bef3fe"
+      "writer_version": "sha256:3dd29c86ba94ab79b9574fa65ba2f351e4405caff648331a9b5577873c008ec4"
     },
     {
       "asset_revisions": [
@@ -2730,7 +2830,7 @@
         },
         {
           "asset_id": "chatgpt-image-creator",
-          "source_revision": "d523ad90e612acda0d03d2278f9b6551d0a5082987c14fdd1a33917b0237edf8"
+          "source_revision": "7b01f6ad41a036fb5c1ef0ecaac6e0095d9db50153ccecef4feb4c58e27eb22f"
         },
         {
           "asset_id": "document-writer",
@@ -2766,7 +2866,7 @@
         },
         {
           "asset_id": "templates/implementation-auditor",
-          "source_revision": "9fe2d3ecefbdaf1a8f03b2afb2e7c357701d77330363d84fd929a80970d5e6a6"
+          "source_revision": "0c12e6b4dd8ad556addd7857fc0fe8da124eff6602ff6ff00498ef545470ee1b"
         },
         {
           "asset_id": "test-fixer",
@@ -2778,15 +2878,15 @@
         }
       ],
       "client": "cursor",
-      "content_digest": "sha256:7a3760ada900a37044b51744cec41f1b96ea3b6b1ffd1c318ea992819c74a035",
+      "content_digest": "sha256:f38455f1f2ae1cd3934dfda8666fcb570ec7727311e6a537bd41641cd0e6772d",
       "kind": "subagent",
-      "materialization_digest": "sha256:9d343a39978dc9dc54379888efc0f416a2a8c797ecfe4cd794150cd4a5dd2696",
+      "materialization_digest": "sha256:e8be1cbd42ff7d7ba70d6f891d4c670440da13477ea3b6353e4e3674c29cd3fb",
       "probe": "fresh-agent-discovery",
-      "source_revision": "sha256:4386f53275c1dd44543dc5f480f0f9b720a346786d082c396eb009cd2b400a8e",
+      "source_revision": "sha256:ea2837cb170619f3ff6ff6bfaf563d5e39a34349891db24903621cc38c25c2a1",
       "symlink_policy": "forbidden",
       "target": ".cursor/agents",
       "writer_id": "sync-cursor-from-cc",
-      "writer_version": "sha256:386ec3b5bebdea9fe15f51df766998edab2e80fbc6af63d1b5b02b0149be7391"
+      "writer_version": "sha256:9c56d1804d9f142697a021a4e988432316e485fd38c8ad0d13748a79d790b6ef"
     },
     {
       "asset_revisions": [
@@ -2826,7 +2926,7 @@
       "client": "kimi",
       "content_digest": "sha256:6d202f94554959e01308d5e55c4d20e69261b82a87ead7ffcdbc0dbafb2dc426",
       "kind": "ai_client",
-      "materialization_digest": "sha256:15d8dbc22d3f076d42cacde424ad9d0517b0c60f779aaa1367b50f1e7ce596ae",
+      "materialization_digest": "sha256:1f9773222e8ff7eba41efa7d7961c7e27b34e8650f07fdbe1e6490f171fab4d1",
       "probe": "stable-client-instruction",
       "source_revision": "sha256:b71e6da24d61a307438d0fa13b957885ccb8e4d6340f06f9e1491f0e62c31337",
       "symlink_policy": "forbidden",
@@ -2870,9 +2970,9 @@
         }
       ],
       "client": "kimi",
-      "content_digest": "sha256:65712959412554aa677e7b861d4493c33c4217de8607e2ac6e36d35a5197981b",
+      "content_digest": "sha256:750ab05ec6915ff64518229d899914b7a1b840abd56aad72b970718b1be0dfbb",
       "kind": "ai_client",
-      "materialization_digest": "sha256:d5880200be5d396012865b7c019f8f895a18d133155c0ddf260c2538a1861472",
+      "materialization_digest": "sha256:ca022421824ecbe4d82ceef12d94ffffa8d8ee8599ead3c1796197e13761f0e7",
       "probe": "stable-sync-state",
       "source_revision": "sha256:b71e6da24d61a307438d0fa13b957885ccb8e4d6340f06f9e1491f0e62c31337",
       "symlink_policy": "forbidden",
@@ -2892,9 +2992,9 @@
         }
       ],
       "client": "kimi",
-      "content_digest": "sha256:fe4956c67587a34c5135d53e9a141715f39d1152379dc8ec32b22f854cc025e2",
+      "content_digest": "sha256:20b7e397a1b79edcec4a275ee4a87b1a51bc20d3e19bcaeea65086bc12634a26",
       "kind": "constitution",
-      "materialization_digest": "sha256:a57665cea825f12374fbbce4cccce19ae225d9007f0c36655df0a25512f45230",
+      "materialization_digest": "sha256:3d7328a2c70fa54dea43d827fea3b50eee7e1bdaa2f68f427a845a909efdcc2f",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:84556fce4f422c96be97f32ac7e8c639f51e9854e32e3f28fce9ec115b90b11e",
       "symlink_policy": "forbidden",
@@ -2914,15 +3014,19 @@
         },
         {
           "asset_id": "block-main-commit",
-          "source_revision": "c5c70460a26b92772e63c8895980f3e88a2cc30360a5288ffb5e8f118e8c0711"
+          "source_revision": "90ad51b2451303c13cb757fe855f1cffc88b7489bd26869f36942487da9999ab"
+        },
+        {
+          "asset_id": "block-physical-pointer",
+          "source_revision": "982376ab772a295fcbee764b4b7e72f952d9e7750e1272e8f44e496f1154e7c3"
         },
         {
           "asset_id": "block-skill-reverse-edit",
-          "source_revision": "a2e603590b202a857068b13887c51a258247c93383d0b3625bb1f6b791c2f679"
+          "source_revision": "10784b916bd1eeb234b2d6174e503da114e6e28b261c480e88d929af3916dd19"
         },
         {
           "asset_id": "block-unauthorized-docs-file",
-          "source_revision": "af2a2f7c29d77bad467cff5816c7aca21795c7a98b8dfc8f4f2fd32c4f5fa67e"
+          "source_revision": "ea6de945025cdb3fe607fd87c74772b6dd541080e89e1524e2c550f8f2b52276"
         },
         {
           "asset_id": "cloud-hub-bootstrap",
@@ -2934,7 +3038,7 @@
         },
         {
           "asset_id": "delegation-routing-backstop",
-          "source_revision": "02d54bfdd5b13e1fde9006e7ff54b64a9460b3389151e5f6ad4bdddbe2658850"
+          "source_revision": "ac1a4d4a837e24195a07a8789c32abaeb855bc6d74427208341fbe54895fbb01"
         },
         {
           "asset_id": "delegation-routing-reminder",
@@ -2942,43 +3046,47 @@
         },
         {
           "asset_id": "fable-implementation-guard",
-          "source_revision": "e3f9d539cfa1ca4b8889e8c37e6d173d2c5eb2fdba87f4f2a344881882752072"
+          "source_revision": "9300d0a47bf1d5dbb272d5bc4f6b44154d2fa95ba08a3d4e0a1dc4ef4f7b3a0a"
         },
         {
           "asset_id": "freshness-gate",
-          "source_revision": "b84994294108a3cfab60bb22018989274234f95fcf90df23cef492341f257c80"
+          "source_revision": "c137cb26d1045bd05db87bd2da593c15d65688c2dd861e73927bece7747984e1"
         },
         {
           "asset_id": "gbrain-recall-preflight",
-          "source_revision": "ac52713f94c848649fc0d85783bae73c520a5d7a1696f8b390a553c2ba412c18"
+          "source_revision": "ea560ffbd214c11fcb832297fb6d184a7d03d2774c487a0d32244497b217256a"
         },
         {
           "asset_id": "handover-preflight",
-          "source_revision": "c8e92d6898a7f9e834f5d322be2004bc0f6a60cdcba375d1b3db59bb13343405"
+          "source_revision": "a3b28cfb72df59b754af4580982fcb1fcc338dca5f6c75b8f057d2c219f091c3"
         },
         {
           "asset_id": "post-merge-gate",
-          "source_revision": "5992930056dd4a3b015fce3fd99b996af3715e7a886c90f790e101332d5e585d"
+          "source_revision": "2a7331aebb70138d4b0d820f0912f3e52ba97959e1e6113b360247837f83efe5"
         },
         {
           "asset_id": "pre-implementation-check",
-          "source_revision": "b496ea36846f33167e3c63a30ec663c68e46f9e809596d900993c19e2776e3c7"
+          "source_revision": "730aaa6511624ec6e48114a3239913b4d519f5fa262b59866988dbb02e6113bd"
         },
         {
           "asset_id": "quality-gate",
-          "source_revision": "757536ff310fffb1bf5cb50fe1a57306d3e82e14f2f8cd0049c697e64f066be1"
+          "source_revision": "d6c86500ec99a8dda9522d11f303f6b8e164d1f830d8c7a0344700791bd5f8b1"
+        },
+        {
+          "asset_id": "stop-explain-check",
+          "source_revision": "4283e2ccb35290a78447353e7c410da8ac93d816287628b3093854b0c6fba813"
         },
         {
           "asset_id": "stop-goal-check",
-          "source_revision": "4124abdcfd0ffe99ce40c84d64de159806f68aae22831c4f1b3a2e8609c8f714"
+          "source_revision": "4ad41fd1f9d6afb3fe6a05d6c0f55da8af157562172b9acad2aafa3a029d1754"
         },
         {
           "asset_id": "stop-loop-continuity",
-          "source_revision": "a3c387596b0988a49b41054b432b54a520082437b6d4538ef5d516a634e0443c"
+          "source_revision": "ee672e9f5f95cf6f0799899442350d217e5e66bb278296e1123f4f565dad6030"
         },
         {
           "asset_id": "telemetry-log",
-          "source_revision": "f7cb6d80491698cb5493a822b77707c17ee904013c536775b87143da2eee92db"
+          "source_revision": "0a73d1af55b7d1d5759f69ee84361ee2221b2f842a44a375029621d0f4cb0b1e"
         },
         {
           "asset_id": "ui-registry-preflight",
@@ -2990,11 +3098,11 @@
         }
       ],
       "client": "kimi",
-      "content_digest": "sha256:4fb63923172ce8c3bd904e63cd17b48fa389f86f461cc2a825ebffc2075f333d",
+      "content_digest": "sha256:fae9d12da5bdfac7d35663741fb6e8581ec1e824e460dfceec8475bdbbb0a6d2",
       "kind": "hook",
-      "materialization_digest": "sha256:491d48e3ea99cb0cf361224f4af127d0f012a52119d29e26cea3a0cc73f59365",
+      "materialization_digest": "sha256:2d59484ac23dca9cc2fe77f75abb33baa83d36567c503532a2e59222f60d4efa",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:e2e0147bf69dec604d6e4a1a178e6e8f4422fdc0fa821b0f85648f8431985cb0",
+      "source_revision": "sha256:2e88b57cd7760e591eb6899a34108334c3aeb44eea9cf030ad81f07b2af75862",
       "symlink_policy": "forbidden",
       "target": ".kimi-code/hooks",
       "writer_id": "sync-kimi-from-cc",
@@ -3054,11 +3162,11 @@
       "asset_revisions": [
         {
           "asset_id": "ai-model-selection",
-          "source_revision": "1e0e1fc33a5fc1ec332fd94caa7d6de35366e9913e000c7dea61b09258efbd34"
+          "source_revision": "de0fe08d8cea37fb9153d2346f6ed3856e8e05ddce06a90029f1ddd97a4276cc"
         },
         {
           "asset_id": "ai-worker-watch",
-          "source_revision": "5c6cbf34bb33af544d6b502f45e7f5fe5ef688f33e4ab73d8a1f8d23cd0b7bb0"
+          "source_revision": "172825919aa56477cb0214b181f63ab3939a34fe1c478d4e1bb6c4f49303fe93"
         },
         {
           "asset_id": "branch-rule",
@@ -3110,7 +3218,7 @@
         },
         {
           "asset_id": "response-style",
-          "source_revision": "3385b09843b8f5fd72ca59100104cc98d2817d5a89772813375b28b2a7e8c042"
+          "source_revision": "ed2207edf9f410f1cfdf8ef61c461a5c5e16288b6a5f08b71a409443ddea27aa"
         },
         {
           "asset_id": "responsive-both-viewports",
@@ -3122,7 +3230,7 @@
         },
         {
           "asset_id": "sub-agent-scope-contract",
-          "source_revision": "9ddb1299a1c6722073964c88e36e8e5be2486b0c69a536c42f8eb867a77b1712"
+          "source_revision": "0fbf88d1c8fa1e16d09a41a78c92681013209e6019f54265749fa432283f120f"
         },
         {
           "asset_id": "test-kinds-and-cheap-loop",
@@ -3146,15 +3254,15 @@
         },
         {
           "asset_id": "worktree-rule",
-          "source_revision": "12a132e9f8dd55252c89d896be3b50b0a57ebe4d7692b50dfa9d37d7adc5113f"
+          "source_revision": "22fdd2cbea2bf9eded9833dd4884be21db05818966e46daa7dc58277548bfd9e"
         }
       ],
       "client": "kimi",
-      "content_digest": "sha256:fe4956c67587a34c5135d53e9a141715f39d1152379dc8ec32b22f854cc025e2",
+      "content_digest": "sha256:20b7e397a1b79edcec4a275ee4a87b1a51bc20d3e19bcaeea65086bc12634a26",
       "kind": "rule",
-      "materialization_digest": "sha256:08fab71c7626e94ffb4388c00f518c78dad7fc6f83a87307bb02c6bbd871583f",
+      "materialization_digest": "sha256:8b4a201d01129d29b1db5e3ddfd01915ac0146b6d66c14c46e8a06bd9e57ec44",
       "probe": "fresh-rule-discovery",
-      "source_revision": "sha256:1c3b54f01a46b0717ef90b6d0c4c97c68b6d607042d8a9ec22373019c8bcc264",
+      "source_revision": "sha256:c81cfc7d81712d5075d306a7e50c5b73c217c54fdf5faa06d815eee5a4655fd7",
       "symlink_policy": "forbidden",
       "target": "AGENTS.md",
       "writer_id": "generate-agents-md",
@@ -3164,11 +3272,15 @@
       "asset_revisions": [
         {
           "asset_id": "adversarial-review",
-          "source_revision": "1ad25db5ea817d9611e717c8bcebe93e0911a670cc9bc346ff1d2d2fcc1de2e7"
+          "source_revision": "dc4ca14e9f26999bc2891551eedb5fa565e6193dd53c9b9829c1f4e5dcb0937a"
+        },
+        {
+          "asset_id": "agent-desktop",
+          "source_revision": "b12497d91ff4d54d947921c238f8fdf5ec9a27376c688573b6fa0666bdc64015"
         },
         {
           "asset_id": "agent-dispatch",
-          "source_revision": "55f60f46a778558a6cea28004856ebb13576a198d6118a3394de32f5bceabcf6"
+          "source_revision": "b4f09b9d7bec84ed8bdeaab772c9f45766ef6903c5f5c80b4d6eff31225bb629"
         },
         {
           "asset_id": "agentmemory-routing",
@@ -3207,36 +3319,44 @@
           "source_revision": "eab6d472e5141b6702de7043f4895e95565c2ebe454a7a0d21f3c5640001d597"
         },
         {
-          "asset_id": "cc-context-optimizer",
-          "source_revision": "a13a4e52476052ada5bcca49437f7f4925f96bce8896787960a127328fbe54cf"
-        },
-        {
           "asset_id": "ci-credit-optimizer",
           "source_revision": "f03a9b8bb652d96b879dfca10c95b993ec2ed623ff015c0b34da4ebef78acf98"
         },
         {
+          "asset_id": "codebase-memory-ja",
+          "source_revision": "2f9003f9ad2d569ff19c333ef5292ecc59587372aa5e610b70a0bc818f54a62e"
+        },
+        {
           "asset_id": "codex-review",
-          "source_revision": "a18f05c096d82df21d6fcb481290aaddd4b5b432e29d72a042ed24e421dc132d"
+          "source_revision": "3a85123081f68c18371675c9c7abb1d083524ddcf089c630cba26173b320f7a2"
         },
         {
           "asset_id": "create-pr",
           "source_revision": "50796780f373bf36c5749249f83a1e0e193335de1880b4d01c806a876532b9d2"
         },
         {
+          "asset_id": "critical-thinking",
+          "source_revision": "f10093d9a03d27fea214bc7fe456b8ee7d5f610016b9cbc118e5ac2ad2d0c768"
+        },
+        {
           "asset_id": "cursor-cloud",
-          "source_revision": "c2d9e7d9bcc3df33a506654db8806aaf0a2c4743929f78b9c908e116e4424b05"
+          "source_revision": "053b1d26c15a274e7290e27e219ee8647671683c7cd355aaac1db87ef460f53c"
         },
         {
           "asset_id": "depanda-staff-roles",
           "source_revision": "30c73a90a390c51f95729bef77d5b5ca57b42a392127ce6aabbf0d652b364a9c"
         },
         {
+          "asset_id": "design-guardrails",
+          "source_revision": "8465c1047bddf2d391cbec642738586dee16de084ac551a499de19387f51972f"
+        },
+        {
           "asset_id": "dev-guardrails",
-          "source_revision": "b19cb72604c5e80e602c6fe3e503ed7a00cea56950f79926490ae5b6476f52e4"
+          "source_revision": "1d59af0b32986c931b4b2ce2c8e5096f43c416f45dffb23f9af3e19d489f57e7"
         },
         {
           "asset_id": "handover-manual",
-          "source_revision": "61ca3f47b7d6797b09d58559d39d6686a291228a56edf3367726c628166ad5a6"
+          "source_revision": "246308f7d215e87206565cc561a9948b6e8c77738acedece1db33deae37d262f"
         },
         {
           "asset_id": "i-have-adhd",
@@ -3247,12 +3367,16 @@
           "source_revision": "be5b3793e91d711c8ca0d57538068b004a0dd17506d222a1ae52bcc5db455dbd"
         },
         {
+          "asset_id": "iphone-duo",
+          "source_revision": "9bcd561080ca8ce16398fe67bb9697422ef4f4648b5924089676aa54d326d303"
+        },
+        {
           "asset_id": "lineworks-talk",
           "source_revision": "1e81eb5c77edb5271b0e7340ebb7fbd1fd41173fb5fc3f79dfa4226de94d57b5"
         },
         {
           "asset_id": "main-intake",
-          "source_revision": "ed113021173cf41c680974f1387bced213a59252a87ff1ba17e7beaaf176f7b5"
+          "source_revision": "51be7602621a5224b1a12ec2584933aebb1bfbd1a0703dcc8849667905df7cfd"
         },
         {
           "asset_id": "mcp-dev-kit",
@@ -3264,7 +3388,7 @@
         },
         {
           "asset_id": "natural-japanese",
-          "source_revision": "3d2db2cc55aa36269e4536de5c099143662a4b3911e8ab74a4e00b294deae6fa"
+          "source_revision": "8e47883cbe5fa1942b29011e5608e46e9b4c9e5068629f7429403d9da2a99024"
         },
         {
           "asset_id": "new-project",
@@ -3276,43 +3400,39 @@
         },
         {
           "asset_id": "plan-approval",
-          "source_revision": "0b420f8322d315683551d754deb86f8ecdf6890ca028ddcc819ab43bf1be2c82"
+          "source_revision": "b9ece76d3677bea5f6e995a859a890edbabf716b3da3296d60452736fc4e7783"
         },
         {
           "asset_id": "post-merge",
-          "source_revision": "a8e67ed1f4cd7a81a26533870cb3ea38df1c11764f92f8e69c067e7ad68eb037"
+          "source_revision": "7117de7470d37e20ffe58a8797217abf388a02d16a202e694e3d59b44f9201aa"
         },
         {
-          "asset_id": "project-prompt-review",
-          "source_revision": "3eb6c977c7dd3494a28e1909bad7d7ec93b6d80f2debc1b40122399530ebb0ae"
+          "asset_id": "security-audit-ja",
+          "source_revision": "d55240b46bc81bae7f588951528fcd80a70e9fc41c1588fda8490b7346d4eeb5"
         },
         {
           "asset_id": "session-status",
-          "source_revision": "def12848919d7f105eda69b83b3a3da9d390b6d4eb5703e1fa57cd92c98ed0ae"
+          "source_revision": "5d06c9526edd9a6c79ff4d63ed94cb3af170ae985e6162629d794b5f5c977ff4"
         },
         {
           "asset_id": "shintaro-gbrain",
-          "source_revision": "e0002a61631dc91bae6fc1260cdea9ef93452d13dc4c677ab900a83ee2ea7534"
+          "source_revision": "0485b8c1f9f9d9d05543dc5796bd7edef9b406c4bcc04d14536ed112adb387f2"
         },
         {
           "asset_id": "shintaro-voice",
-          "source_revision": "3c383acf6436c8a7ca16646dd9a80f8389c288533295b1d11e0a96d91b129a4d"
+          "source_revision": "432e2f14aa12dd7ecd56f67726f0eecdd48af7277d2149b959f3fccdfad5cc8a"
         },
         {
           "asset_id": "skill-audit",
           "source_revision": "0f8e74500c9afb8efcbcea1a677dd86d9840a99ecb027255ca8621761917483e"
         },
         {
-          "asset_id": "skill-doctor",
-          "source_revision": "9f4a11b2cef96fb92b70ef1ad1be0e42a45ee2d4098f499e2258937eaea2f226"
-        },
-        {
-          "asset_id": "skill-doctor-ja",
-          "source_revision": "59c9e0891805002de2aff3c07eb8a6b406db7c48901f561afbabec2b84670f49"
-        },
-        {
           "asset_id": "slide-deck",
           "source_revision": "2d3b86cc196680acf82efa5f1e75f1fb1178ceac88dc4f620f843411370fbd66"
+        },
+        {
+          "asset_id": "stg-environment",
+          "source_revision": "57182b18f7cc4f97d2f883aaca0c584eca6e7cc6e3088262157142c4aa2a1208"
         },
         {
           "asset_id": "timebound-physical-feasibility",
@@ -3320,19 +3440,19 @@
         },
         {
           "asset_id": "verify-to-release",
-          "source_revision": "02f4bd54d429193b91a5338e2613a04c1e390206ec5c4d5fb2929ecd1c1b8f12"
+          "source_revision": "31a738bc7c09341dd8251b0d4fb98f7ae2e85c3d7d4d7291ed04c766552eca14"
         }
       ],
       "client": "kimi",
-      "content_digest": "sha256:307d87ed3d4ab286b441d3eece3c6c28fdc49fe89be4edc61e2d385328f4d81b",
+      "content_digest": "sha256:cbe6a7f4e3b3f21ade5d9ed7d1d49da7fd7e5e304fc38e999c507c82435e54da",
       "kind": "skill",
-      "materialization_digest": "sha256:4d367b4b96edfc03d39f669c18715378e853f68d8eb00374917098686d22b881",
+      "materialization_digest": "sha256:8dda87c3d4fc1f7950b12585530f1579827203ff2142a5a91a6f24ecc0c52a90",
       "probe": "fresh-skill-discovery",
-      "source_revision": "sha256:abac13a9ee19ec47e8e853cc10379c27b7ec39e96d67ca247b834426015fae80",
+      "source_revision": "sha256:f5955b02233511461b5398582cbe35eeb021310ccbace22a866a26e7a21e4064",
       "symlink_policy": "forbidden",
       "target": ".kimi-code/skills",
       "writer_id": "sync-runtime-skills",
-      "writer_version": "sha256:89eeaafb4a5eda0dea4e6094ebe5e831b0051b5f0865d24ae4a1ece201bef3fe"
+      "writer_version": "sha256:3dd29c86ba94ab79b9574fa65ba2f351e4405caff648331a9b5577873c008ec4"
     },
     {
       "asset_revisions": [
@@ -3370,9 +3490,9 @@
         }
       ],
       "client": "opencode",
-      "content_digest": "sha256:e11c1351a5463278164c9c86144a40719e17af8b0dd8946ebd6a1e7eef2cc62a",
+      "content_digest": "sha256:ddae0c2c7af3e020b5779d0d51fac1e5c71f1dd07889d234134c5afe4df9d488",
       "kind": "ai_client",
-      "materialization_digest": "sha256:bde6bed26d71487a85c5679bf89474680472d6aa5b9301b03e59924e456ef643",
+      "materialization_digest": "sha256:10ebd60bfe3fcf2637dd93c6e19018693c22df600b51ce7a86047f3f5500851d",
       "probe": "stable-sync-state",
       "source_revision": "sha256:b71e6da24d61a307438d0fa13b957885ccb8e4d6340f06f9e1491f0e62c31337",
       "symlink_policy": "forbidden",
@@ -3460,15 +3580,19 @@
         },
         {
           "asset_id": "block-main-commit",
-          "source_revision": "c5c70460a26b92772e63c8895980f3e88a2cc30360a5288ffb5e8f118e8c0711"
+          "source_revision": "90ad51b2451303c13cb757fe855f1cffc88b7489bd26869f36942487da9999ab"
+        },
+        {
+          "asset_id": "block-physical-pointer",
+          "source_revision": "982376ab772a295fcbee764b4b7e72f952d9e7750e1272e8f44e496f1154e7c3"
         },
         {
           "asset_id": "block-skill-reverse-edit",
-          "source_revision": "a2e603590b202a857068b13887c51a258247c93383d0b3625bb1f6b791c2f679"
+          "source_revision": "10784b916bd1eeb234b2d6174e503da114e6e28b261c480e88d929af3916dd19"
         },
         {
           "asset_id": "block-unauthorized-docs-file",
-          "source_revision": "af2a2f7c29d77bad467cff5816c7aca21795c7a98b8dfc8f4f2fd32c4f5fa67e"
+          "source_revision": "ea6de945025cdb3fe607fd87c74772b6dd541080e89e1524e2c550f8f2b52276"
         },
         {
           "asset_id": "cloud-hub-bootstrap",
@@ -3480,7 +3604,7 @@
         },
         {
           "asset_id": "delegation-routing-backstop",
-          "source_revision": "02d54bfdd5b13e1fde9006e7ff54b64a9460b3389151e5f6ad4bdddbe2658850"
+          "source_revision": "ac1a4d4a837e24195a07a8789c32abaeb855bc6d74427208341fbe54895fbb01"
         },
         {
           "asset_id": "delegation-routing-reminder",
@@ -3488,43 +3612,47 @@
         },
         {
           "asset_id": "fable-implementation-guard",
-          "source_revision": "e3f9d539cfa1ca4b8889e8c37e6d173d2c5eb2fdba87f4f2a344881882752072"
+          "source_revision": "9300d0a47bf1d5dbb272d5bc4f6b44154d2fa95ba08a3d4e0a1dc4ef4f7b3a0a"
         },
         {
           "asset_id": "freshness-gate",
-          "source_revision": "b84994294108a3cfab60bb22018989274234f95fcf90df23cef492341f257c80"
+          "source_revision": "c137cb26d1045bd05db87bd2da593c15d65688c2dd861e73927bece7747984e1"
         },
         {
           "asset_id": "gbrain-recall-preflight",
-          "source_revision": "ac52713f94c848649fc0d85783bae73c520a5d7a1696f8b390a553c2ba412c18"
+          "source_revision": "ea560ffbd214c11fcb832297fb6d184a7d03d2774c487a0d32244497b217256a"
         },
         {
           "asset_id": "handover-preflight",
-          "source_revision": "c8e92d6898a7f9e834f5d322be2004bc0f6a60cdcba375d1b3db59bb13343405"
+          "source_revision": "a3b28cfb72df59b754af4580982fcb1fcc338dca5f6c75b8f057d2c219f091c3"
         },
         {
           "asset_id": "post-merge-gate",
-          "source_revision": "5992930056dd4a3b015fce3fd99b996af3715e7a886c90f790e101332d5e585d"
+          "source_revision": "2a7331aebb70138d4b0d820f0912f3e52ba97959e1e6113b360247837f83efe5"
         },
         {
           "asset_id": "pre-implementation-check",
-          "source_revision": "b496ea36846f33167e3c63a30ec663c68e46f9e809596d900993c19e2776e3c7"
+          "source_revision": "730aaa6511624ec6e48114a3239913b4d519f5fa262b59866988dbb02e6113bd"
         },
         {
           "asset_id": "quality-gate",
-          "source_revision": "757536ff310fffb1bf5cb50fe1a57306d3e82e14f2f8cd0049c697e64f066be1"
+          "source_revision": "d6c86500ec99a8dda9522d11f303f6b8e164d1f830d8c7a0344700791bd5f8b1"
+        },
+        {
+          "asset_id": "stop-explain-check",
+          "source_revision": "4283e2ccb35290a78447353e7c410da8ac93d816287628b3093854b0c6fba813"
         },
         {
           "asset_id": "stop-goal-check",
-          "source_revision": "4124abdcfd0ffe99ce40c84d64de159806f68aae22831c4f1b3a2e8609c8f714"
+          "source_revision": "4ad41fd1f9d6afb3fe6a05d6c0f55da8af157562172b9acad2aafa3a029d1754"
         },
         {
           "asset_id": "stop-loop-continuity",
-          "source_revision": "a3c387596b0988a49b41054b432b54a520082437b6d4538ef5d516a634e0443c"
+          "source_revision": "ee672e9f5f95cf6f0799899442350d217e5e66bb278296e1123f4f565dad6030"
         },
         {
           "asset_id": "telemetry-log",
-          "source_revision": "f7cb6d80491698cb5493a822b77707c17ee904013c536775b87143da2eee92db"
+          "source_revision": "0a73d1af55b7d1d5759f69ee84361ee2221b2f842a44a375029621d0f4cb0b1e"
         },
         {
           "asset_id": "ui-registry-preflight",
@@ -3538,9 +3666,9 @@
       "client": "opencode",
       "content_digest": "sha256:b35a25a4486d50a197365141d73e0063597600455ef664c9cbff224faa3fd641",
       "kind": "hook",
-      "materialization_digest": "sha256:bd2a1cd83e476166f9f8bd4121bf2a9004ec3401bf8c17cfc238844c299bb808",
+      "materialization_digest": "sha256:f31d742b9b6edd4bb0e88d2fa654ae68774802498fe2fc8454804fe987263738",
       "probe": "safe-hook-fixture",
-      "source_revision": "sha256:e2e0147bf69dec604d6e4a1a178e6e8f4422fdc0fa821b0f85648f8431985cb0",
+      "source_revision": "sha256:2e88b57cd7760e591eb6899a34108334c3aeb44eea9cf030ad81f07b2af75862",
       "symlink_policy": "forbidden",
       "target": ".opencode/plugins",
       "writer_id": "sync-opencode-from-cc",
@@ -3600,11 +3728,11 @@
       "asset_revisions": [
         {
           "asset_id": "ai-model-selection",
-          "source_revision": "1e0e1fc33a5fc1ec332fd94caa7d6de35366e9913e000c7dea61b09258efbd34"
+          "source_revision": "de0fe08d8cea37fb9153d2346f6ed3856e8e05ddce06a90029f1ddd97a4276cc"
         },
         {
           "asset_id": "ai-worker-watch",
-          "source_revision": "5c6cbf34bb33af544d6b502f45e7f5fe5ef688f33e4ab73d8a1f8d23cd0b7bb0"
+          "source_revision": "172825919aa56477cb0214b181f63ab3939a34fe1c478d4e1bb6c4f49303fe93"
         },
         {
           "asset_id": "branch-rule",
@@ -3656,7 +3784,7 @@
         },
         {
           "asset_id": "response-style",
-          "source_revision": "3385b09843b8f5fd72ca59100104cc98d2817d5a89772813375b28b2a7e8c042"
+          "source_revision": "ed2207edf9f410f1cfdf8ef61c461a5c5e16288b6a5f08b71a409443ddea27aa"
         },
         {
           "asset_id": "responsive-both-viewports",
@@ -3668,7 +3796,7 @@
         },
         {
           "asset_id": "sub-agent-scope-contract",
-          "source_revision": "9ddb1299a1c6722073964c88e36e8e5be2486b0c69a536c42f8eb867a77b1712"
+          "source_revision": "0fbf88d1c8fa1e16d09a41a78c92681013209e6019f54265749fa432283f120f"
         },
         {
           "asset_id": "test-kinds-and-cheap-loop",
@@ -3692,15 +3820,15 @@
         },
         {
           "asset_id": "worktree-rule",
-          "source_revision": "12a132e9f8dd55252c89d896be3b50b0a57ebe4d7692b50dfa9d37d7adc5113f"
+          "source_revision": "22fdd2cbea2bf9eded9833dd4884be21db05818966e46daa7dc58277548bfd9e"
         }
       ],
       "client": "opencode",
       "content_digest": "sha256:1f39946a6a348638d6eeb9725f183c732c9b64131f376128309d4b8ab63312c0",
       "kind": "rule",
-      "materialization_digest": "sha256:12d71b2836a8fa7c50361aced5276ed46b0194cd1b4668de8608b4093308bf30",
+      "materialization_digest": "sha256:f4ec187586c8b763b35c924e1d48b3b879db77a74a945a95de3a50f39f6500a3",
       "probe": "fresh-rule-discovery",
-      "source_revision": "sha256:1c3b54f01a46b0717ef90b6d0c4c97c68b6d607042d8a9ec22373019c8bcc264",
+      "source_revision": "sha256:c81cfc7d81712d5075d306a7e50c5b73c217c54fdf5faa06d815eee5a4655fd7",
       "symlink_policy": "forbidden",
       "target": "opencode.json",
       "writer_id": "sync-opencode-from-cc",
@@ -3718,7 +3846,7 @@
         },
         {
           "asset_id": "chatgpt-image-creator",
-          "source_revision": "d523ad90e612acda0d03d2278f9b6551d0a5082987c14fdd1a33917b0237edf8"
+          "source_revision": "7b01f6ad41a036fb5c1ef0ecaac6e0095d9db50153ccecef4feb4c58e27eb22f"
         },
         {
           "asset_id": "document-writer",
@@ -3754,7 +3882,7 @@
         },
         {
           "asset_id": "templates/implementation-auditor",
-          "source_revision": "9fe2d3ecefbdaf1a8f03b2afb2e7c357701d77330363d84fd929a80970d5e6a6"
+          "source_revision": "0c12e6b4dd8ad556addd7857fc0fe8da124eff6602ff6ff00498ef545470ee1b"
         },
         {
           "asset_id": "test-fixer",
@@ -3766,11 +3894,11 @@
         }
       ],
       "client": "opencode",
-      "content_digest": "sha256:ec4dd3e5e98e2950acb64bf95b92aaba7462c0a6bdc3282fa150af7ae9fe543b",
+      "content_digest": "sha256:d48b25ee85b54d895961f1d1c2c33769eac63925e63944e594e25921ac85aef7",
       "kind": "subagent",
-      "materialization_digest": "sha256:11629461540eb94f89f5239938e4daf9211a5b69555f1527b5bb511d07545564",
+      "materialization_digest": "sha256:34af691b4430e3f25373a65834eb6e7fb78896733b17772a3f5455ea976eb479",
       "probe": "fresh-agent-discovery",
-      "source_revision": "sha256:4386f53275c1dd44543dc5f480f0f9b720a346786d082c396eb009cd2b400a8e",
+      "source_revision": "sha256:ea2837cb170619f3ff6ff6bfaf563d5e39a34349891db24903621cc38c25c2a1",
       "symlink_policy": "forbidden",
       "target": ".opencode/agents",
       "writer_id": "sync-opencode-from-cc",
@@ -3788,9 +3916,9 @@
         }
       ],
       "client": "warp",
-      "content_digest": "sha256:fe4956c67587a34c5135d53e9a141715f39d1152379dc8ec32b22f854cc025e2",
+      "content_digest": "sha256:20b7e397a1b79edcec4a275ee4a87b1a51bc20d3e19bcaeea65086bc12634a26",
       "kind": "constitution",
-      "materialization_digest": "sha256:76d81280f58b621110e3b3752f2584925e299f79fc176542eb4c8a1a4294cfc2",
+      "materialization_digest": "sha256:3582277a3b922d10c3bf967e59a34b4ed4ae497629978e7a82d4360e8e980fc6",
       "probe": "fresh-instruction-discovery",
       "source_revision": "sha256:84556fce4f422c96be97f32ac7e8c639f51e9854e32e3f28fce9ec115b90b11e",
       "symlink_policy": "forbidden",
@@ -3852,11 +3980,11 @@
       "asset_revisions": [
         {
           "asset_id": "ai-model-selection",
-          "source_revision": "1e0e1fc33a5fc1ec332fd94caa7d6de35366e9913e000c7dea61b09258efbd34"
+          "source_revision": "de0fe08d8cea37fb9153d2346f6ed3856e8e05ddce06a90029f1ddd97a4276cc"
         },
         {
           "asset_id": "ai-worker-watch",
-          "source_revision": "5c6cbf34bb33af544d6b502f45e7f5fe5ef688f33e4ab73d8a1f8d23cd0b7bb0"
+          "source_revision": "172825919aa56477cb0214b181f63ab3939a34fe1c478d4e1bb6c4f49303fe93"
         },
         {
           "asset_id": "branch-rule",
@@ -3908,7 +4036,7 @@
         },
         {
           "asset_id": "response-style",
-          "source_revision": "3385b09843b8f5fd72ca59100104cc98d2817d5a89772813375b28b2a7e8c042"
+          "source_revision": "ed2207edf9f410f1cfdf8ef61c461a5c5e16288b6a5f08b71a409443ddea27aa"
         },
         {
           "asset_id": "responsive-both-viewports",
@@ -3920,7 +4048,7 @@
         },
         {
           "asset_id": "sub-agent-scope-contract",
-          "source_revision": "9ddb1299a1c6722073964c88e36e8e5be2486b0c69a536c42f8eb867a77b1712"
+          "source_revision": "0fbf88d1c8fa1e16d09a41a78c92681013209e6019f54265749fa432283f120f"
         },
         {
           "asset_id": "test-kinds-and-cheap-loop",
@@ -3944,15 +4072,15 @@
         },
         {
           "asset_id": "worktree-rule",
-          "source_revision": "12a132e9f8dd55252c89d896be3b50b0a57ebe4d7692b50dfa9d37d7adc5113f"
+          "source_revision": "22fdd2cbea2bf9eded9833dd4884be21db05818966e46daa7dc58277548bfd9e"
         }
       ],
       "client": "warp",
-      "content_digest": "sha256:fe4956c67587a34c5135d53e9a141715f39d1152379dc8ec32b22f854cc025e2",
+      "content_digest": "sha256:20b7e397a1b79edcec4a275ee4a87b1a51bc20d3e19bcaeea65086bc12634a26",
       "kind": "rule",
-      "materialization_digest": "sha256:ad51ddfa213819de22be742018e73c18d6d35b291d03eb9c16e0a522230f0fa1",
+      "materialization_digest": "sha256:9b4a80b4be1620acf13101abda8190ae9c7d14b748a85293fafc36355e4b0dd2",
       "probe": "fresh-rule-discovery",
-      "source_revision": "sha256:1c3b54f01a46b0717ef90b6d0c4c97c68b6d607042d8a9ec22373019c8bcc264",
+      "source_revision": "sha256:c81cfc7d81712d5075d306a7e50c5b73c217c54fdf5faa06d815eee5a4655fd7",
       "symlink_policy": "forbidden",
       "target": "AGENTS.md",
       "writer_id": "generate-agents-md",

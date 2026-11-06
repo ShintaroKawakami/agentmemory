@@ -1,6 +1,6 @@
 #!/bin/bash
 # UserPromptSubmit hook for gbrain-recall reminders.
-# Quiet by default: only prints when the prompt contains a known keyword group
+# Quiet by default (except the one-line current date/time): only prints the reminder block when the prompt contains a known keyword group
 # (bug/investigation or management-consultation/strategy), or when
 # GBRAIN_RECALL_PREFLIGHT_FORCE=1 is set.
 # Availability is a model/user check. This hook only prints a reminder; it does
@@ -32,10 +32,40 @@
 #     （既存 UserPromptSubmit matcher にそのまま相乗りできる）。
 # 対応: depanda-roles-policy.json を読み、キーワード一致時に案内行を1行追加する。
 #   既存3パターンの出力・判定には触れない。
+#
+# [2026-10-30][feat] 現在日時（曜日つき・JST）を、発火語に関係なく毎回1行だけ出す。
+# 背景:
+#   - ユーザー依頼意図: AI が日付・曜日を学習の cutoff や記憶で手書きして間違える（2026-10-30 に
+#     11/4（水）を「火」、11/7（土）を「金」と書いた）。date コマンドの値を毎回の発話に注入し、
+#     「記憶で書かない」を仕組みにしたい（伸太郎さん発言 2026-10-30）。
+#   - 守るべき業務ルール: 値は hook 実行時の `TZ=Asia/Tokyo date` から取る（locale 依存を避けるため
+#     LC_ALL=C 固定、曜日は %u から日本語へ変換）。既存の発火語ロジック・出力（相談/バグ/経営/
+#     出パンダ区分）は変えない。ルール本文は response-style.md「日付・曜日の書き方」。
+#   - 他案不採用理由: 「AI の記憶に任せる」案は今日まさに曜日を間違えたので不採用。新しい hook を
+#     1本増やす案は配布登録（manifest・settings・各 client 同期）が増えるため不採用で、全 PJ に
+#     既に配線済みの本 hook に1行足す。
+# 対応: スクリプト冒頭（python 呼出しの前）で1行 print する。発火語なしの時は、この1行だけが出る。
 
 set -euo pipefail
 
 RAW_INPUT="$(cat || true)"
+
+# 現在日時（JST・曜日つき）。date が使えない環境では無言でスキップ（fail-open）。
+_now_jst="$(TZ=Asia/Tokyo LC_ALL=C date '+%Y-%m-%d %u %H:%M' 2>/dev/null || true)"
+if [ -n "$_now_jst" ]; then
+  _now_date="${_now_jst%% *}"
+  _now_rest="${_now_jst#* }"
+  _now_wd="${_now_rest%% *}"
+  _now_time="${_now_rest#* }"
+  case "$_now_wd" in
+    1) _now_wd_ja="月" ;; 2) _now_wd_ja="火" ;; 3) _now_wd_ja="水" ;; 4) _now_wd_ja="木" ;;
+    5) _now_wd_ja="金" ;; 6) _now_wd_ja="土" ;; 7) _now_wd_ja="日" ;; *) _now_wd_ja="" ;;
+  esac
+  if [ -n "$_now_wd_ja" ]; then
+    printf '現在日時: %s（%s）%s JST（date の値。日付・曜日はこれかコマンドで確かめる。記憶で書かない）\n' \
+      "$_now_date" "$_now_wd_ja" "$_now_time"
+  fi
+fi
 
 HOOK_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" 2>/dev/null && pwd || true)"
 HOOK_INPUT="$RAW_INPUT" HOOK_LIB_DIR="$HOOK_LIB_DIR" command python3 - <<'PY'
@@ -121,6 +151,36 @@ except Exception:
 
 DEPANDA_ROLES_RE = re.compile("|".join(re.escape(w) for w in _DEPANDA_KEYWORDS)) if _DEPANDA_KEYWORDS else None
 
+# [2026-11-02][feat] 説明の依頼の案内（独立 policy・fail-open は静かにスキップ）。
+# 背景: 伸太郎さん 2026-11-02「言われないと動かないのはあってはならない」。説明の依頼で
+#   分かりやすい説明ページ（図つき・検品つき）を作る手順を、毎回の発言で思い出させたい。
+# 守るべき業務ルール: 発火語・案内文は hook-library/lib/explain-visual-policy.json から読む。
+#   台帳が無い・壊れている時は無言でスキップし、既存の判定・出力は変えない。
+# 他案不採用理由: ルール文の追記だけでは既に3か所にあっても守れなかったため不採用。
+_EXPLAIN_POLICY_PATH = os.environ.get("EXPLAIN_VISUAL_POLICY_PATH") or os.path.join(
+    os.environ.get("HOOK_LIB_DIR", ""), "explain-visual-policy.json"
+)
+def _explain_words(policy: dict):
+    return [w for w in policy.get("keywords", ()) if isinstance(w, str) and w]
+
+
+def _explain_message_text(policy: dict) -> str:
+    value = policy.get("message", "")
+    return value if isinstance(value, str) and value else ""
+
+
+_EXPLAIN_KEYWORDS = _explain_words({})
+_EXPLAIN_MESSAGE = _explain_message_text({})
+try:
+    with open(_EXPLAIN_POLICY_PATH, encoding="utf-8") as _ef:
+        _explain_policy = json.load(_ef)
+    _EXPLAIN_KEYWORDS = _explain_words(_explain_policy)
+    _EXPLAIN_MESSAGE = _explain_message_text(_explain_policy)
+except Exception:
+    pass  # missing/invalid JSON: 無言でスキップ（本案内だけ出ない）
+
+EXPLAIN_VISUAL_RE = re.compile("|".join(re.escape(w) for w in _EXPLAIN_KEYWORDS)) if _EXPLAIN_KEYWORDS else None
+
 raw = os.environ.get("HOOK_INPUT", "")
 prompt = prompt_from_payload(raw)
 forced = os.environ.get("GBRAIN_RECALL_PREFLIGHT_FORCE", "0") == "1"
@@ -129,7 +189,8 @@ consult_both_hit = bool(CONSULT_BOTH_RE.search(prompt))
 tech_hit = bool(TECH_ONLY_RE.search(prompt))
 business_hit = bool(BUSINESS_ONLY_RE.search(prompt))
 depanda_roles_hit = bool(DEPANDA_ROLES_RE and DEPANDA_ROLES_RE.search(prompt))
-any_hit = consult_both_hit or tech_hit or business_hit or depanda_roles_hit
+explain_hit = bool(EXPLAIN_VISUAL_RE and EXPLAIN_VISUAL_RE.search(prompt))
+any_hit = consult_both_hit or tech_hit or business_hit or depanda_roles_hit or explain_hit
 
 if not forced and not any_hit:
     raise SystemExit(0)
@@ -150,6 +211,9 @@ elif business_hit:
 if depanda_roles_hit and _DEPANDA_REMINDER:
     # [2026-09-26][feat] 既存3パターンと独立の追加行。他パターンの出力を変更しない。
     print(f"- {_DEPANDA_REMINDER}")
+if explain_hit and _EXPLAIN_MESSAGE:
+    # [2026-11-02][feat] 既存の判定と独立の追加行。他パターンの出力を変更しない。
+    print(f"- {_EXPLAIN_MESSAGE}")
 print("- tool availability: 初期 tool 一覧の欠落だけでは可否を決めない")
 print("- status の証拠順序: セッション catalog → 遅延 catalog → 選択状態 → runtime 実測 → 結論")
 print("- status: AVAILABLE / NOT_SELECTED / RUNTIME_UNAVAILABLE / UNPROVEN")

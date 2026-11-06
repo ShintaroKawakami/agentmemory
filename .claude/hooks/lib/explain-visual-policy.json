@@ -1,0 +1,7 @@
+{
+  "_comment": "[2026-11-02][feat] 背景: 伸太郎さん 2026-11-02「言われないと動かないのはあってはならない」「80%でも同じ高品質」/ 守る: 好みの中身は My GBrain 判断軸/分かりやすいのレパートリー に置き、ここは発火語と案内文だけ / 不採用: ルール文の追記だけ（既に3か所にあって守れなかった）。対応: gbrain-recall-preflight.sh がこの台帳を読み一致したら案内を1行出す。stop-explain-check.py も同じ keywords と stop_reason を読む",
+  "version": 1,
+  "keywords": ["わかりやすく", "分かりやすく", "ビフォーアフター", "ビフォー・アフター", "振り返り", "図で", "図解", "見やすく", "説明して", "資料にして"],
+  "message": "説明の依頼: 先に My GBrain『分かりやすいのレパートリー』を読む → 説明ページ（SVG の図・1画面目に答え data-check=\"answer\"）を作る → skills/visual-companion/scripts/check-explain-html.py で検品 → Tailscale の URL を返す。チャットの文字・進捗ページで代用しない。下書きはサブエージェントへ（モデルは agents.yaml の台帳で決める）",
+  "stop_reason": "説明の依頼です。図つきの説明ページを作り skills/visual-companion/scripts/check-explain-html.py に通してから、その Tailscale の URL を返してください（説明ページが要らない依頼なら、その理由を1行書いて返す）"
+}

@@ -238,8 +238,17 @@ check_branch_behind() {
 #     ベース選択の時点（worktree 作成）に間に合わない。システムプロンプト側への ahead/behind
 #     併記（案 C）は Claude Code 本体の変更で当方から変更不能。
 check_main_behind() {
-  local repo_root behind fetch_pid waited
+  local repo_root behind fetch_pid waited commondir
   repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || return 0
+  # [2026-10-30][fix] 共有 .git（git-common-dir/shallow）が shallow だと履歴が途中で切れ、
+  #   「N 件遅れ」が誤って小さく出る（issue #4628: 本当は11件遅れなのに1件と出た）。
+  #   誤った件数を出さず、復旧案内だけを stdout に出して止まる（SessionStart なので exit 0 のまま）。
+  commondir="$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || commondir=""
+  if [ -n "$commondir" ] && [ -f "$commondir/shallow" ]; then
+    echo "  ⚠ 共有リポが shallow です（履歴が途中で切れているため、遅れ件数を正しく数えられません）。"
+    echo "    git fetch --unshallow origin で復旧してください。"
+    return 0
+  fi
   git -C "$repo_root" rev-parse --verify -q refs/heads/main >/dev/null 2>&1 || return 0
   git -C "$repo_root" remote get-url origin >/dev/null 2>&1 || return 0
   (

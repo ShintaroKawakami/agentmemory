@@ -28,16 +28,21 @@ fail() {
 
 payload() {
   # $1=session_id $2=model(空文字可) $3=transcript_path(空文字可)
+  # $4=agent_id(空文字可) $5=file_path(空文字可)
   python3 -c '
 import json, sys
 session, model, transcript = sys.argv[1], sys.argv[2], sys.argv[3]
-obj = {"session_id": session, "tool_name": "Edit", "tool_input": {"file_path": "foo.py"}}
+agent_id = sys.argv[4] if len(sys.argv) > 4 else ""
+file_path = sys.argv[5] if len(sys.argv) > 5 else ""
+obj = {"session_id": session, "tool_name": "Edit", "tool_input": {"file_path": file_path or "foo.py"}}
 if model:
     obj["model"] = model
 if transcript:
     obj["transcript_path"] = transcript
+if agent_id:
+    obj["agent_id"] = agent_id
 print(json.dumps(obj))
-' "$1" "$2" "$3"
+' "$@"
 }
 
 session_hash() {
@@ -310,5 +315,41 @@ out22b="$(guard_run_noyaml "sess-noyaml-repeat-fable" "claude-fable-5")"
 [ -z "$out22b" ] || fail "PyYAML無しでrepeat途中に発火した（repeat_edits が読めていない）: $out22b"
 out22c="$(guard_run_noyaml "sess-noyaml-repeat-fable" "claude-fable-5")"
 echo "$out22c" | grep -q '解除' || fail "PyYAML無しで再リマインドが出ない: $out22c"
+
+# ---------------------------------------------------------------------------
+# [2026-11-05][test] Issue #4833: 委譲先サブエージェント内の PostToolUse（agent_id
+# 付き）と auto-memory（$HOME/.claude/projects/*/memory/）への Write を PM の
+# 実装編集として数えないことの固定。
+# 背景: Opus セッションで委譲先 haiku の docs 追記・auto-memory Write が本 hook の
+#   実装編集カウンタへ混入し、「sonnet へ委譲しろ」の誤リマインドが委譲された側へ
+#   出た。台帳をわざと欠落させ（縮退= fable strict/1回目）、除外が無ければ必ず発火する
+#   条件で「無音・カウンタ不増」を検証する。agent_id が実際の PostToolUse 入力に載る
+#   根拠は Claude Code 2.1.318 の hook 入力スキーマ記述（hook 側 CaD コメント参照）。
+# ---------------------------------------------------------------------------
+
+# 23) agent_id 付き（サブエージェント内）の Edit は無音でカウンタも増えない
+SUB_HASH="$(session_hash "sess-sub-agent")"
+rm -f "$CACHE_DIR/fable-guard-$SUB_HASH" "$CACHE_DIR/fable-guard-$SUB_HASH.count"
+out23="$(printf '%s' "$(payload "sess-sub-agent" "us.anthropic.fable-5" "" "agent-abc123")" \
+  | env CLAUDE_PROJECT_DIR="$TMP_PROJECT" AGENT_HUB_AGENTS_YAML="$TMP_PROJECT/no-such-ledger.yaml" bash "$HOOK")"
+[ -z "$out23" ] || fail "agent_id 付き（サブエージェント内）の呼び出しで発火した: $out23"
+[ ! -e "$CACHE_DIR/fable-guard-$SUB_HASH.count" ] || fail "agent_id 付き呼び出しがカウンタへ計上された"
+
+# 24) auto-memory 配下への Write は無音でカウンタも増えない（HOME を差し替えて検証）
+FAKE_HOME="$TMP_PROJECT/fakehome"
+mkdir -p "$FAKE_HOME/.claude/projects/slug-proj/memory"
+MEM_PATH="$FAKE_HOME/.claude/projects/slug-proj/memory/topic.md"
+MEM_HASH="$(session_hash "sess-mem")"
+rm -f "$CACHE_DIR/fable-guard-$MEM_HASH" "$CACHE_DIR/fable-guard-$MEM_HASH.count"
+out24="$(printf '%s' "$(payload "sess-mem" "us.anthropic.fable-5" "" "" "$MEM_PATH")" \
+  | env CLAUDE_PROJECT_DIR="$TMP_PROJECT" HOME="$FAKE_HOME" AGENT_HUB_AGENTS_YAML="$TMP_PROJECT/no-such-ledger.yaml" bash "$HOOK")"
+[ -z "$out24" ] || fail "auto-memory への Write で発火した: $out24"
+[ ! -e "$CACHE_DIR/fable-guard-$MEM_HASH.count" ] || fail "auto-memory Write がカウンタへ計上された"
+
+# 25) 同じセッションでも PM 本体の通常 Edit は従来どおり発火する（除外し過ぎの確認）
+out25="$(printf '%s' "$(payload "sess-mem" "us.anthropic.fable-5" "" "" "$TMP_PROJECT/normal.py")" \
+  | env CLAUDE_PROJECT_DIR="$TMP_PROJECT" HOME="$FAKE_HOME" AGENT_HUB_AGENTS_YAML="$TMP_PROJECT/no-such-ledger.yaml" bash "$HOOK")"
+echo "$out25" | grep -q '"decision"' || fail "auto-memory 除外のあと PM 本体の Edit が発火しない: $out25"
+[ -e "$CACHE_DIR/fable-guard-$MEM_HASH.count" ] || fail "PM 本体の Edit がカウンタへ計上されていない"
 
 echo "PASS: fable-implementation-guard"

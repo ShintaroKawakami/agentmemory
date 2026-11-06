@@ -32,6 +32,19 @@
 #   RAW_INPUT 専用に空ける。session_id は python 内で hashlib.sha256 により固定長 hex へ
 #   変換してから marker ファイル名に使う。`set -e` は撤去し、失敗時も明示的に exit 0 へ
 #   抜ける fail-open を徹底する。
+#
+# [2026-11-05][fix] Issue #4833: 委譲先サブエージェントの編集と auto-memory への
+#   書き込みで backstop を発火・マーカー汚染しない。
+# 背景:
+#   - Opus セッションで委譲先サブエージェント（haiku）の docs 追記や、記録ファイルへの
+#     Write で本 hook が発火した。マーカーは親セッションの session_id で共有されるため、
+#     サブエージェントの編集が backstop マーカーを立て、その後の PM 本体の正当な編集まで
+#     無音化する混入になっていた。
+#   - 根拠: fable-implementation-guard.sh の同日 CaD と同じ。agent_id はサブエージェント内
+#     の hook 呼び出しにのみ載り、agent_type は --agent 本スレッドにも載るため使わない。
+# 対応: stdin JSON に非空の agent_id（互換で agentId）がある呼び出し、および
+#   tool_input.file_path が $HOME/.claude/projects/<slug>/memory/ 配下の呼び出しは
+#   マーカーを立てず即 exit 0。
 
 set -uo pipefail
 
@@ -49,12 +62,26 @@ DELEGATION_BACKSTOP_SESSION_PY() {
   cat <<'PY'
 import hashlib
 import json
+import os
 import sys
+
+
+def _is_auto_memory_path(file_path: str) -> bool:
+    # auto-memory（~/.claude/projects/<slug>/memory/）配下かを判定する
+    # （fable-implementation-guard.sh と同じ判定）。
+    expanded = os.path.expanduser(file_path).replace("\\", "/")
+    prefix = os.path.expanduser("~").replace("\\", "/") + "/.claude/projects/"
+    if not expanded.startswith(prefix):
+        return False
+    parts = expanded[len(prefix):].split("/")
+    return len(parts) >= 2 and bool(parts[0]) and parts[1] == "memory"
 
 
 def main() -> None:
     raw = sys.stdin.read()
     session_hash = ""
+    in_subagent = ""
+    auto_memory = ""
     if raw.strip():
         try:
             payload = json.loads(raw)
@@ -70,20 +97,53 @@ def main() -> None:
                         value.encode("utf-8", errors="surrogatepass")
                     ).hexdigest()
                     break
+            # [2026-11-05][fix] Issue #4833: サブエージェント内の呼び出しには
+            # agent_id が載る（agent_type は --agent 本スレッドにも載るため使わない）。
+            for key in ("agent_id", "agentId"):
+                value = payload.get(key)
+                if isinstance(value, str) and value:
+                    in_subagent = "1"
+                    break
+            tool_input = payload.get("tool_input")
+            if isinstance(tool_input, dict):
+                fp_value = tool_input.get("file_path")
+                if isinstance(fp_value, str) and fp_value:
+                    if _is_auto_memory_path(fp_value):
+                        auto_memory = "1"
+    # 1行1フィールド（改行区切り。空フィールドも1フィールドとして read できる）。
     print(session_hash)
+    print(in_subagent)
+    print(auto_memory)
 
 
 try:
     main()
 except Exception:
     print("")
+    print("")
+    print("")
 PY
 }
 
-SESSION_HASH="$(printf '%s' "$RAW_INPUT" | command python3 <(DELEGATION_BACKSTOP_SESSION_PY) 2>/dev/null)"
+PARSED="$(printf '%s' "$RAW_INPUT" | command python3 <(DELEGATION_BACKSTOP_SESSION_PY) 2>/dev/null)"
 SESSION_HASH_STATUS=$?
 if [ "$SESSION_HASH_STATUS" -ne 0 ]; then
   # python 実行自体が失敗しても非ブロックを維持する（fail-open）。
+  exit 0
+fi
+
+SESSION_HASH=""
+IN_SUBAGENT=""
+AUTO_MEMORY=""
+{
+  IFS= read -r SESSION_HASH || true
+  IFS= read -r IN_SUBAGENT || true
+  IFS= read -r AUTO_MEMORY || true
+} <<< "$PARSED"
+
+# [2026-11-05][fix] Issue #4833: 委譲先サブエージェント内の呼び出し（agent_id 付き）と
+# auto-memory 配下への書き込みは PM の実装編集ではない。マーカーを立てる前に抜ける。
+if [ "$IN_SUBAGENT" = "1" ] || [ "$AUTO_MEMORY" = "1" ]; then
   exit 0
 fi
 

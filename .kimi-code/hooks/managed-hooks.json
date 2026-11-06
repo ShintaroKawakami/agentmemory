@@ -29,6 +29,12 @@
     },
     {
       "event": "PreToolUse",
+      "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/block-physical-pointer.sh\"",
+      "matcher": "mcp__computer-use__.*|mcp__remote-devices__computer_.*|Bash|Shell",
+      "timeout": 10
+    },
+    {
+      "event": "PreToolUse",
       "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/block-skill-reverse-edit.sh\"",
       "matcher": "Write|Edit|MultiEdit|WriteFile|StrReplaceFile",
       "timeout": 10
@@ -84,9 +90,19 @@
       "timeout": 5
     },
     {
+      "event": "UserPromptSubmit",
+      "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/stop-goal-check.py\" --goal-start",
+      "timeout": 15
+    },
+    {
       "event": "Stop",
       "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/stop-quality-check.sh\"",
       "timeout": 30
+    },
+    {
+      "event": "Stop",
+      "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.kimi-code/hooks/scripts/stop-explain-check.py\"",
+      "timeout": 15
     },
     {
       "event": "Stop",

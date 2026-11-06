@@ -35,8 +35,17 @@ fail() {
 }
 
 payload() {
-  local session="$1"
-  python3 -c 'import json,sys; print(json.dumps({"session_id": sys.argv[1], "tool_name": "Edit", "tool_input": {"file_path": "foo.py"}}))' "$session"
+  # $1=session_id $2=agent_id(空文字可) $3=file_path(空文字可)
+  python3 -c '
+import json, sys
+session = sys.argv[1]
+agent_id = sys.argv[2] if len(sys.argv) > 2 else ""
+file_path = sys.argv[3] if len(sys.argv) > 3 else ""
+obj = {"session_id": session, "tool_name": "Edit", "tool_input": {"file_path": file_path or "foo.py"}}
+if agent_id:
+    obj["agent_id"] = agent_id
+print(json.dumps(obj))
+' "$@"
 }
 
 session_hash() {
@@ -111,5 +120,35 @@ while IFS= read -r f; do
     *) fail "マーカーファイル名がhexハッシュでない: $base" ;;
   esac
 done <<< "$cache_files"
+
+# ---------------------------------------------------------------------------
+# [2026-11-05][test] Issue #4833: 委譲先サブエージェント内の PostToolUse（agent_id
+# 付き）と auto-memory（$HOME/.claude/projects/*/memory/）への Write で backstop を
+# 発火・マーカー汚染しないことの固定。混入があると、その後の PM 本体の正当な編集まで
+# マーカーで無音化されるため、「マーカーを立てない」ことも検証する。
+# ---------------------------------------------------------------------------
+
+# 8) agent_id 付き（サブエージェント内）の Edit は無音で backstop マーカーも立てない
+SUB_HASH="$(session_hash "sess-sub-agent")"
+rm -f "$CACHE_DIR/$SUB_HASH" "$CACHE_DIR/$SUB_HASH.backstop"
+out8="$(printf '%s' "$(payload "sess-sub-agent" "agent-abc123")" | CLAUDE_PROJECT_DIR="$TMP_PROJECT" bash "$HOOK")"
+[ -z "$out8" ] || fail "agent_id 付き（サブエージェント内）の呼び出しでbackstopが鳴った: $out8"
+[ ! -e "$CACHE_DIR/$SUB_HASH.backstop" ] || fail "agent_id 付き呼び出しがbackstopマーカーを立てた"
+
+# 9) auto-memory 配下への Write は無音で backstop マーカーも立てない（HOME 差し替え）
+FAKE_HOME="$TMP_PROJECT/fakehome"
+mkdir -p "$FAKE_HOME/.claude/projects/slug-proj/memory"
+MEM_PATH="$FAKE_HOME/.claude/projects/slug-proj/memory/topic.md"
+MEM_HASH="$(session_hash "sess-back-mem")"
+rm -f "$CACHE_DIR/$MEM_HASH" "$CACHE_DIR/$MEM_HASH.backstop"
+out9="$(printf '%s' "$(payload "sess-back-mem" "" "$MEM_PATH")" \
+  | env CLAUDE_PROJECT_DIR="$TMP_PROJECT" HOME="$FAKE_HOME" bash "$HOOK")"
+[ -z "$out9" ] || fail "auto-memory への Write でbackstopが鳴った: $out9"
+[ ! -e "$CACHE_DIR/$MEM_HASH.backstop" ] || fail "auto-memory Write がbackstopマーカーを立てた"
+
+# 10) その後 PM 本体の通常 Edit は従来どおり発火する（除外し過ぎの確認）
+out10="$(printf '%s' "$(payload "sess-back-mem")" \
+  | env CLAUDE_PROJECT_DIR="$TMP_PROJECT" HOME="$FAKE_HOME" bash "$HOOK")"
+echo "$out10" | grep -q '"decision"' || fail "auto-memory 除外のあと PM 本体の Edit が発火しない: $out10"
 
 echo "PASS: delegation-routing-backstop"

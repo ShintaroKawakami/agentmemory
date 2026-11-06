@@ -76,8 +76,24 @@ fi
 #      `scripts/*.sh` のドリフトで再発するため対症療法。ディレクトリ単位で `.codex/hooks/` と揃える。
 #   3) 配布先 PJ の drift をその都度コミットして消す案 → 配布のたびに日付スタンプで再発するため恒久解にならない。
 # 対応: SYNC_DERIVATIVE_SKIP に `^\.claude/hooks/|/\.claude/hooks/` を追加し、`.codex/hooks/` と対称にする。
+# [2026-10-03][fix]
+# 背景:
+# - ユーザー依頼意図: non-pj の Stop hook が `.claude/settings.local.json` を
+#   「変更されたコードファイル」として毎回 block する事故 (issue #2891) を根治したい。
+#   `.claude/settings*.json` は権限承認時に Claude Code 本体が書き換えるツール管理ファイルであり、
+#   セッション中に mtime が更新されても AI が書いたコードではないため mtime 判定だけでは除外できない。
+# - 守るべき業務ルール: ハーネス管理の設定ファイルは `.claude/hooks/` (配布物) と同じく
+#   品質チェックの対象外。AI がレビューすべき成果物ではない。
+# - 他案不採用理由: mtime ベースの session window だけで除外する案は、Claude Code が
+#   セッション中に settings.local.json へ権限設定を永続化したケース (mtime がセッション内) を
+#   拾い続けて同じ誤検知が再発するため不採用。ファイル種別として除外する必要がある。
+# 対応: SYNC_DERIVATIVE_SKIP に `^\.claude/settings|/\.claude/settings` を追加し、
+#   settings.json / settings.local.json を `.claude/hooks/` と同じ配布物扱いにする。
+# [2026-11-02][fix] PR #3400 再レビュー: 前方一致のままだと `.claude/settings-check.sh` や
+#   `.claude/settings/validate.py` まで除外され品質チェックが漏れる。`(^|/)\.claude/settings(\.local)?\.json$`
+#   に末尾まで限定し、似た名前のスクリプトは検査対象に残す。
 readonly DOC_TYPE_SKIP='\.md$|\.prd$|\.txt$|^docs/|/docs/|\.template$|CLAUDE\.md|README|CHANGELOG'
-readonly SYNC_DERIVATIVE_SKIP='^\.opencode/|/\.opencode/|^\.cursor/|/\.cursor/|^\.gemini/|/\.gemini/|^\.augment/|/\.augment/|^\.claude/hooks/|/\.claude/hooks/|^\.codex/hooks/|/\.codex/hooks/|^\.agent/|/\.agent/|^\.brv/|/\.brv/|^\.kimi-code/|/\.kimi-code/|^\.kimi/|/\.kimi/|sync-state\.json$'
+readonly SYNC_DERIVATIVE_SKIP='^\.opencode/|/\.opencode/|^\.cursor/|/\.cursor/|^\.gemini/|/\.gemini/|^\.augment/|/\.augment/|^\.claude/hooks/|/\.claude/hooks/|(^|/)\.claude/settings(\.local)?\.json$|^\.codex/hooks/|/\.codex/hooks/|^\.agent/|/\.agent/|^\.brv/|/\.brv/|^\.kimi-code/|/\.kimi-code/|^\.kimi/|/\.kimi/|sync-state\.json$'
 # DEPLOY-MARKER(business): deploy-hooks.py は business profile でこの行を SYNC_DERIVATIVE_SKIP のみへ置換する。
 readonly DOC_SKIP_PATTERNS="${DOC_TYPE_SKIP}|${SYNC_DERIVATIVE_SKIP}"
 # [2026-03-17][refactor]
@@ -755,6 +771,157 @@ print(json.dumps(sorted(targets), ensure_ascii=False))
 PY
 }
 
+# [2026-10-03][fix] issue #2891
+# 背景:
+# - ユーザー依頼意図: non-pj の Stop hook が「セッション開始前から dirty だった
+#   `.claude/settings.local.json`」を変更ファイルとして毎回 block する事故を根治したい。
+#   git diff fallback / transcript 検出は「いま差分があるか」は分かっても
+#   「このセッションが起こした差分か」を区別できず、pre-existing dirty や
+#   resume した transcript の古い Write 記録を拾い続けた (同根: #2129 / #1498)。
+# - 守るべき業務ルール: 品質ゲートの block はセッション起因の差分に限定する。
+#   セッション開始より前に最終更新されたファイルは、たとえ working tree で
+#   dirty でも本セッションの成果物ではない。
+# - 他案不採用理由:
+#   1) SessionStart hook で dirty 一覧をスナップショットする案 → 全PJへの新規 hook
+#      配布が必要で blast radius が大きい。開始時点 dirty だがセッション中に
+#      再編集されたファイルの区別 (正の検知) も弱いため不採用。
+#   2) transcript 内の Write エントリ時刻だけを見る案 → resume で旧履歴を引き継ぐ
+#      transcript ではセッション境界が取れないため不採用。
+# 対応: セッション開始時刻を「transcript 先頭エントリの timestamp」と
+#   「transcript ファイルの birth time」の大きい方で推定し、検出した変更ファイルを
+#   max(mtime, ctime) >= session_start(-2s grace) に絞る。stat 不能なパスは fail-open で残す。
+# [2026-11-02][fix] Codex レビュー (PR #3400) 2件。方針: 境界が確かめられない時は絞らず残す
+#   (見逃しより、他セッション分まで検査する方がまし)。
+#   1) `cp -p` 等で mtime を保ったまま置換されたコードを落とさないよう、mtime と ctime
+#      (inode 変更時刻) の新しい方で判定する。
+#   2) 追記型 resume は birth time も最古 timestamp も初回開始時刻のままで、間に入った他セッションの
+#      変更が通ってしまう。birth time が取れない / 最古 timestamp が birth より前 (履歴複写) /
+#      timestamp に 30 分超の空白 (resume 痕跡) のいずれかなら開始時刻を返さず、時刻フィルタを掛けない。
+# [2026-11-02][fix] PR #3400 再レビュー: symlink の向け直しはリンク先 (古い) の時刻だけでは落ちるため
+#   lstat (リンク自身) の mtime/ctime も見る。壊れたリンク等 stat 不能なパスは従来どおり残す。
+transcript_session_start_epoch() {
+  local transcript_path="$1"
+
+  if [ -z "$transcript_path" ] || [ ! -f "$transcript_path" ]; then
+    printf '\n'
+    return 0
+  fi
+
+  python3 - "$transcript_path" <<'PY' 2>/dev/null || printf '\n'
+import json
+import os
+import sys
+from datetime import datetime
+
+path = sys.argv[1]
+BIRTH_SKEW_SECONDS = 120.0
+RESUME_GAP_SECONDS = 1800.0
+
+# birth time (macOS/BSD の st_birthtime) が無ければ、このファイルが現セッション開始から
+# 作られたものかを確かめられない。確かめられない時は開始時刻を返さない (絞らない)。
+try:
+    birth = getattr(os.stat(path), "st_birthtime", None)
+except OSError:
+    birth = None
+if not birth:
+    print("")
+    raise SystemExit(0)
+
+epochs = []
+try:
+    with open(path, encoding="utf-8", errors="ignore") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            ts = obj.get("timestamp") if isinstance(obj, dict) else None
+            if not isinstance(ts, str) or not ts:
+                continue
+            try:
+                epochs.append(datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp())
+            except Exception:
+                continue
+except OSError:
+    pass
+
+if not epochs:
+    print("")
+    raise SystemExit(0)
+
+epochs.sort()
+earliest = epochs[0]
+
+# birth より前の履歴を含む = 履歴複写 resume。現在区間を確実に示せないので絞らない。
+if earliest < float(birth) - BIRTH_SKEW_SECONDS:
+    print("")
+    raise SystemExit(0)
+
+# timestamp の長い空白 = 同一ファイルへの追記 resume の痕跡。間に他セッションの変更が
+# 入りうるので絞らない。
+for prev, cur in zip(epochs, epochs[1:]):
+    if cur - prev > RESUME_GAP_SECONDS:
+        print("")
+        raise SystemExit(0)
+
+print("%.0f" % max(float(birth), earliest))
+PY
+}
+
+filter_files_changed_since() {
+  local files_json="$1"
+  local since_epoch="${2:-}"
+  local project_dir="$3"
+
+  if [ -z "$since_epoch" ]; then
+    printf '%s\n' "$files_json"
+    return 0
+  fi
+
+  python3 -c "
+import json
+import os
+import sys
+
+since = float(sys.argv[1])
+project_dir = sys.argv[2]
+GRACE_SECONDS = 2.0
+
+try:
+    files = json.loads(sys.argv[3])
+except Exception:
+    print('[]')
+    sys.exit(0)
+
+kept = []
+for path in files:
+    if not isinstance(path, str):
+        continue
+    abspath = path if os.path.isabs(path) else os.path.join(project_dir, path)
+    try:
+        # cp -p / touch -t 等で mtime だけ古く保たれた置換も拾うため ctime も見る。
+        # symlink は os.stat だとリンク先の時刻しか見えず、古いファイルへ向け直した変更を
+        # 落とすため、リンク自身 (lstat) の時刻も見て新しい方で判定する。
+        stamps = []
+        for stat_fn in (os.lstat, os.stat):
+            try:
+                st = stat_fn(abspath)
+            except OSError:
+                continue
+            stamps.extend((st.st_mtime, st.st_ctime))
+        if not stamps or max(stamps) >= since - GRACE_SECONDS:
+            kept.append(path)
+    except OSError:
+        # stat 不能 (削除済み / 権限なし) は判断不能のため fail-open で残す
+        kept.append(path)
+
+print(json.dumps(kept, ensure_ascii=False))
+" "$since_epoch" "$project_dir" "$files_json" 2>/dev/null || printf '%s\n' "$files_json"
+}
+
 # [2026-05-26][fix]
 # 背景:
 # - ユーザー依頼意図: jtt-cafe-pj の /insights リフレッシュ作業終了時、Stop hook が
@@ -917,7 +1084,7 @@ run_quality_check_hook() {
   local hook_root="$2"
   local no_file_change_reason="$3"
   local use_git_diff_fallback="${4:-true}"
-  local input project_dir checklist_path stop_hook_active input_changed_files transcript_path transcript_changed_files transcript_readable transcript_bash_write bash_created_paths changed_files non_doc_files formatted_non_doc_files block_reason sql_files security_checklist_path is_codex_hook
+  local input project_dir checklist_path stop_hook_active input_changed_files transcript_path transcript_changed_files transcript_readable transcript_bash_write bash_created_paths changed_files non_doc_files formatted_non_doc_files block_reason sql_files security_checklist_path is_codex_hook session_start_epoch
 
   is_codex_hook="false"
   if is_codex_hook_root "$hook_root"; then
@@ -1008,6 +1175,11 @@ run_quality_check_hook() {
     return 0
   fi
 
+  # [2026-10-03][fix] issue #2891
+  # セッション開始時刻を transcript から推定。transcript が読めない場合は空文字で、
+  # 後段の session window filter は無効 (従来挙動) になる。
+  session_start_epoch="$(transcript_session_start_epoch "$transcript_path")"
+
   # Layer 1: agent_type による読み取り専用エージェント即時判定
   # Explore/Plan等はWrite/Editツールを持たない（公式仕様で除外）ため、
   # コード変更は構造的に不可能。ファイル検出を一切行わずapproveする。
@@ -1057,6 +1229,16 @@ run_quality_check_hook() {
     else
       changed_files=""
       log "git diff fallback disabled, no input/transcript file changes found"
+    fi
+
+    # [2026-10-03][fix] issue #2891
+    # セッション起因の差分に限定する。transcript / git diff fallback 由来の候補から
+    # セッション開始より前に最終更新されたファイル (pre-existing dirty や
+    # 他セッション由来の stale 検出) を外す。session_start_epoch が空
+    # (transcript 不在) なら従来どおり絞らない。
+    if [ -n "$session_start_epoch" ]; then
+      changed_files="$(filter_files_changed_since "$changed_files" "$session_start_epoch" "$project_dir")"
+      log "applied session window filter (start=${session_start_epoch})"
     fi
   fi
 

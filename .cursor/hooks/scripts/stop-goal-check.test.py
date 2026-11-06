@@ -1665,6 +1665,16 @@ class ProseEvidenceTests(unittest.TestCase):
     """Issue #3595: 圧縮後・タスク道具の無い領域で assistant 本文の
     「台帳照合/タスク化証拠 + 行頭の 担当 付き返事待ち」を終了根拠にする経路。"""
 
+    def setUp(self) -> None:
+        # Issue #3993(3): prose 経路の合格は state_dir に記録される。テスト間と
+        # 実キャッシュ（~/.cache/agent-hub/stop-goal-ledger）へ漏れないよう分離する。
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        patcher = mock.patch.dict(
+            os.environ, {HOOK.LEDGER_STATE_ENV: str(Path(tmp.name) / "state")})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     @staticmethod
     def _assistant(text: str) -> dict:
         return {"type": "assistant",
@@ -1749,6 +1759,240 @@ class ProseEvidenceTests(unittest.TestCase):
                    + [self._assistant("[返事待ち] 担当=本人\n台帳の全行照合が済みました。"),
                       self._compact()])
         self.assertTrue(HOOK.should_block(entries))
+
+
+class Issue3993PassRecordTests(unittest.TestCase):
+    """Issue #3993(3): prose 経路で合格した記録は、圧縮要約を挟んでも同じ Goal 範囲で
+    合格を維持する。合格記録が無い・退行した時は従来どおり止める。"""
+
+    EVIDENCE = "[返事待ち] 担当=本人（本番確認待ち）\n台帳の全行照合が済みました。"
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.state = Path(tmp.name) / "state"
+        self.plans = Path(tmp.name) / "plans"
+        self.plans.mkdir()
+        self.ledger = Path(tmp.name) / "ledger-progress.md"
+
+    @staticmethod
+    def _assistant(text: str) -> dict:
+        return {"type": "assistant",
+                "message": {"content": [{"type": "text", "text": text}]}}
+
+    @staticmethod
+    def _wrote(path: Path) -> dict:
+        return {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "w1", "name": "Write",
+             "input": {"file_path": str(path), "content": "x"}}]}}
+
+    def _goal(self, uuid: str = "g1") -> list[dict]:
+        return [{"type": "user", "uuid": uuid, "message": {"content": "/goal 確認する"}}]
+
+    def _compact(self) -> dict:
+        return {"type": "system", "isCompactSummary": True,
+                "message": {"content": "compaction summary: 作業を続行中。"}}
+
+    def blocked(self, entries: list[dict], conversation_id: str = "c1") -> bool:
+        return HOOK.should_block(entries, conversation_id=conversation_id,
+                                 plans_dir=self.plans, state_dir=self.state)
+
+    def passed_markers(self) -> list[str]:
+        return sorted(p.name for p in self.state.glob("passed-*")) if self.state.exists() else []
+
+    def table(self, states: list[str]) -> str:
+        rows = "".join(f"| P{i} | 作業{i} | 本体 | {state} |\n" for i, state in enumerate(states, 1))
+        return "# 台帳\n\n| 行 | 内容 | 担当 | 状態 |\n|---|---|---|---|\n" + rows
+
+    def test_passed_prose_evidence_survives_compaction(self) -> None:
+        evidence = self._assistant(self.EVIDENCE)
+        entries = self._goal() + [evidence]
+        self.assertFalse(self.blocked(entries))          # 合格 → 記録が残る
+        self.assertEqual(len(self.passed_markers()), 1)
+        entries = entries + [self._compact()]
+        self.assertFalse(self.blocked(entries))          # 要約の後も合格を維持する
+        entries = entries + [self._assistant("別の連絡です。")]
+        self.assertFalse(self.blocked(entries))          # さらに会話が進んでも維持する
+
+    def test_no_recorded_pass_blocks_after_compaction(self) -> None:
+        # 合格していない transcript（証拠→要約を1回の判定で見る）は従来どおり止める
+        entries = self._goal() + [self._assistant(self.EVIDENCE), self._compact()]
+        self.assertTrue(self.blocked(entries))
+        self.assertFalse(self.passed_markers())
+
+    def test_other_conversation_does_not_use_recorded_pass(self) -> None:
+        evidence = self._assistant(self.EVIDENCE)
+        self.assertFalse(self.blocked(self._goal() + [evidence]))
+        entries = self._goal() + [evidence, self._compact()]
+        self.assertTrue(self.blocked(entries, conversation_id="other"))
+        self.assertFalse(self.blocked(entries))          # 同じ会話は通る
+
+    def test_new_goal_uuid_does_not_inherit_recorded_pass(self) -> None:
+        evidence = self._assistant(self.EVIDENCE)
+        self.assertFalse(self.blocked(self._goal() + [evidence]))
+        entries = (self._goal() + [evidence, self._compact()]
+                   + [{"type": "user", "uuid": "g2",
+                       "message": {"content": "/goal 確認する"}}])
+        self.assertTrue(self.blocked(entries))           # 別 uuid の Goal は記録を継がない
+
+    def test_scope_without_uuid_does_not_record_or_honor(self) -> None:
+        goal = [{"type": "user", "message": {"content": "/goal 確認する"}}]
+        evidence = self._assistant(self.EVIDENCE)
+        self.assertFalse(self.blocked(goal + [evidence]))     # 合格自体はする
+        self.assertFalse(self.passed_markers())               # uuid 無しは記録しない
+        self.assertTrue(self.blocked(goal + [evidence, self._compact()]))
+
+    def test_open_ledger_after_pass_blocks_and_drops_record(self) -> None:
+        evidence = self._assistant(self.EVIDENCE)
+        self.assertFalse(self.blocked(self._goal() + [evidence]))
+        self.assertEqual(len(self.passed_markers()), 1)
+        self.ledger.write_text(self.table(["☑", "☐"]), encoding="utf-8")
+        entries = self._goal() + [evidence, self._compact(), self._wrote(self.ledger)]
+        self.assertTrue(self.blocked(entries))           # 開いた台帳は退行の証拠
+        self.assertFalse(self.passed_markers())          # 阻止で記録は捨てる
+        self.ledger.unlink()
+        self.assertTrue(self.blocked(entries))           # 記録は戻らず新しい証拠が要る
+
+    def test_pending_task_after_pass_blocks_and_drops_record(self) -> None:
+        evidence = self._assistant(self.EVIDENCE)
+        self.assertFalse(self.blocked(self._goal() + [evidence]))
+        self.assertEqual(len(self.passed_markers()), 1)
+        entries = self._goal() + [evidence, self._compact()] + _created()
+        self.assertTrue(self.blocked(entries))           # 未完了タスクは退行の証拠
+        self.assertFalse(self.passed_markers())
+
+
+class Issue3993GoalStartRecordTests(unittest.TestCase):
+    """Issue #3993(1): /goal 受理時（UserPromptSubmit）に「台帳と Goal の対応＋☐ 残り」を
+    記録し、一度も Stop が無いまま全 ☑ になっても記録で終われるようにする。
+    記録が無い・別の Goal の記録は従来どおり止める。"""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = Path(tmp.name)
+        self.plans = self.tmp / "plans"
+        self.state = self.tmp / "state"
+        self.plans.mkdir()
+
+    def plan(self, name: str, goal: str, marks: list[str], **kw: object) -> None:
+        (self.plans / name).write_text(_plan_html(goal, marks, **kw), encoding="utf-8")
+
+    def ups(self, entries: list[dict] | None = None, prompt: str = "",
+            conversation_id: str = "conv") -> None:
+        payload: dict = {"session_id": conversation_id, "prompt": prompt}
+        if entries is not None:
+            transcript = self.tmp / "transcript.jsonl"
+            _write_jsonl(transcript, entries)
+            payload["transcript_path"] = str(transcript)
+        HOOK.record_goal_start(payload, plans_dir=self.plans, state_dir=self.state)
+
+    def blocked(self, entries: list[dict] | None = None, conversation_id: str = "conv") -> bool:
+        return HOOK.should_block(entries if entries is not None else _goal_entries(),
+                                 conversation_id=conversation_id, plans_dir=self.plans,
+                                 state_dir=self.state)
+
+    def markers(self) -> list[str]:
+        return sorted(p.name for p in self.state.glob("goalstart-*")) if self.state.exists() else []
+
+    def test_goal_start_record_passes_without_stop(self) -> None:
+        # /goal 受理時に ☐ を見た記録 → Stop 無しで全 ☑ → 止めない
+        self.plan("a.html", GOAL, ["☐ 未", "☑ 済"])
+        self.ups(entries=_goal_entries())
+        self.assertEqual(len(self.markers()), 1)
+        self.plan("a.html", GOAL, ["☑ 済", "☑ 済"])
+        self.assertFalse(self.blocked())
+
+    def test_no_record_still_blocks(self) -> None:
+        # 記録が無い初回判定の全 ☑ は従来どおり止める
+        self.plan("a.html", GOAL, ["☑ 済", "☑ 済"])
+        self.assertTrue(self.blocked())
+        self.assertEqual(self.markers(), [])
+
+    def test_no_open_mark_at_start_writes_no_record(self) -> None:
+        # 受理時に ☐ が無い（全 ☑・不明な印・台帳なし）は記録しない
+        self.plan("a.html", GOAL, ["☑ 済"])
+        self.ups(entries=_goal_entries())
+        self.assertEqual(self.markers(), [])
+        self.assertTrue(self.blocked())
+
+    def test_other_goal_record_is_not_used(self) -> None:
+        # 別 Goal（別原文）の記録は今の Goal では使わない
+        self.plan("a.html", "別の Goal", ["☐ 残り"])
+        self.ups(entries=_goal_entries("別の Goal"))
+        self.assertEqual(len(self.markers()), 1)
+        self.plan("b.html", GOAL, ["☑ 済"])
+        self.assertTrue(self.blocked())
+
+    def test_same_text_new_goal_uuid_does_not_reuse_record(self) -> None:
+        # 同名 Goal のやり直しは、前の uuid に結んだ記録を使い回さない
+        self.plan("a.html", GOAL, ["☐ 残り"])
+        self.ups(entries=_goal_entries(uuid="g1"))
+        self.assertEqual(len(self.markers()), 1)
+        self.plan("a.html", GOAL, ["☑ 済"])
+        rerun = [{"type": "user", "uuid": "g0", "message": {"content": "/goal " + GOAL}},
+                 {"type": "user", "uuid": "g1", "message": {"content": "/goal clear"}},
+                 {"type": "user", "uuid": "g2", "message": {"content": "/goal " + GOAL}}]
+        self.assertTrue(self.blocked(rerun))             # g2 の範囲には g1 の記録を使わない
+
+    def test_other_conversation_does_not_use_record(self) -> None:
+        self.plan("a.html", GOAL, ["☐ 残り"])
+        self.ups(entries=_goal_entries(), conversation_id="conv")
+        self.plan("a.html", GOAL, ["☑ 済"])
+        self.assertTrue(self.blocked(conversation_id="other"))
+
+    def test_clear_drops_record(self) -> None:
+        # /goal clear の受理で記録を消す（終わった Goal の記録を残さない）
+        self.plan("a.html", GOAL, ["☐ 残り"])
+        self.ups(entries=_goal_entries())
+        self.assertEqual(len(self.markers()), 1)
+        clear = _goal_entries() + [{"type": "user", "uuid": "c1",
+                                    "message": {"content": "/goal clear"}}]
+        self.ups(entries=clear)
+        self.assertEqual(self.markers(), [])
+
+    def test_prompt_fallback_records_and_binds_next_start(self) -> None:
+        # transcript に /goal エントリがまだ無い時は prompt から記録し、
+        # anchor 以後で最初に始まる範囲（この /goal）に結ぶ
+        before = [{"type": "user", "uuid": "u0", "message": {"content": "別の話題"}}]
+        self.plan("a.html", GOAL, ["☐ 残り"])
+        self.ups(entries=before, prompt="/goal " + GOAL)
+        self.assertEqual(len(self.markers()), 1)
+        entries = before + _goal_entries()
+        self.plan("a.html", GOAL, ["☑ 済"])
+        self.assertFalse(self.blocked(entries))
+
+    def test_prompt_fallback_other_goal_still_blocks(self) -> None:
+        # anchor 以後で最初に始まる範囲が別の Goal なら記録は使わない
+        before = [{"type": "user", "uuid": "u0", "message": {"content": "別の話題"}}]
+        self.plan("a.html", GOAL, ["☐ 残り"])
+        self.ups(entries=before, prompt="/goal " + GOAL)
+        entries = before + _goal_entries("別の Goal", uuid="g9")
+        self.plan("a.html", GOAL, ["☑ 済"])
+        self.assertTrue(self.blocked(entries))
+
+    def test_missing_uuid_start_writes_no_record(self) -> None:
+        no_uuid = [{"type": "user", "message": {"content": "/goal " + GOAL}}]
+        self.plan("a.html", GOAL, ["☐ 残り"])
+        self.ups(entries=no_uuid)
+        self.assertEqual(self.markers(), [])
+
+    def test_main_goal_start_mode_writes_record(self) -> None:
+        transcript = self.tmp / "transcript.jsonl"
+        _write_jsonl(transcript, _goal_entries())
+        self.plan("a.html", GOAL, ["☐ 残り"])
+        old = {k: os.environ.get(k) for k in (HOOK.LEDGER_PLANS_ENV, HOOK.LEDGER_STATE_ENV)}
+        os.environ[HOOK.LEDGER_PLANS_ENV], os.environ[HOOK.LEDGER_STATE_ENV] = (
+            str(self.plans), str(self.state))
+        self.addCleanup(lambda: [os.environ.__setitem__(k, v) if v is not None
+                                 else os.environ.pop(k, None) for k, v in old.items()])
+        old_argv = sys.argv
+        sys.argv = ["stop-goal-check.py", "--goal-start"]
+        self.addCleanup(setattr, sys, "argv", old_argv)
+        code, _ = _run_main({"session_id": "conv", "transcript_path": str(transcript),
+                             "prompt": "/goal " + GOAL})
+        self.assertEqual(code, 0)
+        self.assertEqual(len(self.markers()), 1)
 
 
 class MarkdownLedgerAndClearTests(unittest.TestCase):
@@ -1888,6 +2132,53 @@ class MarkdownLedgerAndClearTests(unittest.TestCase):
             code, out = _run_main({"transcript_path": str(transcript), "session_id": "s"})
             self.assertEqual((code, out), (0, ""))
 
+    # Issue #3993(2): 実 transcript の /goal clear は system+local_command に残る。
+    def system_clear(self) -> dict:
+        return {"type": "system", "subtype": "local_command",
+                "content": "<command-name>/goal</command-name>\n<command-message>goal</command-message>\n<command-args>clear</command-args>"}
+
+    def summary(self, text: str = '/goal "夜間テストを進める"\n作業を続ける。') -> dict:
+        return {"type": "system", "isCompactSummary": True,
+                "message": {"content": text}}
+
+    def test_local_command_clear_ends_summary_goal(self) -> None:
+        # 要約の /goal 文だけで Goal 継続とみなしていた領域に、後から正式な clear が
+        # あれば止めない（clear 無しの要約だけは従来どおり止める）。
+        compact = self.summary()
+        open_work = [self.said("作業中")]
+        self.assertTrue(self.blocked([compact] + open_work))
+        for name, clear in (("local_command", self.system_clear()),
+                            ("typed", self.clear()), ("plain", self.clear(typed=False)),
+                            ("pasted", {"type": "user", "message": {"content":
+                                        '<pasted_content id="1">\n/goal clear\n</pasted_content>'}})):
+            with self.subTest(name=name):
+                self.assertFalse(self.blocked([compact] + open_work + [clear] + open_work))
+        # clear が要約より前（実時間で clear → /compact）でも同じく止めない。
+        self.assertFalse(self.blocked([self.system_clear(), compact] + open_work))
+
+    def test_goal_state_stdout_ends_summary_goal(self) -> None:
+        compact = self.summary()
+        for out in ("<local-command-stdout>Goal cleared: 夜間テストを進める</local-command-stdout>",
+                    "<local-command-stdout>No goal set</local-command-stdout>"):
+            entry = {"type": "system", "subtype": "local_command", "content": out}
+            with self.subTest(out=out[:60]):
+                self.assertFalse(self.blocked([compact, entry, self.said("作業中")]))
+
+    def test_quoted_clear_and_stdout_text_are_not_official_records(self) -> None:
+        compact = self.summary()
+        quoted = self.said("例: <command-name>/goal</command-name><command-args>clear</command-args>")
+        self.assertTrue(self.blocked([compact, quoted]))
+        plain_stdout = self.said("<local-command-stdout>No goal set</local-command-stdout>")
+        self.assertTrue(self.blocked([compact, plain_stdout]))
+        other_subtype = {"type": "system", "subtype": "stop_hook_summary",
+                         "content": "<command-args>clear</command-args>"}
+        self.assertTrue(self.blocked([compact, other_subtype]))
+
+    def test_new_goal_after_local_command_clear_is_active_again(self) -> None:
+        compact = self.summary()
+        again = {"type": "user", "uuid": "g2", "message": {"content": "/goal 別の作業"}}
+        self.assertTrue(self.blocked([compact, self.system_clear(), again, self.said("作業中")]))
+
 
 class StatusPageLedgerTests(unittest.TestCase):
     """2026-10-24: 進捗ページ（~/AI-Work/status/<PJ>.html）の const D の ledger を完了の根拠に読む。"""
@@ -1988,6 +2279,60 @@ class StatusPageLedgerTests(unittest.TestCase):
         self.assertTrue(self.blocked(self.goal() + [self.wrote(), self.wrote(second)]))
         second.write_text(self.html(self.rows(("done", ""))), encoding="utf-8")
         self.assertFalse(self.blocked(self.goal() + [self.wrote(), self.wrote(second)]))
+
+    def test_page_without_const_d_is_not_a_candidate(self) -> None:
+        # Issue #4830: const D の無い status ページ（例 duo-diag.html）は進捗ページではない。
+        # Goal 中に Write していても候補から外れ、本物の進捗ページが complete なら通す。
+        diag = self.dir / "duo-diag.html"
+        diag.write_text("<html><body>表示確認用</body></html>", encoding="utf-8")
+        self.write(self.rows(("done", "")))
+        self.assertFalse(self.blocked(self.goal() + [self.wrote(diag), self.wrote()]))
+
+    def test_page_without_const_d_alone_has_no_evidence(self) -> None:
+        # const D 無しのページだけでは進捗ページの証拠にならない（証拠なしで止まる）。
+        diag = self.dir / "duo-diag.html"
+        diag.write_text("<html><body>表示確認用</body></html>", encoding="utf-8")
+        self.assertTrue(self.blocked(self.goal() + [self.wrote(diag)]))
+
+    def test_broken_const_d_page_still_blocks(self) -> None:
+        # const D はあるがリテラルが読めない＝壊れた進捗ページは素通りさせず止める。
+        self.page.write_text(
+            "<html><script>\nconst D = { workId: 'x', ledger: [ { s: 'done' } ]\n</script></html>",
+            encoding="utf-8")
+        self.assertTrue(self.blocked(self.goal() + [self.wrote()]))
+
+    def test_block_reason_names_open_status_page(self) -> None:
+        # Issue #4830: 阻止文に open と判定したページのパスが出る。const D 無しのページは出ない。
+        self.write(self.rows(("done", ""), ("open", "")))
+        diag = self.dir / "duo-diag.html"
+        diag.write_text("<html><body>表示確認用</body></html>", encoding="utf-8")
+        transcript = self.tmp / "t.jsonl"
+        _write_jsonl(transcript, self.goal() + [self.wrote(), self.wrote(diag)])
+        env = {HOOK.LEDGER_PLANS_ENV: str(self.tmp / "none"),
+               HOOK.LEDGER_STATE_ENV: str(self.tmp / "state")}
+        with mock.patch.dict(os.environ, env):
+            code, out = _run_main({"transcript_path": str(transcript), "session_id": "s4830"})
+        self.assertEqual(code, 0)
+        payload = json.loads(out)
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn(str(self.page), payload["reason"])
+        self.assertNotIn("duo-diag", payload["reason"])
+
+    def test_block_reason_names_unreadable_status_page(self) -> None:
+        # const D はあるが読めない（壊れた）進捗ページもパスを出して止める。
+        self.page.write_text(
+            "<html><script>\nconst D = { workId: 'x', ledger: [ { s: 'done' } ]\n</script></html>",
+            encoding="utf-8")
+        transcript = self.tmp / "t.jsonl"
+        _write_jsonl(transcript, self.goal() + [self.wrote()])
+        env = {HOOK.LEDGER_PLANS_ENV: str(self.tmp / "none"),
+               HOOK.LEDGER_STATE_ENV: str(self.tmp / "state")}
+        with mock.patch.dict(os.environ, env):
+            code, out = _run_main({"transcript_path": str(transcript), "session_id": "s4830u"})
+        self.assertEqual(code, 0)
+        payload = json.loads(out)
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn(str(self.page), payload["reason"])
 
     def test_open_page_beats_prose_claim(self) -> None:
         self.write(self.rows(("open", "")))
@@ -2186,6 +2531,258 @@ class Issue4423ApprovalPremiseTests(unittest.TestCase):
         self.assertNotIn("OKが出たので", payload["reason"])
         self.assertNotIn("承認済みです", payload["reason"])
         self.assertIsNone(HOOK._APPROVAL_PREMISE_RE.search(payload["reason"]))
+
+
+class Issue4055ApprovalWaitTests(unittest.TestCase):
+    """Issue #4055 再現テスト: 残り手順が本人の承認待ち（[明示保留] owner:…・
+    「owner: 伸太郎さん」・「本人の明示承認が要る」等の human-approval ゲート）だけに
+    なった時、同じ理由での未達差し戻しは1回までで、2回目以降は待機扱いで止めない。
+    安全側は緩めない: 承認待ちを完了扱いせず1回は差し戻す、阻止文に承認済み前提の
+    文言を出さない（#4423 維持）、他の未達は従来どおり毎回差し戻す。"""
+
+    # 2026-10-22 jtt-apps の実測: 台帳の残り行が旧書式 [明示保留] owner:… だけの状態。
+    HOLD_OLD_TAG = "[明示保留] owner: 伸太郎さん / P5 別名設定の本人承認待ち"
+    HOLD_FREE = "残りは本番投稿のみ。本人の明示承認が要るため待機する。"
+
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.state_dir = self.tmp / "state"
+        self.plans_dir = self.tmp / "plans"
+        self.plans_dir.mkdir()
+
+    def goal(self) -> dict:
+        return {"type": "user", "uuid": "g1",
+                "message": {"content": "/goal 承認済みプランを最後まで進める"}}
+
+    @staticmethod
+    def said(text: str) -> dict:
+        return {"type": "assistant",
+                "message": {"content": [{"type": "text", "text": text}]}}
+
+    def run_main(self, transcript: Path) -> tuple[int, dict]:
+        env = {HOOK.LEDGER_PLANS_ENV: str(self.tmp / "none"),
+               HOOK.LEDGER_STATE_ENV: str(self.state_dir)}
+        with mock.patch.dict(os.environ, env):
+            code, out = _run_main({"transcript_path": str(transcript),
+                                   "session_id": "s4055"})
+        return code, json.loads(out) if out.strip() else {}
+
+    def assert_blocks_once_then_waits(self, transcript: Path) -> None:
+        """同一の承認待ち状態で、1回目は未達差し戻し、2回目以降は止めないことを確認する。"""
+        code, payload = self.run_main(transcript)
+        self.assertEqual(code, 0)
+        self.assertEqual(payload.get("decision"), "block")   # 1回は差し戻す（完了扱いにしない）
+        self.assertIn("本人のユーザー発言", payload.get("reason", ""))  # 安全側の指示は残る
+        self.assertIsNone(HOOK._APPROVAL_PREMISE_RE.search(payload.get("reason", "")))
+        for _ in range(2):
+            code, notice = self.run_main(transcript)
+            self.assertEqual(code, 0)
+            self.assertNotIn("decision", notice)
+            self.assertIn("systemMessage", notice)
+            self.assertIn("残っています", notice["systemMessage"])
+
+    def test_old_explicit_hold_tag_in_prose_dedupes(self) -> None:
+        # 旧書式 [明示保留] owner:… を本文に書いただけの状態（jtt-apps 2026-10-22 実測）。
+        transcript = self.tmp / "t.jsonl"
+        _write_jsonl(transcript, [self.goal(), self.said(self.HOLD_OLD_TAG)])
+        self.assert_blocks_once_then_waits(transcript)
+
+    def test_free_form_approval_wait_in_prose_dedupes(self) -> None:
+        # 札なしの自然文「本人の明示承認が要る」（jtt-cms 2026-10-14 実測）。
+        transcript = self.tmp / "t.jsonl"
+        _write_jsonl(transcript, [self.goal(), self.said(self.HOLD_FREE)])
+        self.assert_blocks_once_then_waits(transcript)
+
+    def test_task_with_owner_approval_note_dedupes(self) -> None:
+        # TaskList の pending 行が人待ちの注記だけを持つ状態。
+        entries = [self.goal(),
+                   _call("list", "TaskList", {}),
+                   _result("list", {"tasks": [
+                       {"id": "p5", "subject": "P5 別名設定", "status": "pending",
+                        "note": "owner: 伸太郎さん / 本人承認待ち"},
+                   ]})]
+        transcript = self.tmp / "t.jsonl"
+        _write_jsonl(transcript, entries)
+        self.assert_blocks_once_then_waits(transcript)
+
+    def test_md_ledger_old_format_holds_dedupe(self) -> None:
+        # Markdown 台帳の状態列が旧書式の保留だけの状態（読みは「open」だが人待ちは検知する）。
+        ledger = self.tmp / "progress-ledger.md"
+        ledger.write_text(
+            "# 台帳\n\n| 行 | 内容 | 状態 |\n|---|---|---|\n"
+            f"| P5 | 別名設定 | {self.HOLD_OLD_TAG} |\n"
+            "| P7 | 試しの通し確認 | [明示保留] owner: 伸太郎さん / 実機確認が要る |\n",
+            encoding="utf-8")
+        entries = [self.goal(),
+                   {"type": "assistant", "message": {"content": [
+                       {"type": "tool_use", "id": "w1", "name": "Write",
+                        "input": {"file_path": str(ledger)}}]}}]
+        transcript = self.tmp / "t.jsonl"
+        _write_jsonl(transcript, entries)
+        self.assert_blocks_once_then_waits(transcript)
+
+    def test_html_ledger_old_format_holds_dedupe(self) -> None:
+        # HTML 台帳の項目行が旧書式の保留だけ（不明な印で止まるが人待ちは検知する）。
+        goal_text = "承認済みプランを最後まで進める"
+        (self.plans_dir / "a.html").write_text(
+            _plan_html(goal_text, [self.HOLD_OLD_TAG, "[明示保留] owner: 伸太郎さん"]),
+            encoding="utf-8")
+        entries = [self.goal(),
+                   {"type": "assistant", "message": {"content": [
+                       {"type": "text", "text": "台帳を更新しました。"}]}}]
+        transcript = self.tmp / "t.jsonl"
+        _write_jsonl(transcript, entries)
+        env = {HOOK.LEDGER_PLANS_ENV: str(self.plans_dir),
+               HOOK.LEDGER_STATE_ENV: str(self.state_dir)}
+        payload = {"transcript_path": str(transcript), "session_id": "s4055"}
+        with mock.patch.dict(os.environ, env):
+            code, out = _run_main(payload)
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads(out)["decision"], "block")
+            for _ in range(2):
+                code, out = _run_main(payload)
+                self.assertEqual(code, 0)
+                notice = json.loads(out)
+                self.assertNotIn("decision", notice)
+                self.assertIn("systemMessage", notice)
+
+    def test_status_page_approval_note_row_dedupes(self) -> None:
+        # 進捗ページの open 行に「本人承認待ち」と書かれた状態。
+        page_dir = self.tmp / "Documents" / "AI-Work" / "status"
+        page_dir.mkdir(parents=True)
+        page = page_dir / "PJ.html"
+        page.write_text(
+            "<html><script>\nconst D = { workId: 'x', ledger: "
+            "[{ t: '本番投稿', s: 'open', who: '', note: '本人承認待ち' }] };\n</script></html>",
+            encoding="utf-8")
+        entries = [self.goal(),
+                   {"type": "assistant", "message": {"content": [
+                       {"type": "tool_use", "id": "w1", "name": "Write",
+                        "input": {"file_path": str(page)}}]}}]
+        transcript = self.tmp / "t.jsonl"
+        _write_jsonl(transcript, entries)
+        self.assert_blocks_once_then_waits(transcript)
+
+    def test_other_unmet_still_blocks_every_time(self) -> None:
+        # 他の未達（人待ちの目印が無い未完了）は従来どおり毎回差し戻す（黙らせない）。
+        transcript = self.tmp / "t.jsonl"
+        _write_jsonl(transcript, [self.goal(), self.said("実装がまだ途中です。")])
+        for _ in range(2):
+            code, payload = self.run_main(transcript)
+            self.assertEqual(code, 0)
+            self.assertEqual(payload.get("decision"), "block")
+
+    def test_changed_wait_state_fires_again(self) -> None:
+        # 承認待ちの内容が変われば別の理由として再び差し戻す。
+        transcript = self.tmp / "t.jsonl"
+        _write_jsonl(transcript, [self.goal(), self.said(self.HOLD_OLD_TAG)])
+        code, payload = self.run_main(transcript)
+        self.assertEqual(payload.get("decision"), "block")
+        _write_jsonl(transcript, [self.goal(), self.said(
+            "[明示保留] owner: 伸太郎さん / P7 試しの通し確認の本人承認待ち")])
+        code, payload = self.run_main(transcript)
+        self.assertEqual(payload.get("decision"), "block")
+
+
+class Issue4344TempLedgerTests(unittest.TestCase):
+    """Issue #4344 後半: 書類フォルダの許可が途中で外れ、控えの Markdown 台帳が
+    PermissionError で読めなくなった時の扱い（2026-10-25 jtt-apps 面談モーダル実測）。
+    - 権限の拒否で読めない台帳は "open"（毎ターン阻止）ではなく証拠なしとして扱う。
+    - 読める同名の台帳（scratchpad 等の一時置き）があればそちらを優先する。
+    - 止める時の阻止文には、読めなかったパスと理由を出す。
+    安全側は緩めない: 読める台帳の ☐ 残り・表の崩れは従来どおり止める。"""
+
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.denied = self.tmp / "Documents" / "AI-Work" / "goal-台帳.md"
+        self.denied.parent.mkdir(parents=True)
+        self.scratch = self.tmp / "scratchpad" / "goal-台帳.md"
+        self.scratch.parent.mkdir(parents=True)
+
+    @staticmethod
+    def table(states: list[str]) -> str:
+        rows = "".join(f"| P{i} | 作業{i} | {state} |\n" for i, state in enumerate(states, 1))
+        return "# 台帳\n\n| 行 | 内容 | 状態 |\n|---|---|---|\n" + rows
+
+    @staticmethod
+    def goal() -> list[dict]:
+        return [{"type": "user", "uuid": "g1",
+                 "message": {"content": "/goal 夜間テストを進める"}}]
+
+    @staticmethod
+    def wrote(path: Path) -> dict:
+        return {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "w1", "name": "Write",
+             "input": {"file_path": str(path)}}]}}
+
+    def blocked(self, entries: list[dict]) -> bool:
+        empty = self.tmp / "none"
+        return HOOK.should_block(entries, conversation_id="c",
+                                 plans_dir=empty, state_dir=empty)
+
+    def deny_read(self):
+        """stat は通るが中身だけ読めない状態（macOS TCC 実測）を再現する。"""
+        denied = self.denied
+        real_read_text = Path.read_text
+
+        def fake_read_text(this: Path, *args, **kwargs):
+            if this == denied:
+                raise PermissionError(1, "Operation not permitted", str(this))
+            return real_read_text(this, *args, **kwargs)
+        return mock.patch.object(Path, "read_text", fake_read_text)
+
+    def test_denied_copy_and_complete_scratchpad_passes(self) -> None:
+        # 控え（書類側・権限で読めない）と一時置き（scratchpad・全 ☑）がある時、
+        # 控えで止め続けず、読める台帳を優先して通す。
+        self.denied.write_text(self.table(["☑"]), encoding="utf-8")
+        self.scratch.write_text(self.table(["☑", "☑"]), encoding="utf-8")
+        entries = self.goal() + [self.wrote(self.denied), self.wrote(self.scratch)]
+        with self.deny_read():
+            self.assertFalse(self.blocked(entries))
+
+    def test_denied_copy_and_hold_only_scratchpad_passes(self) -> None:
+        # 一時置きの台帳が全行 担当付き返事待ち（止まった理由つきの保留）でも通す。
+        hold = "[返事待ち] 担当=伸太郎殿 / 書類フォルダの許可待ち"
+        self.denied.write_text(self.table(["☑"]), encoding="utf-8")
+        self.scratch.write_text(self.table(["☑", hold]), encoding="utf-8")
+        entries = self.goal() + [self.wrote(self.denied), self.wrote(self.scratch)]
+        with self.deny_read():
+            self.assertFalse(self.blocked(entries))
+
+    def test_denied_copy_and_open_scratchpad_still_blocks(self) -> None:
+        # 読める台帳に ☐ が残るなら従来どおり止める（判定を緩めない）。
+        self.denied.write_text(self.table(["☑"]), encoding="utf-8")
+        self.scratch.write_text(self.table(["☑", "☐"]), encoding="utf-8")
+        entries = self.goal() + [self.wrote(self.denied), self.wrote(self.scratch)]
+        with self.deny_read():
+            self.assertTrue(self.blocked(entries))
+
+    def test_denied_only_blocks_and_reason_shows_path_and_cause(self) -> None:
+        # 控えしか無い時は証拠なしで止まり、阻止文に読めなかったパスと理由が出る。
+        self.denied.write_text(self.table(["☑"]), encoding="utf-8")
+        entries = self.goal() + [self.wrote(self.denied)]
+        transcript = self.tmp / "t.jsonl"
+        _write_jsonl(transcript, entries)
+        env = {HOOK.LEDGER_PLANS_ENV: str(self.tmp / "none"),
+               HOOK.LEDGER_STATE_ENV: str(self.tmp / "state")}
+        with self.deny_read(), mock.patch.dict(os.environ, env):
+            code, out = _run_main({"transcript_path": str(transcript),
+                                   "session_id": "s4344"})
+        self.assertEqual(code, 0)
+        payload = json.loads(out)
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn(str(self.denied), payload["reason"])
+        self.assertIn("Operation not permitted", payload["reason"])
+
+    def test_malformed_ledger_is_still_unreadable_not_denied(self) -> None:
+        # 読めるのに状態列のある表が無い台帳は従来どおり "open" で止める
+        # （証拠なしになるのは PermissionError だけ）。
+        self.scratch.write_text("# 台帳\n\n| 行 | メモ |\n|---|---|\n| P1 | x |\n",
+                                encoding="utf-8")
+        entries = self.goal() + [self.wrote(self.scratch)]
+        self.assertTrue(self.blocked(entries))
 
 
 class HookCliTests(unittest.TestCase):
