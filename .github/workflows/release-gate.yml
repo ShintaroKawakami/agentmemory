@@ -31,15 +31,14 @@ permissions:
 jobs:
   packed-artifact:
     name: packed artifact (${{ matrix.os }})
-    # Forks skip macOS matrix cells (they still report skipped).
-    # Upstream keeps the full OS matrix. Revert this `if:` to restore.
-    if: ${{ github.repository == 'rohitg00/agentmemory' || startsWith(matrix.os, 'ubuntu') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-15-intel]
+        # Forks keep Linux only. Upstream keeps the full OS list.
+        # Revert the fromJSON expression to restore the static list.
+        os: ${{ fromJSON(github.repository == 'rohitg00/agentmemory' && '["ubuntu-latest","ubuntu-24.04-arm","macos-latest","macos-15-intel"]' || '["ubuntu-latest","ubuntu-24.04-arm"]') }}
     steps:
       - uses: actions/checkout@v6
         with:

@@ -43,9 +43,6 @@ permissions:
 
 jobs:
   test:
-    # Forks skip macOS/Windows matrix cells (they still report skipped).
-    # Upstream keeps the full OS matrix. Revert this `if:` to restore.
-    if: ${{ github.repository == 'rohitg00/agentmemory' || startsWith(matrix.os, 'ubuntu') }}
     runs-on: ${{ matrix.os }}
     strategy:
       # Don't bail the whole matrix on one cell's failure — we want to
@@ -57,7 +54,9 @@ jobs:
         # POSIX paths (`/tmp/...`) that fail on D:\ drive runners.
         # src/functions/obsidian-export.ts needs os.tmpdir() + path.join
         # rework before Windows can be added back. Tracked as follow-up.
-        os: [ubuntu-latest, macos-latest]
+        # Forks keep Linux only. Upstream keeps the full OS list.
+        # Revert the fromJSON expression to restore the static list.
+        os: ${{ fromJSON(github.repository == 'rohitg00/agentmemory' && '["ubuntu-latest","macos-latest"]' || '["ubuntu-latest"]') }}
         node-version: [20, 22, 24, 26]
     steps:
       - uses: actions/checkout@v7
