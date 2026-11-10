@@ -19,9 +19,11 @@ on:
       - "**/*.mdx"
   workflow_dispatch:
 
+# Same PR / ref: cancel the older run. This workflow does not run on
+# release or tag events, so in-progress cancellation is always on.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -34,7 +36,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-15-intel]
+        # Forks keep Linux only. Upstream keeps the full OS list.
+        # Revert the fromJSON expression to restore the static list.
+        os: ${{ fromJSON(github.repository == 'rohitg00/agentmemory' && '["ubuntu-latest","ubuntu-24.04-arm","macos-latest","macos-15-intel"]' || '["ubuntu-latest","ubuntu-24.04-arm"]') }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -89,6 +93,8 @@ jobs:
 
   windows-smoke:
     name: windows smoke (${{ matrix.os }})
+    # Windows smoke is upstream-only. Forks skip the whole job.
+    if: ${{ github.repository == 'rohitg00/agentmemory' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:

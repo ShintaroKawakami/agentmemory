@@ -32,11 +32,11 @@ on:
       - "**/*.mdx"
   workflow_dispatch:
 
-# Cancel in-flight PR runs when a force-push lands. Keep push runs to
-# protect against partial state on main.
+# Same PR / ref: cancel the older run. This workflow does not run on
+# release or tag events, so in-progress cancellation is always on.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -54,7 +54,9 @@ jobs:
         # POSIX paths (`/tmp/...`) that fail on D:\ drive runners.
         # src/functions/obsidian-export.ts needs os.tmpdir() + path.join
         # rework before Windows can be added back. Tracked as follow-up.
-        os: [ubuntu-latest, macos-latest]
+        # Forks keep Linux only. Upstream keeps the full OS list.
+        # Revert the fromJSON expression to restore the static list.
+        os: ${{ fromJSON(github.repository == 'rohitg00/agentmemory' && '["ubuntu-latest","macos-latest"]' || '["ubuntu-latest"]') }}
         node-version: [20, 22, 24, 26]
     steps:
       - uses: actions/checkout@v7
