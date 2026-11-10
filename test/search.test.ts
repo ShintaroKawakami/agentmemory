@@ -156,7 +156,7 @@ describe("mem::search", () => {
     ).rejects.toThrow("format must be one of");
   });
 
-  it("surfaces saved memories from KV.memories (#265)", async () => {
+  it("surfaces saved memories from KV.memories", async () => {
     // mem::remember persists to KV.memories under a synthetic sessionId
     // ("memory") that has no corresponding KV.observations entry. mem::search
     // must fall back to KV.memories or memory_recall returns empty.
@@ -186,6 +186,36 @@ describe("mem::search", () => {
     const hit = result.results.find((r) => r.obsId === "mem_x1");
     expect(hit).toBeDefined();
     expect(hit?.title).toBe("Pineapple belongs on pizza");
+  });
+
+  it("returns more than 3 saved memories when limit is 10", async () => {
+    for (let i = 0; i < 10; i++) {
+      await kv.set(KV.memories, `mem_uncap_${i}`, {
+        id: `mem_uncap_${i}`,
+        createdAt: `2026-03-01T00:00:0${i}Z`,
+        updatedAt: `2026-03-01T00:00:0${i}Z`,
+        type: "fact",
+        title: `Uncapped zebra recall ${i}`,
+        content: "Uncapped zebra recall marker used to verify search is not stuck at three hits.",
+        concepts: ["zebra-recall"],
+        files: [],
+        sessionIds: [],
+        strength: 7,
+        version: 1,
+        isLatest: true,
+      });
+    }
+    getSearchIndex().clear();
+    await rebuildIndex(kv as never);
+
+    const result = (await sdk.trigger("mem::search", {
+      query: "Uncapped zebra recall",
+      limit: 10,
+      targetLayer: "memory",
+    })) as { results: Array<{ observation: CompressedObservation }> };
+
+    expect(result.results.length).toBeGreaterThan(3);
+    expect(result.results.length).toBe(10);
   });
 
   it("fails closed for unscoped and other-project memories when project is filtered", async () => {
@@ -242,5 +272,22 @@ describe("mem::search", () => {
     // Cleanup
     setVectorIndex(null);
     setEmbeddingProvider(null);
+  });
+
+  it("a cold-start search rebuilds BM25 without touching the persisted vector index", async () => {
+    const vector = new VectorIndex();
+    vector.add("obs_persisted", "ses_1", new Float32Array([0.1, 0.2, 0.3]));
+    setVectorIndex(vector);
+    getSearchIndex().clear();
+
+    const result = (await sdk.trigger("mem::search", {
+      query: "auth middleware",
+    })) as { results: Array<{ observation: CompressedObservation }> };
+
+    expect(result.results[0]?.observation.id).toBe("obs_a");
+    expect(getVectorIndex()?.has("obs_persisted")).toBe(true);
+    expect(getVectorIndex()?.size).toBe(1);
+
+    setVectorIndex(null);
   });
 });
