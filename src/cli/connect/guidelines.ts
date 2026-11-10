@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { resolveDshHome } from "./util.js";
 
 // Activating memory for agents that have no auto-capture hooks: write a short
 // "use the memory tools" guideline into each agent's native rules mechanism so
@@ -112,8 +113,27 @@ export function guidelineTargets(
       scope: "global",
       source: "https://docs.factory.ai/cli/configuration/agents-md",
     },
+    // DeepSeek Harness loads $DSH_HOME/AGENTS.md into every session's first
+    // step via @deepseek-ai/dsh-agent-instructions (same mechanism as the
+    // project-level AGENTS.md chain). DSH_HOME override keeps this aligned
+    // with the dsh adapter, which resolves its profile paths through DSH_HOME.
+    dsh: {
+      globalPath: join(resolveDshHome(home), "AGENTS.md"),
+      projectPath: "AGENTS.md",
+      format: "block",
+      scope: "global",
+      source: "https://github.com/deepseek-ai/deepseek-harness",
+    },
     // Antigravity does NOT read AGENTS.md; global rules live in ~/.gemini/GEMINI.md.
     antigravity: {
+      globalPath: join(home, ".gemini", "GEMINI.md"),
+      projectPath: join(".agents", "rules", "agentmemory.md"),
+      format: "block",
+      scope: "global",
+      source: "https://antigravity.google/docs/rules-workflows",
+    },
+    // The agy CLI reads the same ~/.gemini/GEMINI.md as the IDE.
+    "antigravity-cli": {
       globalPath: join(home, ".gemini", "GEMINI.md"),
       projectPath: join(".agents", "rules", "agentmemory.md"),
       format: "block",
