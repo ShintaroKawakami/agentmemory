@@ -20,8 +20,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/') }}
 
 permissions:
   contents: read
@@ -29,6 +29,9 @@ permissions:
 jobs:
   packed-artifact:
     name: packed artifact (${{ matrix.os }})
+    # Forks skip macOS matrix cells (they still report skipped).
+    # Upstream keeps the full OS matrix. Revert this `if:` to restore.
+    if: github.repository == 'rohitg00/agentmemory' || startsWith(matrix.os, 'ubuntu')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -89,6 +92,8 @@ jobs:
 
   windows-smoke:
     name: windows smoke (${{ matrix.os }})
+    # Windows smoke is upstream-only. Forks skip the whole job.
+    if: github.repository == 'rohitg00/agentmemory'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:

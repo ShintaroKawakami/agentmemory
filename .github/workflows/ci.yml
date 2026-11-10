@@ -32,17 +32,19 @@ on:
       - "**/*.mdx"
   workflow_dispatch:
 
-# Cancel in-flight PR runs when a force-push lands. Keep push runs to
-# protect against partial state on main.
+# Same PR / ref: cancel the older run. Do not cancel release or tag runs.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/') }}
 
 permissions:
   contents: read
 
 jobs:
   test:
+    # Forks skip macOS/Windows matrix cells (they still report skipped).
+    # Upstream keeps the full OS matrix. Revert this `if:` to restore.
+    if: github.repository == 'rohitg00/agentmemory' || startsWith(matrix.os, 'ubuntu')
     runs-on: ${{ matrix.os }}
     strategy:
       # Don't bail the whole matrix on one cell's failure — we want to
